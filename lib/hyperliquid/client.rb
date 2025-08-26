@@ -7,6 +7,8 @@ require 'json'
 module Hyperliquid
   # HTTP client for making requests to Hyperliquid API
   class Client
+    # TODO:
+    # Unused for now. To be added to build_connection
     DEFAULT_RETRY_OPTIONS = {
       max: 2,
       interval: 0.5,
@@ -44,10 +46,8 @@ module Hyperliquid
         conn.options.timeout = timeout
         conn.options.read_timeout = Constants::DEFAULT_READ_TIMEOUT
 
-        # NOTE: Retry functionality can be added later if needed
+        # TODO:
         # conn.request :retry, DEFAULT_RETRY_OPTIONS
-
-        conn.adapter Faraday.default_adapter
       end
     end
 
