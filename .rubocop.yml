@@ -1,8 +1,16 @@
 AllCops:
-  TargetRubyVersion: 3.1
+  NewCops: enable
+  TargetRubyVersion: 3.4.3
 
-Style/StringLiterals:
-  EnforcedStyle: double_quotes
+# Allow longer methods for complex logic
+Metrics/MethodLength:
+  Max: 50
 
-Style/StringLiteralsInInterpolation:
-  EnforcedStyle: double_quotes
+# Allow higher complexity for response handling
+Metrics/AbcSize:
+  Max: 25
+
+# Allow longer blocks in specs - this is normal for tests
+Metrics/BlockLength:
+  Exclude:
+    - 'spec/**/*'

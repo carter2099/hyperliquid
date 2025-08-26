@@ -1,51 +1,197 @@
-# Hyperliquid
+# Hyperliquid Ruby SDK
 
+A Ruby SDK for interacting with the Hyperliquid decentralized exchange API.
 
----
-
-## UNDER DEVELOPMENT: PRE-ALPHA
-
----
-
-
-TODO: Delete this and the text below, and describe your gem
-
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/hyperliquid`. To experiment with that code, run `bin/console` for an interactive prompt.
+This is v0.1.0 - a read-only implementation focusing on the Info API endpoints for market data, user information, and order book data.
 
 ## Installation
 
-TODO: Replace `UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG` with your gem name right after releasing it to RubyGems.org. Please do not do it earlier due to security reasons. Alternatively, replace this section with instructions to install your gem from git if you don't plan to release to RubyGems.org.
+Add this line to your application's Gemfile:
 
-Install the gem and add to the application's Gemfile by executing:
-
-```bash
-bundle add UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+```ruby
+gem 'hyperliquid'
 ```
 
-If bundler is not being used to manage dependencies, install the gem by executing:
+And then execute:
 
-```bash
-gem install UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
-```
+    $ bundle install
+
+Or install it yourself as:
+
+    $ gem install hyperliquid
 
 ## Usage
 
-TODO: Write usage instructions here
+### Basic Setup
+
+```ruby
+require 'hyperliquid'
+
+# Create SDK instance (mainnet by default)
+sdk = Hyperliquid.new
+
+# Or use testnet
+testnet_sdk = Hyperliquid.new(testnet: true)
+
+# Access the Info API
+info = sdk.info
+```
+
+### Info API Methods
+
+The SDK provides access to all Hyperliquid Info API endpoints:
+
+#### Market Data
+
+```ruby
+# Get all market mid prices
+mids = sdk.info.all_mids
+# => { "BTC" => "50000", "ETH" => "3000", ... }
+
+# Get asset metadata
+meta = sdk.info.meta
+# => { "universe" => [...] }
+
+# Get extended asset metadata with contexts
+meta_ctxs = sdk.info.meta_and_asset_ctxs  
+# => { "universe" => [...], "assetCtxs" => [...] }
+
+# Get L2 order book for a coin
+book = sdk.info.l2_book("BTC")
+# => { "coin" => "BTC", "levels" => [[asks], [bids]], "time" => ... }
+
+# Get candlestick data
+candles = sdk.info.candles_snapshot("BTC", "1h", start_time, end_time)
+# => [{ "t" => ..., "o" => "50000", "h" => "51000", "l" => "49000", "c" => "50500", "v" => "100" }]
+```
+
+#### User Data
+
+```ruby
+user_address = "0x..." # Wallet address
+
+# Get user's open orders
+orders = sdk.info.open_orders(user_address)
+# => [{ "coin" => "BTC", "sz" => "0.1", "px" => "50000", "side" => "A" }]
+
+# Get user's fill history
+fills = sdk.info.user_fills(user_address)
+# => [{ "coin" => "BTC", "sz" => "0.1", "px" => "50000", "side" => "A", "time" => 1234567890 }]
+
+# Get user's trading state (positions, balances)
+state = sdk.info.user_state(user_address)
+# => { "assetPositions" => [...], "marginSummary" => {...} }
+
+# Get order status  
+status = sdk.info.order_status(user_address, order_id)
+# => { "status" => "filled", "sz" => "0.1", "px" => "50000" }
+```
+
+### Configuration
+
+```ruby
+# Custom timeout (default: 30 seconds)
+sdk = Hyperliquid.new(timeout: 60)
+
+# Check which environment you're using
+sdk.testnet?  # => false
+sdk.base_url  # => "https://api.hyperliquid.xyz"
+```
+
+### Error Handling
+
+The SDK provides comprehensive error handling:
+
+```ruby
+begin
+  orders = sdk.info.open_orders(user_address)
+rescue Hyperliquid::AuthenticationError
+  # Handle authentication issues
+rescue Hyperliquid::RateLimitError  
+  # Handle rate limiting
+rescue Hyperliquid::ServerError
+  # Handle server errors
+rescue Hyperliquid::NetworkError
+  # Handle network connectivity issues
+rescue Hyperliquid::Error => e
+  # Handle any other Hyperliquid API errors
+  puts "Error: #{e.message}"
+  puts "Status: #{e.status_code}" if e.status_code
+  puts "Response: #{e.response_body}" if e.response_body
+end
+```
+
+Available error classes:
+- `Hyperliquid::Error` - Base error class
+- `Hyperliquid::ClientError` - 4xx errors
+- `Hyperliquid::ServerError` - 5xx errors
+- `Hyperliquid::AuthenticationError` - 401 errors
+- `Hyperliquid::BadRequestError` - 400 errors
+- `Hyperliquid::NotFoundError` - 404 errors
+- `Hyperliquid::RateLimitError` - 429 errors
+- `Hyperliquid::NetworkError` - Connection issues
+- `Hyperliquid::TimeoutError` - Request timeouts
+
+## API Reference
+
+### Hyperliquid.new(options = {})
+
+Creates a new SDK instance.
+
+**Parameters:**
+- `testnet` (Boolean) - Use testnet instead of mainnet (default: false)  
+- `timeout` (Integer) - Request timeout in seconds (default: 30)
+
+### Info API Methods
+
+All Info methods return parsed JSON responses from the Hyperliquid API.
+
+#### Market Data Methods
+- `all_mids()` - Get all market mid prices
+- `meta()` - Get asset metadata
+- `meta_and_asset_ctxs()` - Get extended asset metadata
+- `l2_book(coin)` - Get L2 order book for a coin
+- `candles_snapshot(coin, interval, start_time, end_time)` - Get candlestick data
+
+#### User Data Methods  
+- `open_orders(user)` - Get user's open orders
+- `user_fills(user)` - Get user's fill history
+- `user_state(user)` - Get user's trading state
+- `order_status(user, oid)` - Get order status
 
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
+Run the example:
+```bash
+ruby example.rb
+```
+
+Run tests:
+```bash  
+bundle exec rspec
+```
+
+Run linting:
+```bash
+bundle exec rubocop
+```
+
 To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+
+## Roadmap
+
+This is v0.1.0 with read-only Info API support. Future versions will include:
+
+- v0.2.0: Trading API (place orders, cancel orders, etc.)
+- v0.3.0: WebSocket support for real-time data
+- v0.4.0: Advanced trading features
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/hyperliquid. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [code of conduct](https://github.com/[USERNAME]/hyperliquid/blob/main/CODE_OF_CONDUCT.md).
+Bug reports and pull requests are welcome on GitHub at https://github.com/carter2099/hyperliquid.
 
 ## License
 
 The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
-
-## Code of Conduct
-
-Everyone interacting in the Hyperliquid project's codebases, issue trackers, chat rooms and mailing lists is expected to follow the [code of conduct](https://github.com/[USERNAME]/hyperliquid/blob/main/CODE_OF_CONDUCT.md).
