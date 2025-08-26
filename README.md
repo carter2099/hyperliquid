@@ -2,7 +2,7 @@
 
 A Ruby SDK for interacting with the Hyperliquid decentralized exchange API.
 
-This is v0.1.0 - a read-only implementation focusing on the Info API endpoints for market data, user information, and order book data.
+This is v0.1.0 - an alpha-stage read-only implementation focusing on the Info API endpoints for market data, user information, and order book data.
 
 ## Installation
 
