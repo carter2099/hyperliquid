@@ -21,11 +21,25 @@ module Hyperliquid
       ]
     }.freeze
 
+    # Initialize a new HTTP client
+    # @param base_url [String] The base URL for the API
+    # @param timeout [Integer] Request timeout in seconds (default: Constants::DEFAULT_TIMEOUT)
     def initialize(base_url:, timeout: Constants::DEFAULT_TIMEOUT)
       @connection = build_connection(base_url, timeout)
     end
 
     # Make a POST request to the API
+    # @param endpoint [String] The API endpoint to make the request to
+    # @param body [Hash] The request body as a hash (default: {})
+    # @return [Hash, String] The parsed JSON response or raw response body
+    # @raise [NetworkError] When connection fails
+    # @raise [TimeoutError] When request times out
+    # @raise [BadRequestError] When API returns 400 status
+    # @raise [AuthenticationError] When API returns 401 status
+    # @raise [NotFoundError] When API returns 404 status
+    # @raise [RateLimitError] When API returns 429 status
+    # @raise [ServerError] When API returns 5xx status
+    # @raise [ClientError] When API returns unexpected status
     def post(endpoint, body = {})
       response = @connection.post(endpoint) do |req|
         req.headers['Content-Type'] = 'application/json'
