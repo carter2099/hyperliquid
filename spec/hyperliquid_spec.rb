@@ -20,9 +20,20 @@ RSpec.describe Hyperliquid do
       expect(sdk.base_url).to eq(Hyperliquid::Constants::TESTNET_API_URL)
     end
 
+    it 'uses default timeout when none specified' do
+      sdk = Hyperliquid.new
+      client = sdk.info.instance_variable_get(:@client)
+      connection = client.instance_variable_get(:@connection)
+      expect(connection.options.timeout).to eq(Hyperliquid::Constants::DEFAULT_TIMEOUT)
+    end
+
     it 'creates a new SDK instance with custom timeout' do
       sdk = Hyperliquid.new(timeout: 60)
       expect(sdk).to be_a(Hyperliquid::SDK)
+      
+      client = sdk.info.instance_variable_get(:@client)
+      connection = client.instance_variable_get(:@connection)
+      expect(connection.options.timeout).to eq(60)
     end
   end
 
