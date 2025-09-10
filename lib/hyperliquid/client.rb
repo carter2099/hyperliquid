@@ -23,7 +23,9 @@ module Hyperliquid
     # Initialize a new HTTP client
     # @param base_url [String] The base URL for the API
     # @param timeout [Integer] Request timeout in seconds (default: Constants::DEFAULT_TIMEOUT)
-    def initialize(base_url:, timeout: Constants::DEFAULT_TIMEOUT)
+    # @param retry_enabled [Boolean] Whether to enable retry logic (default: false)
+    def initialize(base_url:, timeout: Constants::DEFAULT_TIMEOUT, retry_enabled: false)
+      @retry_enabled = retry_enabled
       @connection = build_connection(base_url, timeout)
     end
 
@@ -62,7 +64,7 @@ module Hyperliquid
       Faraday.new(url: base_url) do |conn|
         conn.options.timeout = timeout
         conn.options.read_timeout = Constants::DEFAULT_READ_TIMEOUT
-        conn.request :retry, DEFAULT_RETRY_OPTIONS
+        conn.request :retry, DEFAULT_RETRY_OPTIONS if @retry_enabled
       end
     end
 

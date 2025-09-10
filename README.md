@@ -93,10 +93,32 @@ status = sdk.info.order_status(user_address, order_id)
 # Custom timeout (default: 30 seconds)
 sdk = Hyperliquid.new(timeout: 60)
 
+# Enable retry logic for handling transient failures (default: disabled)
+sdk = Hyperliquid.new(retry_enabled: true)
+
+# Combine multiple configuration options
+sdk = Hyperliquid.new(testnet: true, timeout: 60, retry_enabled: true)
+
 # Check which environment you're using
 sdk.testnet?  # => false
 sdk.base_url  # => "https://api.hyperliquid.xyz"
 ```
+
+#### Retry Configuration
+
+By default, retry logic is **disabled** for predictable API behavior. When enabled, the SDK will automatically retry requests that fail due to:
+
+- Network connectivity issues (connection failed, timeouts)
+- Server errors (5xx status codes)
+- Rate limiting (429 status codes)
+
+**Retry Settings:**
+- Maximum retries: 2
+- Base interval: 0.5 seconds
+- Backoff factor: 2x (exponential backoff)
+- Randomness: ±50% to prevent thundering herd
+
+**Note:** Retries are disabled by default to avoid unexpected delays in time-sensitive trading applications. Enable only when you want automatic handling of transient failures.
 
 ### Error Handling
 
@@ -141,6 +163,7 @@ Creates a new SDK instance.
 **Parameters:**
 - `testnet` (Boolean) - Use testnet instead of mainnet (default: false)  
 - `timeout` (Integer) - Request timeout in seconds (default: 30)
+- `retry_enabled` (Boolean) - Enable automatic retry logic for transient failures (default: false)
 
 ### Info API Methods
 

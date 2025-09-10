@@ -12,9 +12,10 @@ module Hyperliquid
   # Create a new SDK instance
   # @param testnet [Boolean] Whether to use testnet (default: false for mainnet)
   # @param timeout [Integer] Request timeout in seconds (default: 30)
+  # @param retry_enabled [Boolean] Whether to enable retry logic (default: false)
   # @return [Hyperliquid::SDK] A new SDK instance
-  def self.new(testnet: false, timeout: Constants::DEFAULT_TIMEOUT)
-    SDK.new(testnet: testnet, timeout: timeout)
+  def self.new(testnet: false, timeout: Constants::DEFAULT_TIMEOUT, retry_enabled: false)
+    SDK.new(testnet: testnet, timeout: timeout, retry_enabled: retry_enabled)
   end
 
   # Main SDK class
@@ -24,9 +25,10 @@ module Hyperliquid
     # Initialize the SDK
     # @param testnet [Boolean] Whether to use testnet (default: false for mainnet)
     # @param timeout [Integer] Request timeout in seconds
-    def initialize(testnet: false, timeout: Constants::DEFAULT_TIMEOUT)
+    # @param retry_enabled [Boolean] Whether to enable retry logic (default: false)
+    def initialize(testnet: false, timeout: Constants::DEFAULT_TIMEOUT, retry_enabled: false)
       base_url = testnet ? Constants::TESTNET_API_URL : Constants::MAINNET_API_URL
-      client = Client.new(base_url: base_url, timeout: timeout)
+      client = Client.new(base_url: base_url, timeout: timeout, retry_enabled: retry_enabled)
 
       @info = Info.new(client)
       @testnet = testnet
