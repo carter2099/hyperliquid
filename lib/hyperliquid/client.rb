@@ -7,14 +7,13 @@ require 'json'
 module Hyperliquid
   # HTTP client for making requests to Hyperliquid API
   class Client
-    # TODO:
-    # Unused for now. To be added to build_connection
+    # Default retry configuration for API requests
     DEFAULT_RETRY_OPTIONS = {
       max: 2,
       interval: 0.5,
       interval_randomness: 0.5,
       backoff_factor: 2,
-      retry_statuses: [502, 503, 504],
+      retry_statuses: [429, 502, 503, 504],
       exceptions: [
         Faraday::ConnectionFailed,
         Faraday::TimeoutError
@@ -47,6 +46,10 @@ module Hyperliquid
       end
 
       handle_response(response)
+    rescue Faraday::RetriableResponse => e
+      # After retries are exhausted, Faraday throws a RetriableResponse
+      # Catch and handle that here to bubble up the actual network error
+      handle_response(e.response)
     rescue Faraday::ConnectionFailed => e
       raise NetworkError, "Connection failed: #{e.message}"
     rescue Faraday::TimeoutError => e
@@ -59,9 +62,7 @@ module Hyperliquid
       Faraday.new(url: base_url) do |conn|
         conn.options.timeout = timeout
         conn.options.read_timeout = Constants::DEFAULT_READ_TIMEOUT
-
-        # TODO:
-        # conn.request :retry, DEFAULT_RETRY_OPTIONS
+        conn.request :retry, DEFAULT_RETRY_OPTIONS
       end
     end
 

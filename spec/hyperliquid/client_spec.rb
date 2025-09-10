@@ -146,6 +146,73 @@ RSpec.describe Hyperliquid::Client do
     end
   end
 
+  describe 'retry behavior' do
+    context 'retry configuration' do
+      it 'configures retry middleware with correct options' do
+        expect(described_class::DEFAULT_RETRY_OPTIONS[:max]).to eq(2)
+        expect(described_class::DEFAULT_RETRY_OPTIONS[:interval]).to eq(0.5)
+        expect(described_class::DEFAULT_RETRY_OPTIONS[:backoff_factor]).to eq(2)
+        expect(described_class::DEFAULT_RETRY_OPTIONS[:retry_statuses]).to include(429, 502, 503, 504)
+        expect(described_class::DEFAULT_RETRY_OPTIONS[:exceptions]).to include(Faraday::ConnectionFailed, Faraday::TimeoutError)
+      end
+
+      it 'enables retry middleware on connection' do
+        # Verify that retry middleware is configured by checking the connection
+        connection = client.instance_variable_get(:@connection)
+        builder = connection.builder
+        
+        # Check that retry middleware is in the stack
+        middleware_names = builder.handlers.map(&:name)
+        expect(middleware_names).to include('Faraday::Retry::Middleware')
+      end
+    end
+
+    context 'error handling with retries enabled' do
+      it 'includes retry statuses for server errors' do
+        # Verify that server errors that would normally be retried are configured correctly
+        retry_statuses = described_class::DEFAULT_RETRY_OPTIONS[:retry_statuses]
+        
+        expect(retry_statuses).to include(429) # Rate limiting
+        expect(retry_statuses).to include(502) # Bad gateway
+        expect(retry_statuses).to include(503) # Service unavailable  
+        expect(retry_statuses).to include(504) # Gateway timeout
+      end
+
+      it 'includes connection exceptions for retry' do
+        retry_exceptions = described_class::DEFAULT_RETRY_OPTIONS[:exceptions]
+        
+        expect(retry_exceptions).to include(Faraday::ConnectionFailed)
+        expect(retry_exceptions).to include(Faraday::TimeoutError)
+      end
+    end
+
+    context 'non-retryable errors' do
+      it 'does not retry 400 bad request errors' do
+        stub_request(:post, full_url)
+          .to_return(status: 400, body: { 'error' => 'Bad request' }.to_json)
+
+        expect { client.post(endpoint) }.to raise_error(Hyperliquid::BadRequestError)
+        expect(a_request(:post, full_url)).to have_been_made.once
+      end
+
+      it 'does not retry 401 authentication errors' do
+        stub_request(:post, full_url)
+          .to_return(status: 401, body: { 'error' => 'Unauthorized' }.to_json)
+
+        expect { client.post(endpoint) }.to raise_error(Hyperliquid::AuthenticationError)
+        expect(a_request(:post, full_url)).to have_been_made.once
+      end
+
+      it 'does not retry 404 not found errors' do
+        stub_request(:post, full_url)
+          .to_return(status: 404, body: { 'error' => 'Not found' }.to_json)
+
+        expect { client.post(endpoint) }.to raise_error(Hyperliquid::NotFoundError)
+        expect(a_request(:post, full_url)).to have_been_made.once
+      end
+    end
+  end
+
   describe 'initialization' do
     it 'creates client with default timeout' do
       client = described_class.new(base_url: base_url)
