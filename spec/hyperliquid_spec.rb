@@ -30,10 +30,45 @@ RSpec.describe Hyperliquid do
     it 'creates a new SDK instance with custom timeout' do
       sdk = Hyperliquid.new(timeout: 60)
       expect(sdk).to be_a(Hyperliquid::SDK)
-      
+
       client = sdk.info.instance_variable_get(:@client)
       connection = client.instance_variable_get(:@connection)
       expect(connection.options.timeout).to eq(60)
+    end
+
+    it 'disables retry logic by default' do
+      sdk = Hyperliquid.new
+      client = sdk.info.instance_variable_get(:@client)
+      connection = client.instance_variable_get(:@connection)
+      builder = connection.builder
+
+      middleware_names = builder.handlers.map(&:name)
+      expect(middleware_names).not_to include('Faraday::Retry::Middleware')
+    end
+
+    it 'enables retry logic when retry_enabled is true' do
+      sdk = Hyperliquid.new(retry_enabled: true)
+      client = sdk.info.instance_variable_get(:@client)
+      connection = client.instance_variable_get(:@connection)
+      builder = connection.builder
+
+      middleware_names = builder.handlers.map(&:name)
+      expect(middleware_names).to include('Faraday::Retry::Middleware')
+    end
+
+    it 'creates a new SDK instance with all configuration options' do
+      sdk = Hyperliquid.new(testnet: true, timeout: 45, retry_enabled: true)
+      expect(sdk).to be_a(Hyperliquid::SDK)
+      expect(sdk.testnet?).to be true
+      expect(sdk.base_url).to eq(Hyperliquid::Constants::TESTNET_API_URL)
+
+      client = sdk.info.instance_variable_get(:@client)
+      connection = client.instance_variable_get(:@connection)
+      expect(connection.options.timeout).to eq(45)
+
+      builder = connection.builder
+      middleware_names = builder.handlers.map(&:name)
+      expect(middleware_names).to include('Faraday::Retry::Middleware')
     end
   end
 

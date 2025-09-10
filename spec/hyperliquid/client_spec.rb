@@ -156,12 +156,12 @@ RSpec.describe Hyperliquid::Client do
         expect(described_class::DEFAULT_RETRY_OPTIONS[:exceptions]).to include(Faraday::ConnectionFailed, Faraday::TimeoutError)
       end
 
-      it 'enables retry middleware on connection' do
-        # Verify that retry middleware is configured by checking the connection
-        connection = client.instance_variable_get(:@connection)
+      it 'enables retry middleware on connection when retry_enabled is true' do
+        retry_client = described_class.new(base_url: base_url, retry_enabled: true)
+
+        connection = retry_client.instance_variable_get(:@connection)
         builder = connection.builder
-        
-        # Check that retry middleware is in the stack
+
         middleware_names = builder.handlers.map(&:name)
         expect(middleware_names).to include('Faraday::Retry::Middleware')
       end
@@ -169,18 +169,17 @@ RSpec.describe Hyperliquid::Client do
 
     context 'error handling with retries enabled' do
       it 'includes retry statuses for server errors' do
-        # Verify that server errors that would normally be retried are configured correctly
         retry_statuses = described_class::DEFAULT_RETRY_OPTIONS[:retry_statuses]
-        
-        expect(retry_statuses).to include(429) # Rate limiting
-        expect(retry_statuses).to include(502) # Bad gateway
-        expect(retry_statuses).to include(503) # Service unavailable  
-        expect(retry_statuses).to include(504) # Gateway timeout
+
+        expect(retry_statuses).to include(429)
+        expect(retry_statuses).to include(502)
+        expect(retry_statuses).to include(503)
+        expect(retry_statuses).to include(504)
       end
 
       it 'includes connection exceptions for retry' do
         retry_exceptions = described_class::DEFAULT_RETRY_OPTIONS[:exceptions]
-        
+
         expect(retry_exceptions).to include(Faraday::ConnectionFailed)
         expect(retry_exceptions).to include(Faraday::TimeoutError)
       end
@@ -222,6 +221,36 @@ RSpec.describe Hyperliquid::Client do
     it 'creates client with custom timeout' do
       client = described_class.new(base_url: base_url, timeout: 60)
       expect(client).to be_a(described_class)
+    end
+
+    it 'creates client with retry disabled by default' do
+      client = described_class.new(base_url: base_url)
+      connection = client.instance_variable_get(:@connection)
+      builder = connection.builder
+
+      middleware_names = builder.handlers.map(&:name)
+      expect(middleware_names).not_to include('Faraday::Retry::Middleware')
+    end
+
+    it 'creates client with retry enabled when specified' do
+      client = described_class.new(base_url: base_url, retry_enabled: true)
+      connection = client.instance_variable_get(:@connection)
+      builder = connection.builder
+
+      middleware_names = builder.handlers.map(&:name)
+      expect(middleware_names).to include('Faraday::Retry::Middleware')
+    end
+
+    it 'creates client with all configuration options' do
+      client = described_class.new(base_url: base_url, timeout: 45, retry_enabled: true)
+      expect(client).to be_a(described_class)
+
+      connection = client.instance_variable_get(:@connection)
+      expect(connection.options.timeout).to eq(45)
+
+      builder = connection.builder
+      middleware_names = builder.handlers.map(&:name)
+      expect(middleware_names).to include('Faraday::Retry::Middleware')
     end
   end
 end
