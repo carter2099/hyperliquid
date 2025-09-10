@@ -5,6 +5,7 @@ require 'spec_helper'
 RSpec.describe Hyperliquid::Client do
   let(:base_url) { 'https://api.example.com' }
   let(:client) { described_class.new(base_url: base_url) }
+  let(:retry_client) { described_class.new(base_url: base_url, retry_enabled: true) }
   let(:endpoint) { '/test' }
   let(:full_url) { "#{base_url}#{endpoint}" }
 
@@ -157,8 +158,6 @@ RSpec.describe Hyperliquid::Client do
       end
 
       it 'enables retry middleware on connection when retry_enabled is true' do
-        retry_client = described_class.new(base_url: base_url, retry_enabled: true)
-
         connection = retry_client.instance_variable_get(:@connection)
         builder = connection.builder
 
@@ -190,7 +189,7 @@ RSpec.describe Hyperliquid::Client do
         stub_request(:post, full_url)
           .to_return(status: 400, body: { 'error' => 'Bad request' }.to_json)
 
-        expect { client.post(endpoint) }.to raise_error(Hyperliquid::BadRequestError)
+        expect { retry_client.post(endpoint) }.to raise_error(Hyperliquid::BadRequestError)
         expect(a_request(:post, full_url)).to have_been_made.once
       end
 
@@ -198,7 +197,7 @@ RSpec.describe Hyperliquid::Client do
         stub_request(:post, full_url)
           .to_return(status: 401, body: { 'error' => 'Unauthorized' }.to_json)
 
-        expect { client.post(endpoint) }.to raise_error(Hyperliquid::AuthenticationError)
+        expect { retry_client.post(endpoint) }.to raise_error(Hyperliquid::AuthenticationError)
         expect(a_request(:post, full_url)).to have_been_made.once
       end
 
@@ -206,7 +205,7 @@ RSpec.describe Hyperliquid::Client do
         stub_request(:post, full_url)
           .to_return(status: 404, body: { 'error' => 'Not found' }.to_json)
 
-        expect { client.post(endpoint) }.to raise_error(Hyperliquid::NotFoundError)
+        expect { retry_client.post(endpoint) }.to raise_error(Hyperliquid::NotFoundError)
         expect(a_request(:post, full_url)).to have_been_made.once
       end
     end
@@ -233,8 +232,7 @@ RSpec.describe Hyperliquid::Client do
     end
 
     it 'creates client with retry enabled when specified' do
-      client = described_class.new(base_url: base_url, retry_enabled: true)
-      connection = client.instance_variable_get(:@connection)
+      connection = retry_client.instance_variable_get(:@connection)
       builder = connection.builder
 
       middleware_names = builder.handlers.map(&:name)
