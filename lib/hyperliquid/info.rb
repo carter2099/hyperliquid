@@ -78,5 +78,48 @@ module Hyperliquid
                      }
                    })
     end
+
+    # ============================
+    # Spot-specific info endpoints
+    # ============================
+
+    # Get spot metadata
+    # @return [Hash] Spot tokens and universe metadata
+    def spot_meta
+      @client.post(Constants::INFO_ENDPOINT, { type: 'spotMeta' })
+    end
+
+    # Get spot metadata and asset contexts
+    # @return [Array] [spot_meta, spot_asset_ctxs]
+    def spot_meta_and_asset_ctxs
+      @client.post(Constants::INFO_ENDPOINT, { type: 'spotMetaAndAssetCtxs' })
+    end
+
+    # Get a user's spot token balances
+    # @param user [String] Wallet address
+    # @return [Hash] Object containing balances array
+    def spot_balances(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'spotClearinghouseState', user: user })
+    end
+
+    # Get Spot Deploy Auction state for a user
+    # @param user [String] Wallet address
+    # @return [Hash] Spot deploy state
+    def spot_deploy_state(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'spotDeployState', user: user })
+    end
+
+    # Get Spot Pair Deploy Auction status
+    # @return [Hash] Auction timing and gas parameters
+    def spot_pair_deploy_auction_status
+      @client.post(Constants::INFO_ENDPOINT, { type: 'spotPairDeployAuctionStatus' })
+    end
+
+    # Get token details by tokenId
+    # @param token_id [String] 34-character hexadecimal token id
+    # @return [Hash] Token details
+    def token_details(token_id)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'tokenDetails', tokenId: token_id })
+    end
   end
 end
