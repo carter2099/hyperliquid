@@ -2,7 +2,7 @@
 
 A Ruby SDK for interacting with the Hyperliquid decentralized exchange API.
 
-This is v0.1.0 - an alpha-stage read-only implementation focusing on the Info API endpoints for market data, user information, and order book data.
+The latest version is v0.2.0 - a read-only implementation focusing on the Info API endpoints for market data, user information, and order book data.
 
 ## Installation
 
@@ -208,11 +208,11 @@ rake rubocop
 
 ## Roadmap
 
-This is v0.1.0 with read-only Info API support. Future versions will include:
+The latest version is v0.2.0 with read-only Info API support. Future versions will include:
 
-- v0.2.0: Trading API (place orders, cancel orders, etc.)
-- v0.3.0: WebSocket support for real-time data
-- v0.4.0: Advanced trading features
+- Trading API (place orders, cancel orders, etc.)
+- WebSocket support for real-time data
+- Advanced trading features
 
 ## Contributing
 
