@@ -41,7 +41,7 @@ info = sdk.info
 
 The SDK provides access to all Hyperliquid Info API endpoints:
 
-#### Market Data
+#### Perpetuals
 
 ```ruby
 # Get all market mid prices
@@ -65,7 +65,39 @@ candles = sdk.info.candles_snapshot("BTC", "1h", start_time, end_time)
 # => [{ "t" => ..., "o" => "50000", "h" => "51000", "l" => "49000", "c" => "50500", "v" => "100" }]
 ```
 
-#### User Data
+Note: `l2_book` and `candles_snapshot` work for both Perpetuals and Spot. For spot, use `"{BASE}/USDC"` when available (e.g., `"PURR/USDC"`). Otherwise, use the index alias `"@{index}"` from `spot_meta["universe"]`.
+
+#### Spot
+
+```ruby
+# Spot metadata (tokens and spot universe)
+spot_meta = sdk.info.spot_meta
+# => { "tokens" => [...], "universe" => [...] }
+
+# Spot metadata and asset contexts
+spot_meta_ctxs = sdk.info.spot_meta_and_asset_ctxs
+# => [ { "tokens" => [...], "universe" => [...] }, [ { "midPx" => "...", ... } ] ]
+
+# A user's spot token balances
+balances = sdk.info.spot_balances(user_address)
+# => { "balances" => [{ "coin" => "USDC", "token" => 0, "total" => "..." }, ...] }
+
+# Spot deploy auction state (Dutch auction for deploying new base tokens)
+deploy_state = sdk.info.spot_deploy_state(user_address)
+# => { "states" => [...], "gasAuction" => { ... } }
+
+# Spot pair deploy auction status (Dutch auction for new spot pairs)
+pair_status = sdk.info.spot_pair_deploy_auction_status
+# => { "startTimeSeconds" => ..., "durationSeconds" => ..., "startGas" => "...", ... }
+
+# Token details by tokenId (34-char hex id)
+details = sdk.info.token_details("0x00000000000000000000000000000000")
+# => { "name" => "TEST", "maxSupply" => "...", "midPx" => "...", ... }
+```
+
+#### User Data (Perpetuals and Spot)
+
+The following endpoints apply to both Perpetuals and Spot. For Spot responses, coins/pairs in results will follow the Spot coin naming described above.
 
 ```ruby
 user_address = "0x..." # Wallet address
@@ -78,13 +110,17 @@ orders = sdk.info.open_orders(user_address)
 fills = sdk.info.user_fills(user_address)
 # => [{ "coin" => "BTC", "sz" => "0.1", "px" => "50000", "side" => "A", "time" => 1234567890 }]
 
-# Get user's trading state (positions, balances)
+# Get user's trading state (Perpetuals only)
 state = sdk.info.user_state(user_address)
 # => { "assetPositions" => [...], "marginSummary" => {...} }
 
 # Get order status  
 status = sdk.info.order_status(user_address, order_id)
 # => { "status" => "filled", "sz" => "0.1", "px" => "50000" }
+
+# Spot balances (Spot only)
+spot_state = sdk.info.spot_balances(user_address)
+# => { "balances" => [...] }
 ```
 
 ### Configuration
@@ -169,17 +205,25 @@ Creates a new SDK instance.
 
 All Info methods return parsed JSON responses from the Hyperliquid API.
 
-#### Market Data Methods
+#### Perpetuals Methods
 - `all_mids()` - Get all market mid prices
 - `meta()` - Get asset metadata
 - `meta_and_asset_ctxs()` - Get extended asset metadata
 - `l2_book(coin)` - Get L2 order book for a coin
 - `candles_snapshot(coin, interval, start_time, end_time)` - Get candlestick data
 
+#### Spot Methods
+- `spot_meta()` - Retrieve spot metadata (tokens and universe)
+- `spot_meta_and_asset_ctxs()` - Retrieve spot metadata and asset contexts
+- `spot_balances(user)` - Retrieve a user's spot token balances
+- `spot_deploy_state(user)` - Retrieve Spot Deploy Auction information
+- `spot_pair_deploy_auction_status()` - Retrieve Spot Pair Deploy Auction status
+- `token_details(token_id)` - Retrieve information about a token by tokenId
+
 #### User Data Methods  
 - `open_orders(user)` - Get user's open orders
 - `user_fills(user)` - Get user's fill history
-- `user_state(user)` - Get user's trading state
+- `user_state(user)` - Get user's trading state (Perpetuals only)
 - `order_status(user, oid)` - Get order status
 
 ## Development
