@@ -35,4 +35,7 @@ Gem::Specification.new do |spec|
   # Add gem dependencies
   spec.add_dependency 'faraday', '~> 2.0'
   spec.add_dependency 'faraday-retry', '~> 2.0'
+  spec.add_dependency 'eth'
+  spec.add_dependency 'msgpack'
+  spec.add_dependency 'keccak', '~> 1.3'
 end

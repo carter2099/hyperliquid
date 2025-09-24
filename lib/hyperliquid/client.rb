@@ -44,7 +44,13 @@ module Hyperliquid
     def post(endpoint, body = {})
       response = @connection.post(endpoint) do |req|
         req.headers['Content-Type'] = 'application/json'
-        req.body = body.to_json unless body.empty?
+        if !body.empty?
+          payload = body.to_json
+          if ENV['HL_DEBUG_HTTP'] == '1'
+            warn "POST #{endpoint} => #{payload}"
+          end
+          req.body = payload
+        end
       end
 
       handle_response(response)

@@ -9,6 +9,7 @@ module Hyperliquid
 
     # API endpoints
     INFO_ENDPOINT = '/info'
+    EXCHANGE_ENDPOINT = '/exchange'
 
     # Request timeouts (seconds)
     DEFAULT_TIMEOUT = 30

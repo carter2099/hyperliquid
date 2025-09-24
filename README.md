@@ -2,7 +2,7 @@
 
 A Ruby SDK for interacting with the Hyperliquid decentralized exchange API.
 
-This is v0.1.0 - an alpha-stage read-only implementation focusing on the Info API endpoints for market data, user information, and order book data.
+This is v0.1.0 - an alpha-stage implementation focusing on the Info API endpoints for market data, user information, and order book data.
 
 ## Installation
 
@@ -19,6 +19,22 @@ And then execute:
 Or install it yourself as:
 
     $ gem install hyperliquid
+
+### Platform prerequisites for native dependencies
+
+This gem depends on `eth`, which pulls in `rbsecp256k1` (a native extension). If you see "Failed to build gem native extension" during installation, make sure build tools are installed on your system.
+
+- macOS (Homebrew):
+```bash
+xcode-select --install  # if not already installed
+brew install autoconf automake libtool pkg-config
+```
+
+- Debian/Ubuntu:
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential autoconf automake libtool pkg-config
+```
 
 ## Usage
 
@@ -86,6 +102,8 @@ state = sdk.info.user_state(user_address)
 status = sdk.info.order_status(user_address, order_id)
 # => { "status" => "filled", "sz" => "0.1", "px" => "50000" }
 ```
+
+### Exchange API 
 
 ### Configuration
 
@@ -210,7 +228,7 @@ rake rubocop
 
 This is v0.1.0 with read-only Info API support. Future versions will include:
 
-- v0.2.0: Trading API (place orders, cancel orders, etc.)
+- v0.2.0: Trading API (signing + place orders, cancel orders, etc.)
 - v0.3.0: WebSocket support for real-time data
 - v0.4.0: Advanced trading features
 

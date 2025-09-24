@@ -5,6 +5,8 @@ require_relative 'hyperliquid/constants'
 require_relative 'hyperliquid/errors'
 require_relative 'hyperliquid/client'
 require_relative 'hyperliquid/info'
+require_relative 'hyperliquid/exchange'
+require_relative 'hyperliquid/signing'
 
 # Ruby SDK for Hyperliquid API
 # Provides read-only access to Hyperliquid's decentralized exchange API
@@ -20,7 +22,7 @@ module Hyperliquid
 
   # Main SDK class
   class SDK
-    attr_reader :info
+    attr_reader :info, :exchange
 
     # Initialize the SDK
     # @param testnet [Boolean] Whether to use testnet (default: false for mainnet)
@@ -31,6 +33,7 @@ module Hyperliquid
       client = Client.new(base_url: base_url, timeout: timeout, retry_enabled: retry_enabled)
 
       @info = Info.new(client)
+      @exchange = Exchange.new(client)
       @testnet = testnet
     end
 
