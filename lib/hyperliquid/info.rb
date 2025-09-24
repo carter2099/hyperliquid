@@ -7,6 +7,16 @@ module Hyperliquid
       @client = client
     end
 
+    # ============================
+    # Perpetuals-specific endpoints
+    # ============================
+
+    # Retrieve all perpetual dexs
+    # @return [Array]
+    def perp_dexs
+      @client.post(Constants::INFO_ENDPOINT, { type: 'perpDexs' })
+    end
+
     # Get all market mid prices
     # @return [Hash] Hash containing mid prices for all markets
     def all_mids
@@ -37,15 +47,21 @@ module Hyperliquid
 
     # Get user's trading state
     # @param user [String] Wallet address
+    # @param dex [String, nil] Optional perp dex name
     # @return [Hash] User's trading state including positions and balances
-    def user_state(user)
-      @client.post(Constants::INFO_ENDPOINT, { type: 'clearinghouseState', user: user })
+    def user_state(user, dex: nil)
+      body = { type: 'clearinghouseState', user: user }
+      body[:dex] = dex if dex
+      @client.post(Constants::INFO_ENDPOINT, body)
     end
 
     # Get metadata for all assets
     # @return [Hash] Metadata for all tradable assets
-    def meta
-      @client.post(Constants::INFO_ENDPOINT, { type: 'meta' })
+    # @param dex [String, nil] Optional perp dex name (defaults to first perp dex when not provided)
+    def meta(dex: nil)
+      body = { type: 'meta' }
+      body[:dex] = dex if dex
+      @client.post(Constants::INFO_ENDPOINT, body)
     end
 
     # Get metadata for all assets including universe info
@@ -77,6 +93,72 @@ module Hyperliquid
                        endTime: end_time
                      }
                    })
+    end
+
+    # Retrieve a user's funding history
+    # @param user [String]
+    # @param start_time [Integer]
+    # @param end_time [Integer, nil]
+    # @return [Array]
+    def user_funding(user, start_time, end_time = nil)
+      body = { type: 'userFunding', user: user, startTime: start_time }
+      body[:endTime] = end_time if end_time
+      @client.post(Constants::INFO_ENDPOINT, body)
+    end
+
+    # Retrieve a user's non-funding ledger updates
+    # @param user [String]
+    # @param start_time [Integer]
+    # @param end_time [Integer, nil]
+    # @return [Array]
+    def user_non_funding_ledger_updates(user, start_time, end_time = nil)
+      body = { type: 'userNonFundingLedgerUpdates', user: user, startTime: start_time }
+      body[:endTime] = end_time if end_time
+      @client.post(Constants::INFO_ENDPOINT, body)
+    end
+
+    # Retrieve historical funding rates
+    # @param coin [String]
+    # @param start_time [Integer]
+    # @param end_time [Integer, nil]
+    # @return [Array]
+    def funding_history(coin, start_time, end_time = nil)
+      body = { type: 'fundingHistory', coin: coin, startTime: start_time }
+      body[:endTime] = end_time if end_time
+      @client.post(Constants::INFO_ENDPOINT, body)
+    end
+
+    # Retrieve predicted funding rates for different venues
+    # @return [Array]
+    def predicted_fundings
+      @client.post(Constants::INFO_ENDPOINT, { type: 'predictedFundings' })
+    end
+
+    # Query perps at open interest caps
+    # @return [Array]
+    def perps_at_open_interest_cap
+      @client.post(Constants::INFO_ENDPOINT, { type: 'perpsAtOpenInterestCap' })
+    end
+
+    # Retrieve information about the Perp Deploy Auction
+    # @return [Hash]
+    def perp_deploy_auction_status
+      @client.post(Constants::INFO_ENDPOINT, { type: 'perpDeployAuctionStatus' })
+    end
+
+    # Retrieve User's Active Asset Data
+    # @param user [String]
+    # @param coin [String]
+    # @return [Hash]
+    def active_asset_data(user, coin)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'activeAssetData', user: user, coin: coin })
+    end
+
+    # Retrieve Builder-Deployed Perp Market Limits
+    # @param dex [String]
+    # @return [Hash]
+    def perp_dex_limits(dex)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'perpDexLimits', dex: dex })
     end
 
     # ============================

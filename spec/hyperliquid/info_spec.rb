@@ -8,6 +8,19 @@ RSpec.describe Hyperliquid::Info do
   let(:client) { Hyperliquid::Client.new(base_url: base_url) }
   let(:info) { described_class.new(client) }
 
+  describe '#perp_dexs' do
+    it 'requests all perp dexs' do
+      expected_response = [nil, { 'name' => 'test', 'full_name' => 'test dex' }]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpDexs' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.perp_dexs
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#all_mids' do
     it 'requests all market mid prices' do
       expected_response = { 'BTC' => '50000', 'ETH' => '3000' }
@@ -89,6 +102,17 @@ RSpec.describe Hyperliquid::Info do
       result = info.user_state(user_address)
       expect(result).to eq(expected_response)
     end
+
+    it 'supports optional dex parameter' do
+      expected_response = { 'time' => 1_708_622_398_623 }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'clearinghouseState', user: user_address, dex: 'builder-dex' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_state(user_address, dex: 'builder-dex')
+      expect(result).to eq(expected_response)
+    end
   end
 
   describe '#meta' do
@@ -104,6 +128,17 @@ RSpec.describe Hyperliquid::Info do
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.meta
+      expect(result).to eq(expected_response)
+    end
+
+    it 'supports optional dex parameter' do
+      expected_response = { 'universe' => [] }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'meta', dex: 'builder-dex' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.meta(dex: 'builder-dex')
       expect(result).to eq(expected_response)
     end
   end
@@ -247,6 +282,158 @@ RSpec.describe Hyperliquid::Info do
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.spot_balances(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#user_funding' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+    let(:start_time) { 1_681_222_254_710 }
+
+    it "requests user's funding history without end_time" do
+      expected_response = [{ 'delta' => { 'coin' => 'ETH', 'type' => 'funding' } }]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userFunding', user: user_address, startTime: start_time }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_funding(user_address, start_time)
+      expect(result).to eq(expected_response)
+    end
+
+    it "requests user's funding history with end_time" do
+      end_time = start_time + 86_400_000
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userFunding', user: user_address, startTime: start_time, endTime: end_time }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_funding(user_address, start_time, end_time)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#user_non_funding_ledger_updates' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+    let(:start_time) { 1_681_222_254_710 }
+
+    it "requests user's non-funding ledger updates without end_time" do
+      expected_response = [{ 'delta' => { 'type' => 'deposit', 'usdc' => '100.0' } }]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userNonFundingLedgerUpdates', user: user_address, startTime: start_time }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_non_funding_ledger_updates(user_address, start_time)
+      expect(result).to eq(expected_response)
+    end
+
+    it "requests user's non-funding ledger updates with end_time" do
+      end_time = start_time + 86_400_000
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userNonFundingLedgerUpdates', user: user_address, startTime: start_time, endTime: end_time }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_non_funding_ledger_updates(user_address, start_time, end_time)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#funding_history' do
+    let(:coin) { 'ETH' }
+    let(:start_time) { 1_683_849_600_076 }
+
+    it 'requests historical funding rates without end_time' do
+      expected_response = [{ 'coin' => coin, 'fundingRate' => '0.0001', 'time' => start_time }]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'fundingHistory', coin: coin, startTime: start_time }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.funding_history(coin, start_time)
+      expect(result).to eq(expected_response)
+    end
+
+    it 'requests historical funding rates with end_time' do
+      end_time = start_time + 3_600_000
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'fundingHistory', coin: coin, startTime: start_time, endTime: end_time }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.funding_history(coin, start_time, end_time)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#predicted_fundings' do
+    it 'requests predicted funding rates' do
+      expected_response = [['AVAX', [['HlPerp', { 'fundingRate' => '0.0000125' }]]]]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'predictedFundings' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.predicted_fundings
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#perps_at_open_interest_cap' do
+    it 'requests perps at open interest caps' do
+      expected_response = ['BADGER', 'CANTO']
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpsAtOpenInterestCap' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.perps_at_open_interest_cap
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#perp_deploy_auction_status' do
+    it 'requests perp deploy auction status' do
+      expected_response = { 'startTimeSeconds' => 1_747_656_000, 'durationSeconds' => 111_600, 'startGas' => '500.0' }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpDeployAuctionStatus' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.perp_deploy_auction_status
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#active_asset_data' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+    let(:coin) { 'APT' }
+
+    it "requests user's active asset data" do
+      expected_response = { 'user' => user_address, 'coin' => coin, 'leverage' => { 'type' => 'cross', 'value' => 3 } }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'activeAssetData', user: user_address, coin: coin }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.active_asset_data(user_address, coin)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#perp_dex_limits' do
+    it 'requests builder-deployed perp market limits for a dex' do
+      expected_response = { 'totalOiCap' => '10000000.0' }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpDexLimits', dex: 'builder-dex' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.perp_dex_limits('builder-dex')
       expect(result).to eq(expected_response)
     end
   end
