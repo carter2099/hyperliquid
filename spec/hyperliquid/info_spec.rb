@@ -264,7 +264,8 @@ RSpec.describe Hyperliquid::Info do
             'spots' => [107]
           }
         ],
-        'gasAuction' => { 'startTimeSeconds' => 1_733_929_200, 'durationSeconds' => 111_600, 'startGas' => '181305.90046' }
+        'gasAuction' => { 'startTimeSeconds' => 1_733_929_200, 'durationSeconds' => 111_600,
+                          'startGas' => '181305.90046' }
       }
 
       stub_request(:post, info_endpoint)
