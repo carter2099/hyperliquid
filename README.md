@@ -156,7 +156,7 @@ limits = sdk.info.perp_dex_limits("builder-dex")
 # => { "totalOiCap" => "10000000.0", "oiSzCapPerPerp" => "...", ... }
 ```
 
-#### Examples: Spot
+##### Examples: Spot
 
 ```ruby
 # Retrieve spot metadata
@@ -251,22 +251,6 @@ Available error classes:
 - `Hyperliquid::NetworkError` - Connection issues
 - `Hyperliquid::TimeoutError` - Request timeouts
 
-## API Reference
-
-### Hyperliquid.new(options = {})
-
-Creates a new SDK instance.
-
-**Parameters:**
-- `testnet` (Boolean) - Use testnet instead of mainnet (default: false)  
-- `timeout` (Integer) - Request timeout in seconds (default: 30)
-- `retry_enabled` (Boolean) - Enable automatic retry logic for transient failures (default: false)
-
-### Info API Methods
-
-All Info methods return parsed JSON responses from the Hyperliquid API.
-
-
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
@@ -293,7 +277,7 @@ rake rubocop
 
 ## Roadmap
 
-The latest version is v0.2.0 with read-only Info API support. Future versions will include:
+The latest version implements read-only Info API support. Future versions will include:
 
 - Trading API (place orders, cancel orders, etc.)
 - WebSocket support for real-time data
