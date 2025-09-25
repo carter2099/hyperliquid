@@ -103,11 +103,60 @@ module Hyperliquid
                    })
     end
 
+    # Check builder fee approval
+    # @param user [String] Wallet address
+    # @param builder [String] Builder address
+    # @return [Hash]
+    def max_builder_fee(user, builder)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'maxBuilderFee', user: user, builder: builder })
+    end
+
+    # Retrieve a user's historical orders
+    # @param user [String] Wallet address
+    # @param start_time [Integer, nil] Optional start timestamp in milliseconds
+    # @param end_time [Integer, nil] Optional end timestamp in milliseconds
+    # @return [Array]
+    def historical_orders(user, start_time = nil, end_time = nil)
+      body = { type: 'historicalOrders', user: user }
+      body[:startTime] = start_time if start_time
+      body[:endTime] = end_time if end_time
+      @client.post(Constants::INFO_ENDPOINT, body)
+    end
+
+    # Retrieve a user's TWAP slice fills
+    # @param user [String] Wallet address
+    # @param start_time [Integer, nil] Optional start timestamp in milliseconds
+    # @param end_time [Integer, nil] Optional end timestamp in milliseconds
+    # @return [Array]
+    def user_twap_slice_fills(user, start_time = nil, end_time = nil)
+      body = { type: 'userTwapSliceFills', user: user }
+      body[:startTime] = start_time if start_time
+      body[:endTime] = end_time if end_time
+      @client.post(Constants::INFO_ENDPOINT, body)
+    end
+
     # Retrieve a user's subaccounts
     # @param user [String]
     # @return [Array]
     def user_subaccounts(user)
       @client.post(Constants::INFO_ENDPOINT, { type: 'subaccounts', user: user })
+    end
+
+    # Retrieve details for a vault
+    # @param vault_address [String] Vault address
+    # @param user [String, nil] Optional wallet address
+    # @return [Hash]
+    def vault_details(vault_address, user = nil)
+      body = { type: 'vaultDetails', vaultAddress: vault_address }
+      body[:user] = user if user
+      @client.post(Constants::INFO_ENDPOINT, body)
+    end
+
+    # Retrieve a user's vault deposits
+    # @param user [String] Wallet address
+    # @return [Array]
+    def user_vault_equities(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'userVaultEquities', user: user })
     end
 
     # Query a user's role

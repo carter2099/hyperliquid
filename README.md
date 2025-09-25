@@ -52,7 +52,12 @@ The SDK provides access to the following Hyperliquid APIs:
 - `order_status_by_cloid(user, cloid)` - Query order status by client order id (cloid)
 - `l2_book(coin)` - L2 book snapshot (Perpetuals and Spot)
 - `candles_snapshot(coin, interval, start_time, end_time)` - Candle snapshot (Perpetuals and Spot)
+- `max_builder_fee(user, builder)` - Check builder fee approval
+- `historical_orders(user, start_time = nil, end_time = nil)` - Retrieve a user's historical orders
+- `user_twap_slice_fills(user, start_time = nil, end_time = nil)` - Retrieve a user's TWAP slice fills
 - `user_subaccounts(user)` - Retrieve a user's subaccounts
+- `vault_details(vault_address, user = nil)` - Retrieve details for a vault
+- `user_vault_equities(user)` - Retrieve a user's vault deposits
 - `user_role(user)` - Query a user's role
 - `portfolio(user)` - Query a user's portfolio
 - `referral(user)` - Query a user's referral information
@@ -133,9 +138,37 @@ book = sdk.info.l2_book("BTC")
 candles = sdk.info.candles_snapshot("BTC", "1h", start_time_ms, end_time_ms)
 # => [{ "t" => ..., "o" => "50000", "h" => "51000", "l" => "49000", "c" => "50500", "v" => "100" }]
 
+# Check builder fee approval
+builder_address = "0x..."
+fee_approval = sdk.info.max_builder_fee(user_address, builder_address)
+# => { "approved" => true, ... }
+
+# Retrieve a user's historical orders
+hist_orders = sdk.info.historical_orders(user_address)
+# => [{ "oid" => 123, "coin" => "BTC", ... }]
+hist_orders_ranged = sdk.info.historical_orders(user_address, start_time_ms, end_time_ms)
+# => []
+
+# Retrieve a user's TWAP slice fills
+twap_fills = sdk.info.user_twap_slice_fills(user_address)
+# => [{ "sliceId" => 1, "coin" => "ETH", "sz" => "1.0" }, ...]
+twap_fills_ranged = sdk.info.user_twap_slice_fills(user_address, start_time_ms, end_time_ms)
+# => []
+
 # Retrieve a user's subaccounts
 subaccounts = sdk.info.user_subaccounts(user_address)
 # => ["0x1111...", ...]
+
+# Retrieve details for a vault
+vault_addr = "0x..."
+vault = sdk.info.vault_details(vault_addr)
+# => { "vaultAddress" => vault_addr, ... }
+vault_with_user = sdk.info.vault_details(vault_addr, user_address)
+# => { "vaultAddress" => vault_addr, "user" => user_address, ... }
+
+# Retrieve a user's vault deposits
+vault_deposits = sdk.info.user_vault_equities(user_address)
+# => [{ "vaultAddress" => "0x...", "equity" => "123.45" }, ...]
 
 # Query a user's role
 role = sdk.info.user_role(user_address)

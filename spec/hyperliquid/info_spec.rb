@@ -21,6 +21,127 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#max_builder_fee' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+    let(:builder_address) { '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' }
+
+    it 'checks builder fee approval' do
+      expected_response = { 'approved' => true }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'maxBuilderFee', user: user_address, builder: builder_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.max_builder_fee(user_address, builder_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#historical_orders' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's historical orders without time range" do
+      expected_response = [
+        { 'oid' => 123, 'coin' => 'BTC', 'side' => 'A' }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'historicalOrders', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.historical_orders(user_address)
+      expect(result).to eq(expected_response)
+    end
+
+    it "requests user's historical orders with time range" do
+      start_time = 1_700_000_000_000
+      end_time = start_time + 86_400_000
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'historicalOrders', user: user_address, startTime: start_time, endTime: end_time }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.historical_orders(user_address, start_time, end_time)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#user_twap_slice_fills' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's TWAP slice fills without time range" do
+      expected_response = [
+        { 'sliceId' => 1, 'coin' => 'ETH', 'sz' => '1.0' }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userTwapSliceFills', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_twap_slice_fills(user_address)
+      expect(result).to eq(expected_response)
+    end
+
+    it "requests user's TWAP slice fills with time range" do
+      start_time = 1_700_000_000_000
+      end_time = start_time + 86_400_000
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userTwapSliceFills', user: user_address, startTime: start_time,
+                      endTime: end_time }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_twap_slice_fills(user_address, start_time, end_time)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#vault_details' do
+    let(:vault_address) { '0x1111111111111111111111111111111111111111' }
+
+    it 'requests vault details without user' do
+      expected_response = { 'vaultAddress' => vault_address, 'totalDeposits' => '1000.0' }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'vaultDetails', vaultAddress: vault_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.vault_details(vault_address)
+      expect(result).to eq(expected_response)
+    end
+
+    it 'requests vault details with user' do
+      user_address = '0x1234567890123456789012345678901234567890'
+      expected_response = { 'vaultAddress' => vault_address, 'user' => user_address }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'vaultDetails', vaultAddress: vault_address, user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.vault_details(vault_address, user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#user_vault_equities' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's vault deposits" do
+      expected_response = [
+        { 'vaultAddress' => '0x1111111111111111111111111111111111111111', 'equity' => '123.45' }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userVaultEquities', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_vault_equities(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#all_mids' do
     it 'requests all market mid prices' do
       expected_response = { 'BTC' => '50000', 'ETH' => '3000' }
