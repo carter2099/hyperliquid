@@ -37,90 +37,151 @@ testnet_sdk = Hyperliquid.new(testnet: true)
 info = sdk.info
 ```
 
-### Info API Methods
+### Supported APIs
 
-The SDK provides access to all Hyperliquid Info API endpoints:
+The SDK provides access to the following Hyperliquid APIs:
 
-#### Perpetuals
+#### Info Methods
+- `all_mids()` - Retrieve mids for all coins
+- `open_orders(user)` - Retrieve a user's open orders
+- `user_fills(user)` - Retrieve a user's fills
+- `order_status(user, oid)` - Query order status by order id
+- `l2_book(coin)` - L2 book snapshot (works for both Perpetuals and Spot)
+- `candles_snapshot(coin, interval, start_time, end_time)` - Candle snapshot (works for both Perpetuals and Spot)
+
+##### Perpetuals Methods
+- `perp_dexs()` - Retrieve all perpetual DEXs
+- `meta(dex: nil)` - Get asset metadata (optionally for a specific perp DEX)
+- `meta_and_asset_ctxs()` - Get extended asset metadata
+- `predicted_fundings()` - Retrieve predicted funding rates across venues
+- `perps_at_open_interest_cap()` - Query perps at open interest caps
+- `perp_deploy_auction_status()` - Retrieve Perp Deploy Auction status
+- `active_asset_data(user, coin)` - Retrieve a user's active asset data for a coin
+- `perp_dex_limits(dex)` - Retrieve builder-deployed perp market limits for a DEX
+- `user_state(user, dex: nil)` - Retrieve user's perpetuals account summary (optional `dex`)
+- `user_funding(user, start_time, end_time = nil)` - Retrieve a user's funding history
+- `funding_history(coin, start_time, end_time = nil)` - Retrieve historical funding rates
+
+##### Spot Methods
+- `spot_meta()` - Retrieve spot metadata (tokens and universe)
+- `spot_meta_and_asset_ctxs()` - Retrieve spot metadata and asset contexts
+- `spot_balances(user)` - Retrieve a user's spot token balances
+- `spot_deploy_state(user)` - Retrieve Spot Deploy Auction information
+- `spot_pair_deploy_auction_status()` - Retrieve Spot Pair Deploy Auction status
+- `token_details(token_id)` - Retrieve information about a token by tokenId
+
+#### Examples: Info
 
 ```ruby
-# Get all market mid prices
+# Retrieve mids for all coints
 mids = sdk.info.all_mids
 # => { "BTC" => "50000", "ETH" => "3000", ... }
 
-# Get asset metadata
-meta = sdk.info.meta
-# => { "universe" => [...] }
+user_address = "0x..."
 
-# Get extended asset metadata with contexts
-meta_ctxs = sdk.info.meta_and_asset_ctxs  
-# => { "universe" => [...], "assetCtxs" => [...] }
+# Retrieve a user's open orders
+orders = sdk.info.open_orders(user_address)
+# => [{ "coin" => "BTC", "sz" => "0.1", "px" => "50000", "side" => "A" }]
 
-# Get L2 order book for a coin
+# Retrieve a user's fills
+fills = sdk.info.user_fills(user_address)
+# => [{ "coin" => "BTC", "sz" => "0.1", "px" => "50000", "side" => "A", "time" => 1234567890 }]
+
+# Query order status by order id
+status = sdk.info.order_status(user_address, order_id)
+# => { "status" => "filled", "sz" => "0.1", "px" => "50000" }
+
+# L2 order book snapshot
 book = sdk.info.l2_book("BTC")
 # => { "coin" => "BTC", "levels" => [[asks], [bids]], "time" => ... }
 
-# Get candlestick data
+# Candle snapshot
 candles = sdk.info.candles_snapshot("BTC", "1h", start_time, end_time)
 # => [{ "t" => ..., "o" => "50000", "h" => "51000", "l" => "49000", "c" => "50500", "v" => "100" }]
 ```
 
 Note: `l2_book` and `candles_snapshot` work for both Perpetuals and Spot. For spot, use `"{BASE}/USDC"` when available (e.g., `"PURR/USDC"`). Otherwise, use the index alias `"@{index}"` from `spot_meta["universe"]`.
 
-#### Spot
+##### Examples: Perpetuals
 
 ```ruby
-# Spot metadata (tokens and spot universe)
+# Retrieve all perpetual DEXs
+perp_dexs = sdk.info.perp_dexs
+# => [nil, { "name" => "test", "full_name" => "test dex", ... }]
+
+# Retrieve perpetuals metadata (optionally for a specific perp dex)
+meta = sdk.info.meta
+# => { "universe" => [...] }
+meta = sdk.info.meta(dex: "perp-dex-name")
+# => { "universe" => [...] }
+
+# Retrieve perpetuals asset contexts (includes mark price, current funding, open interest, etc.)
+meta_ctxs = sdk.info.meta_and_asset_ctxs  
+# => { "universe" => [...], "assetCtxs" => [...] }
+
+# Retrieve user's perpetuals account summary (optionally for a specific perp dex)
+state = sdk.info.user_state(user_address)
+# => { "assetPositions" => [...], "marginSummary" => {...} }
+state = sdk.info.user_state(user_address, dex: "perp-dex-name")
+# => { "assetPositions" => [...], "marginSummary" => {...} }
+
+# Retrieve a user's funding history or non-funding ledger updates (optional end_time)
+funding = sdk.info.user_funding(user_address, start_time)
+# => [{ "delta" => { "type" => "funding", ... }, "time" => ... }]
+funding = sdk.info.user_funding(user_address, start_time, end_time)
+# => [{ "delta" => { "type" => "funding", ... }, "time" => ... }]
+
+# Retrieve historical funding rates
+hist = sdk.info.funding_history("ETH", start_time)
+# => [{ "coin" => "ETH", "fundingRate" => "...", "time" => ... }]
+
+# Retrieve predicted funding rates for different venues
+pred = sdk.info.predicted_fundings
+# => [["AVAX", [["HlPerp", { "fundingRate" => "0.0000125", "nextFundingTime" => ... }], ...]], ...]
+
+# Query perps at open interest caps
+oi_capped = sdk.info.perps_at_open_interest_cap
+# => ["BADGER", "CANTO", ...]
+
+# Retrieve information about the Perp Deploy Auction
+auction = sdk.info.perp_deploy_auction_status
+# => { "startTimeSeconds" => ..., "durationSeconds" => ..., "startGas" => "500.0", ... }
+
+# Retrieve User's Active Asset Data
+aad = sdk.info.active_asset_data(user_address, "APT")
+# => { "user" => user_address, "coin" => "APT", "leverage" => { "type" => "cross", "value" => 3 }, ... }
+
+# Retrieve Builder-Deployed Perp Market Limits
+limits = sdk.info.perp_dex_limits("builder-dex")
+# => { "totalOiCap" => "10000000.0", "oiSzCapPerPerp" => "...", ... }
+```
+
+#### Examples: Spot
+
+```ruby
+# Retrieve spot metadata
 spot_meta = sdk.info.spot_meta
 # => { "tokens" => [...], "universe" => [...] }
 
-# Spot metadata and asset contexts
+# Retrieve spot asset contexts
 spot_meta_ctxs = sdk.info.spot_meta_and_asset_ctxs
 # => [ { "tokens" => [...], "universe" => [...] }, [ { "midPx" => "...", ... } ] ]
 
-# A user's spot token balances
+# Retrieve a user's token balances
 balances = sdk.info.spot_balances(user_address)
 # => { "balances" => [{ "coin" => "USDC", "token" => 0, "total" => "..." }, ...] }
 
-# Spot deploy auction state (Dutch auction for deploying new base tokens)
+# Retrieve information about the Spot Deploy Auction
 deploy_state = sdk.info.spot_deploy_state(user_address)
 # => { "states" => [...], "gasAuction" => { ... } }
 
-# Spot pair deploy auction status (Dutch auction for new spot pairs)
+# Retrieve information about the Spot Pair Deploy Auction
 pair_status = sdk.info.spot_pair_deploy_auction_status
 # => { "startTimeSeconds" => ..., "durationSeconds" => ..., "startGas" => "...", ... }
 
-# Token details by tokenId (34-char hex id)
+# Retrieve information about a token by onchain id in 34-character hexadecimal format
 details = sdk.info.token_details("0x00000000000000000000000000000000")
 # => { "name" => "TEST", "maxSupply" => "...", "midPx" => "...", ... }
-```
-
-#### User Data (Perpetuals and Spot)
-
-The following endpoints apply to both Perpetuals and Spot. For Spot responses, coins/pairs in results will follow the Spot coin naming described above.
-
-```ruby
-user_address = "0x..." # Wallet address
-
-# Get user's open orders
-orders = sdk.info.open_orders(user_address)
-# => [{ "coin" => "BTC", "sz" => "0.1", "px" => "50000", "side" => "A" }]
-
-# Get user's fill history
-fills = sdk.info.user_fills(user_address)
-# => [{ "coin" => "BTC", "sz" => "0.1", "px" => "50000", "side" => "A", "time" => 1234567890 }]
-
-# Get user's trading state (Perpetuals only)
-state = sdk.info.user_state(user_address)
-# => { "assetPositions" => [...], "marginSummary" => {...} }
-
-# Get order status  
-status = sdk.info.order_status(user_address, order_id)
-# => { "status" => "filled", "sz" => "0.1", "px" => "50000" }
-
-# Spot balances (Spot only)
-spot_state = sdk.info.spot_balances(user_address)
-# => { "balances" => [...] }
 ```
 
 ### Configuration
@@ -205,26 +266,6 @@ Creates a new SDK instance.
 
 All Info methods return parsed JSON responses from the Hyperliquid API.
 
-#### Perpetuals Methods
-- `all_mids()` - Get all market mid prices
-- `meta()` - Get asset metadata
-- `meta_and_asset_ctxs()` - Get extended asset metadata
-- `l2_book(coin)` - Get L2 order book for a coin
-- `candles_snapshot(coin, interval, start_time, end_time)` - Get candlestick data
-
-#### Spot Methods
-- `spot_meta()` - Retrieve spot metadata (tokens and universe)
-- `spot_meta_and_asset_ctxs()` - Retrieve spot metadata and asset contexts
-- `spot_balances(user)` - Retrieve a user's spot token balances
-- `spot_deploy_state(user)` - Retrieve Spot Deploy Auction information
-- `spot_pair_deploy_auction_status()` - Retrieve Spot Pair Deploy Auction status
-- `token_details(token_id)` - Retrieve information about a token by tokenId
-
-#### User Data Methods  
-- `open_orders(user)` - Get user's open orders
-- `user_fills(user)` - Get user's fill history
-- `user_state(user)` - Get user's trading state (Perpetuals only)
-- `order_status(user, oid)` - Get order status
 
 ## Development
 
