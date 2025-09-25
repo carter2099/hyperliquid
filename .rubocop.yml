@@ -10,6 +10,10 @@ Metrics/MethodLength:
 Metrics/AbcSize:
   Max: 25
 
+# Disable class length checks so rubocop doesn't complain that we implement all of Hyperliquid's endpoints
+Metrics/ClassLength:
+  Enabled: false
+
 # Allow longer blocks in specs - this is normal for tests
 Metrics/BlockLength:
   Exclude:

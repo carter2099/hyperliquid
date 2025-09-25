@@ -51,6 +51,34 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#frontend_open_orders' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's frontend open orders" do
+      expected_response = [
+        { 'coin' => 'BTC', 'isTrigger' => false, 'isPositionTpsl' => false }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'frontendOpenOrders', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.frontend_open_orders(user_address)
+      expect(result).to eq(expected_response)
+    end
+
+    it 'supports optional dex parameter' do
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'frontendOpenOrders', user: user_address, dex: 'builder-dex' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.frontend_open_orders(user_address, dex: 'builder-dex')
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#user_fills' do
     let(:user_address) { '0x1234567890123456789012345678901234567890' }
 
@@ -68,6 +96,36 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#user_fills_by_time' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+    let(:start_time) { 1_700_000_000_000 }
+
+    it "requests user's fills by time without end_time" do
+      expected_response = [
+        { 'coin' => 'ETH', 'px' => '3000', 'sz' => '0.5', 'time' => start_time }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userFillsByTime', user: user_address, startTime: start_time }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_fills_by_time(user_address, start_time)
+      expect(result).to eq(expected_response)
+    end
+
+    it "requests user's fills by time with end_time" do
+      end_time = start_time + 86_400_000
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userFillsByTime', user: user_address, startTime: start_time, endTime: end_time }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_fills_by_time(user_address, start_time, end_time)
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#order_status' do
     let(:user_address) { '0x1234567890123456789012345678901234567890' }
     let(:order_id) { 12_345 }
@@ -80,6 +138,37 @@ RSpec.describe Hyperliquid::Info do
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.order_status(user_address, order_id)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#order_status_by_cloid' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+    let(:cloid) { 'client-order-id-123' }
+
+    it 'requests order status by cloid' do
+      expected_response = { 'status' => 'cancelled', 'order' => { 'cloid' => cloid } }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'orderStatus', user: user_address, cloid: cloid }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.order_status_by_cloid(user_address, cloid)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#user_rate_limit' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's rate limit" do
+      expected_response = { 'nRequestsUsed' => 100, 'nRequestsCap' => 10_000 }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userRateLimit', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_rate_limit(user_address)
       expect(result).to eq(expected_response)
     end
   end
@@ -334,7 +423,14 @@ RSpec.describe Hyperliquid::Info do
       expected_response = []
 
       stub_request(:post, info_endpoint)
-        .with(body: { type: 'userNonFundingLedgerUpdates', user: user_address, startTime: start_time, endTime: end_time }.to_json)
+        .with(
+          body: {
+            type: 'userNonFundingLedgerUpdates',
+            user: user_address,
+            startTime: start_time,
+            endTime: end_time
+          }.to_json
+        )
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.user_non_funding_ledger_updates(user_address, start_time, end_time)
@@ -385,7 +481,7 @@ RSpec.describe Hyperliquid::Info do
 
   describe '#perps_at_open_interest_cap' do
     it 'requests perps at open interest caps' do
-      expected_response = ['BADGER', 'CANTO']
+      expected_response = %w[BADGER CANTO]
 
       stub_request(:post, info_endpoint)
         .with(body: { type: 'perpsAtOpenInterestCap' }.to_json)
@@ -434,6 +530,53 @@ RSpec.describe Hyperliquid::Info do
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.perp_dex_limits('builder-dex')
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#portfolio' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's portfolio" do
+      expected_response = [
+        ['day', { 'vlm' => '0.0', 'pnlHistory' => [] }]
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'portfolio', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.portfolio(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#referral' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's referral info" do
+      expected_response = { 'referredBy' => { 'referrer' => user_address } }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'referral', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.referral(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#user_fees' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's fees" do
+      expected_response = { 'userAddRate' => '0.0001', 'userCrossRate' => '0.0003' }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userFees', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_fees(user_address)
       expect(result).to eq(expected_response)
     end
   end
@@ -502,6 +645,102 @@ RSpec.describe Hyperliquid::Info do
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.token_details(token_id)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#user_subaccounts' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's subaccounts" do
+      expected_response = ['0x1111111111111111111111111111111111111111']
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'subaccounts', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_subaccounts(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#user_role' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's role" do
+      expected_response = { 'role' => 'tradingUser' }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userRole', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_role(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#delegations' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's staking delegations" do
+      expected_response = [
+        { 'validator' => '0x5ac99df645f3414876c816caa18b2d234024b487', 'amount' => '100.0' }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'delegations', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.delegations(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#delegator_summary' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's staking summary" do
+      expected_response = { 'delegated' => '100.0', 'undelegated' => '0.0' }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'delegatorSummary', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.delegator_summary(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#delegator_history' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's staking history" do
+      expected_response = [
+        { 'time' => 1_736_726_400_073, 'delta' => { 'delegate' => { 'amount' => '10.0' } } }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'delegatorHistory', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.delegator_history(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#delegator_rewards' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's staking rewards" do
+      expected_response = [
+        { 'time' => 1_736_726_400_073, 'source' => 'delegation', 'totalAmount' => '0.123' }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'delegatorRewards', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.delegator_rewards(user_address)
       expect(result).to eq(expected_response)
     end
   end
