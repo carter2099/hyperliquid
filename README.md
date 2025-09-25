@@ -44,10 +44,23 @@ The SDK provides access to the following Hyperliquid APIs:
 #### Info Methods
 - `all_mids()` - Retrieve mids for all coins
 - `open_orders(user)` - Retrieve a user's open orders
+- `frontend_open_orders(user, dex: nil)` - Retrieve a user's open orders with additional frontend info
 - `user_fills(user)` - Retrieve a user's fills
-- `order_status(user, oid)` - Query order status by order id
-- `l2_book(coin)` - L2 book snapshot (works for both Perpetuals and Spot)
-- `candles_snapshot(coin, interval, start_time, end_time)` - Candle snapshot (works for both Perpetuals and Spot)
+- `user_fills_by_time(user, start_time, end_time = nil)` - Retrieve a user's fills by time
+- `user_rate_limit(user)` - Query user rate limits
+- `order_status(user, oid)` - Query order status by order id (oid)
+- `order_status_by_cloid(user, cloid)` - Query order status by client order id (cloid)
+- `l2_book(coin)` - L2 book snapshot (Perpetuals and Spot)
+- `candles_snapshot(coin, interval, start_time, end_time)` - Candle snapshot (Perpetuals and Spot)
+- `user_subaccounts(user)` - Retrieve a user's subaccounts
+- `user_role(user)` - Query a user's role
+- `portfolio(user)` - Query a user's portfolio
+- `referral(user)` - Query a user's referral information
+- `user_fees(user)` - Query a user's fees and fee schedule
+- `delegations(user)` - Query a user's staking delegations
+- `delegator_summary(user)` - Query a user's staking summary
+- `delegator_history(user)` - Query a user's staking history
+- `delegator_rewards(user)` - Query a user's staking rewards
 
 ##### Perpetuals Methods
 - `perp_dexs()` - Retrieve all perpetual DEXs
@@ -73,7 +86,7 @@ The SDK provides access to the following Hyperliquid APIs:
 #### Examples: Info
 
 ```ruby
-# Retrieve mids for all coints
+# Retrieve mids for all coins
 mids = sdk.info.all_mids
 # => { "BTC" => "50000", "ETH" => "3000", ... }
 
@@ -83,21 +96,77 @@ user_address = "0x..."
 orders = sdk.info.open_orders(user_address)
 # => [{ "coin" => "BTC", "sz" => "0.1", "px" => "50000", "side" => "A" }]
 
+# Retrieve a user's open orders with additional frontend info
+frontend_orders = sdk.info.frontend_open_orders(user_address)
+# => [{ "coin" => "BTC", "isTrigger" => false, ... }]
+
 # Retrieve a user's fills
 fills = sdk.info.user_fills(user_address)
 # => [{ "coin" => "BTC", "sz" => "0.1", "px" => "50000", "side" => "A", "time" => 1234567890 }]
 
-# Query order status by order id
-status = sdk.info.order_status(user_address, order_id)
-# => { "status" => "filled", "sz" => "0.1", "px" => "50000" }
+# Retrieve a user's fills by time
+start_time_ms = 1_700_000_000_000
+end_time_ms = start_time_ms + 86_400_000
+fills_by_time = sdk.info.user_fills_by_time(user_address, start_time_ms, end_time_ms)
+# => [{ "coin" => "ETH", "px" => "3000", "time" => start_time_ms }, ...]
+
+# Query user rate limits
+rate_limit = sdk.info.user_rate_limit(user_address)
+# => { "nRequestsUsed" => 100, "nRequestsCap" => 10000 }
+
+# Query order status by oid
+order_id = 12345
+status_by_oid = sdk.info.order_status(user_address, order_id)
+# => { "status" => "filled", ... }
+
+# Query order status by cloid
+cloid = "client-order-id-123"
+status_by_cloid = sdk.info.order_status_by_cloid(user_address, cloid)
+# => { "status" => "cancelled", ... }
 
 # L2 order book snapshot
 book = sdk.info.l2_book("BTC")
 # => { "coin" => "BTC", "levels" => [[asks], [bids]], "time" => ... }
 
 # Candle snapshot
-candles = sdk.info.candles_snapshot("BTC", "1h", start_time, end_time)
+candles = sdk.info.candles_snapshot("BTC", "1h", start_time_ms, end_time_ms)
 # => [{ "t" => ..., "o" => "50000", "h" => "51000", "l" => "49000", "c" => "50500", "v" => "100" }]
+
+# Retrieve a user's subaccounts
+subaccounts = sdk.info.user_subaccounts(user_address)
+# => ["0x1111...", ...]
+
+# Query a user's role
+role = sdk.info.user_role(user_address)
+# => { "role" => "tradingUser" }
+
+# Query a user's portfolio
+portfolio = sdk.info.portfolio(user_address)
+# => [["day", { "pnlHistory" => [...], "vlm" => "0.0" }], ...]
+
+# Query a user's referral information
+referral = sdk.info.referral(user_address)
+# => { "referredBy" => { "referrer" => "0x..." }, ... }
+
+# Query a user's fees
+fees = sdk.info.user_fees(user_address)
+# => { "userAddRate" => "0.0001", "feeSchedule" => { ... } }
+
+# Query a user's staking delegations
+delegations = sdk.info.delegations(user_address)
+# => [{ "validator" => "0x...", "amount" => "100.0" }, ...]
+
+# Query a user's staking summary
+summary = sdk.info.delegator_summary(user_address)
+# => { "delegated" => "12060.16529862", ... }
+
+# Query a user's staking history
+history = sdk.info.delegator_history(user_address)
+# => [{ "time" => 1_736_726_400_073, "delta" => { ... } }, ...]
+
+# Query a user's staking rewards
+rewards = sdk.info.delegator_rewards(user_address)
+# => [{ "time" => 1_736_726_400_073, "source" => "delegation", "totalAmount" => "0.123" }, ...]
 ```
 
 Note: `l2_book` and `candles_snapshot` work for both Perpetuals and Spot. For spot, use `"{BASE}/USDC"` when available (e.g., `"PURR/USDC"`). Otherwise, use the index alias `"@{index}"` from `spot_meta["universe"]`.
