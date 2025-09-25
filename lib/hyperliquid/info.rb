@@ -7,11 +7,9 @@ module Hyperliquid
       @client = client
     end
 
-    # Retrieve all perpetual dexs
-    # @return [Array]
-    def perp_dexs
-      @client.post(Constants::INFO_ENDPOINT, { type: 'perpDexs' })
-    end
+    # ============================
+    # Info
+    # ============================
 
     # Get all market mid prices
     # @return [Hash] Hash containing mid prices for all markets
@@ -21,9 +19,12 @@ module Hyperliquid
 
     # Get a user's open orders
     # @param user [String] Wallet address
+    # @param dex [String, nil] Optional perp dex name
     # @return [Array] Array of open orders for the user
-    def open_orders(user)
-      @client.post(Constants::INFO_ENDPOINT, { type: 'openOrders', user: user })
+    def open_orders(user, dex: nil)
+      body = { type: 'openOrders', user: user }
+      body[:dex] = dex if dex
+      @client.post(Constants::INFO_ENDPOINT, body)
     end
 
     # Get a user's open orders with additional frontend info
@@ -54,6 +55,13 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, body)
     end
 
+    # Query user rate limits and usage
+    # @param user [String] Wallet address
+    # @return [Hash]
+    def user_rate_limit(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'userRateLimit', user: user })
+    end
+
     # Get order status by order ID
     # @param user [String] Wallet address
     # @param oid [Integer] Order ID
@@ -68,38 +76,6 @@ module Hyperliquid
     # @return [Hash] Order status information
     def order_status_by_cloid(user, cloid)
       @client.post(Constants::INFO_ENDPOINT, { type: 'orderStatus', user: user, cloid: cloid })
-    end
-
-    # Query user rate limits and usage
-    # @param user [String] Wallet address
-    # @return [Hash]
-    def user_rate_limit(user)
-      @client.post(Constants::INFO_ENDPOINT, { type: 'userRateLimit', user: user })
-    end
-
-    # Get user's trading state
-    # @param user [String] Wallet address
-    # @param dex [String, nil] Optional perp dex name
-    # @return [Hash] User's trading state including positions and balances
-    def user_state(user, dex: nil)
-      body = { type: 'clearinghouseState', user: user }
-      body[:dex] = dex if dex
-      @client.post(Constants::INFO_ENDPOINT, body)
-    end
-
-    # Get metadata for all assets
-    # @return [Hash] Metadata for all tradable assets
-    # @param dex [String, nil] Optional perp dex name (defaults to first perp dex when not provided)
-    def meta(dex: nil)
-      body = { type: 'meta' }
-      body[:dex] = dex if dex
-      @client.post(Constants::INFO_ENDPOINT, body)
-    end
-
-    # Get metadata for all assets including universe info
-    # @return [Hash] Extended metadata for all assets with universe information
-    def meta_and_asset_ctxs
-      @client.post(Constants::INFO_ENDPOINT, { type: 'metaAndAssetCtxs' })
     end
 
     # Get L2 order book for a coin
@@ -127,36 +103,101 @@ module Hyperliquid
                    })
     end
 
-    # Retrieve a user's funding history
+    # Retrieve a user's subaccounts
     # @param user [String]
-    # @param start_time [Integer]
-    # @param end_time [Integer, nil]
     # @return [Array]
-    def user_funding(user, start_time, end_time = nil)
-      body = { type: 'userFunding', user: user, startTime: start_time }
-      body[:endTime] = end_time if end_time
+    def user_subaccounts(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'subaccounts', user: user })
+    end
+
+    # Query a user's role
+    # @param user [String]
+    # @return [Hash]
+    def user_role(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'userRole', user: user })
+    end
+
+    # Query a user's portfolio time series
+    # @param user [String]
+    # @return [Array]
+    def portfolio(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'portfolio', user: user })
+    end
+
+    # Query a user's referral information
+    # @param user [String]
+    # @return [Hash]
+    def referral(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'referral', user: user })
+    end
+
+    # Query a user's effective fee rates and schedule
+    # @param user [String]
+    # @return [Hash]
+    def user_fees(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'userFees', user: user })
+    end
+
+    # Query a user's staking delegations
+    # @param user [String]
+    # @return [Array]
+    def delegations(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'delegations', user: user })
+    end
+
+    # Query a user's staking summary
+    # @param user [String]
+    # @return [Hash]
+    def delegator_summary(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'delegatorSummary', user: user })
+    end
+
+    # Query a user's staking history
+    # @param user [String]
+    # @return [Array]
+    def delegator_history(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'delegatorHistory', user: user })
+    end
+
+    # Query a user's staking rewards
+    # @param user [String]
+    # @return [Array]
+    def delegator_rewards(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'delegatorRewards', user: user })
+    end
+
+    # ============================
+    # Info: Perpetuals
+    # ============================
+
+    # Retrieve all perpetual dexs
+    # @return [Array]
+    def perp_dexs
+      @client.post(Constants::INFO_ENDPOINT, { type: 'perpDexs' })
+    end
+
+    # Get metadata for all assets
+    # @return [Hash] Metadata for all tradable assets
+    # @param dex [String, nil] Optional perp dex name (defaults to first perp dex when not provided)
+    def meta(dex: nil)
+      body = { type: 'meta' }
+      body[:dex] = dex if dex
       @client.post(Constants::INFO_ENDPOINT, body)
     end
 
-    # Retrieve a user's non-funding ledger updates
-    # @param user [String]
-    # @param start_time [Integer]
-    # @param end_time [Integer, nil]
-    # @return [Array]
-    def user_non_funding_ledger_updates(user, start_time, end_time = nil)
-      body = { type: 'userNonFundingLedgerUpdates', user: user, startTime: start_time }
-      body[:endTime] = end_time if end_time
-      @client.post(Constants::INFO_ENDPOINT, body)
+    # Get metadata for all assets including universe info
+    # @return [Hash] Extended metadata for all assets with universe information
+    def meta_and_asset_ctxs
+      @client.post(Constants::INFO_ENDPOINT, { type: 'metaAndAssetCtxs' })
     end
 
-    # Retrieve historical funding rates
-    # @param coin [String]
-    # @param start_time [Integer]
-    # @param end_time [Integer, nil]
-    # @return [Array]
-    def funding_history(coin, start_time, end_time = nil)
-      body = { type: 'fundingHistory', coin: coin, startTime: start_time }
-      body[:endTime] = end_time if end_time
+    # Get user's trading state
+    # @param user [String] Wallet address
+    # @param dex [String, nil] Optional perp dex name
+    # @return [Hash] User's trading state including positions and balances
+    def user_state(user, dex: nil)
+      body = { type: 'clearinghouseState', user: user }
+      body[:dex] = dex if dex
       @client.post(Constants::INFO_ENDPOINT, body)
     end
 
@@ -193,26 +234,42 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'perpDexLimits', dex: dex })
     end
 
-    # Query a user's portfolio time series
+    # Retrieve a user's funding history
     # @param user [String]
+    # @param start_time [Integer]
+    # @param end_time [Integer, nil]
     # @return [Array]
-    def portfolio(user)
-      @client.post(Constants::INFO_ENDPOINT, { type: 'portfolio', user: user })
+    def user_funding(user, start_time, end_time = nil)
+      body = { type: 'userFunding', user: user, startTime: start_time }
+      body[:endTime] = end_time if end_time
+      @client.post(Constants::INFO_ENDPOINT, body)
     end
 
-    # Query a user's referral information
+    # Retrieve a user's non-funding ledger updates
     # @param user [String]
-    # @return [Hash]
-    def referral(user)
-      @client.post(Constants::INFO_ENDPOINT, { type: 'referral', user: user })
+    # @param start_time [Integer]
+    # @param end_time [Integer, nil]
+    # @return [Array]
+    def user_non_funding_ledger_updates(user, start_time, end_time = nil)
+      body = { type: 'userNonFundingLedgerUpdates', user: user, startTime: start_time }
+      body[:endTime] = end_time if end_time
+      @client.post(Constants::INFO_ENDPOINT, body)
     end
 
-    # Query a user's effective fee rates and schedule
-    # @param user [String]
-    # @return [Hash]
-    def user_fees(user)
-      @client.post(Constants::INFO_ENDPOINT, { type: 'userFees', user: user })
+    # Retrieve historical funding rates
+    # @param coin [String]
+    # @param start_time [Integer]
+    # @param end_time [Integer, nil]
+    # @return [Array]
+    def funding_history(coin, start_time, end_time = nil)
+      body = { type: 'fundingHistory', coin: coin, startTime: start_time }
+      body[:endTime] = end_time if end_time
+      @client.post(Constants::INFO_ENDPOINT, body)
     end
+
+    # ============================
+    # Info: Spot
+    # ============================
 
     # Get spot metadata
     # @return [Hash] Spot tokens and universe metadata
@@ -251,48 +308,6 @@ module Hyperliquid
     # @return [Hash] Token details
     def token_details(token_id)
       @client.post(Constants::INFO_ENDPOINT, { type: 'tokenDetails', tokenId: token_id })
-    end
-
-    # Retrieve a user's subaccounts
-    # @param user [String]
-    # @return [Array]
-    def user_subaccounts(user)
-      @client.post(Constants::INFO_ENDPOINT, { type: 'subaccounts', user: user })
-    end
-
-    # Query a user's role
-    # @param user [String]
-    # @return [Hash]
-    def user_role(user)
-      @client.post(Constants::INFO_ENDPOINT, { type: 'userRole', user: user })
-    end
-
-    # Query a user's staking delegations
-    # @param user [String]
-    # @return [Array]
-    def delegations(user)
-      @client.post(Constants::INFO_ENDPOINT, { type: 'delegations', user: user })
-    end
-
-    # Query a user's staking summary
-    # @param user [String]
-    # @return [Hash]
-    def delegator_summary(user)
-      @client.post(Constants::INFO_ENDPOINT, { type: 'delegatorSummary', user: user })
-    end
-
-    # Query a user's staking history
-    # @param user [String]
-    # @return [Array]
-    def delegator_history(user)
-      @client.post(Constants::INFO_ENDPOINT, { type: 'delegatorHistory', user: user })
-    end
-
-    # Query a user's staking rewards
-    # @param user [String]
-    # @return [Array]
-    def delegator_rewards(user)
-      @client.post(Constants::INFO_ENDPOINT, { type: 'delegatorRewards', user: user })
     end
   end
   # rubocop:enable Metrics/ClassLength

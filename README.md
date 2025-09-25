@@ -46,7 +46,7 @@ The SDK provides access to the following Hyperliquid APIs:
 - `open_orders(user)` - Retrieve a user's open orders
 - `frontend_open_orders(user, dex: nil)` - Retrieve a user's open orders with additional frontend info
 - `user_fills(user)` - Retrieve a user's fills
-- `user_fills_by_time(user, start_time, end_time = nil)` - Retrieve a user's fills by time
+- `user_fills_by_time(user, start_time, end_time = nil)` - Retrieve a user's fills by time (optional end time)
 - `user_rate_limit(user)` - Query user rate limits
 - `order_status(user, oid)` - Query order status by order id (oid)
 - `order_status_by_cloid(user, cloid)` - Query order status by client order id (cloid)
@@ -66,14 +66,15 @@ The SDK provides access to the following Hyperliquid APIs:
 - `perp_dexs()` - Retrieve all perpetual DEXs
 - `meta(dex: nil)` - Get asset metadata (optionally for a specific perp DEX)
 - `meta_and_asset_ctxs()` - Get extended asset metadata
+- `user_state(user, dex: nil)` - Retrieve user's perpetuals account summary (optionally for a specific perp DEX)
 - `predicted_fundings()` - Retrieve predicted funding rates across venues
 - `perps_at_open_interest_cap()` - Query perps at open interest caps
 - `perp_deploy_auction_status()` - Retrieve Perp Deploy Auction status
 - `active_asset_data(user, coin)` - Retrieve a user's active asset data for a coin
 - `perp_dex_limits(dex)` - Retrieve builder-deployed perp market limits for a DEX
-- `user_state(user, dex: nil)` - Retrieve user's perpetuals account summary (optional `dex`)
-- `user_funding(user, start_time, end_time = nil)` - Retrieve a user's funding history
-- `funding_history(coin, start_time, end_time = nil)` - Retrieve historical funding rates
+- `user_funding(user, start_time, end_time = nil)` - Retrieve a user's funding history (optional end time)
+- `user_non_funding_ledger_updates(user, start_time, end_time = nil)` - Retrieve a user's non-funding ledger updates. Non-funding ledger updates include deposits, transfers, and withdrawals. (optional end time)
+- `funding_history(coin, start_time, end_time = nil)` - Retrieve historical funding rates (optional end time)
 
 ##### Spot Methods
 - `spot_meta()` - Retrieve spot metadata (tokens and universe)

@@ -49,6 +49,17 @@ RSpec.describe Hyperliquid::Info do
       result = info.open_orders(user_address)
       expect(result).to eq(expected_response)
     end
+
+    it 'supports optional dex parameter' do
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'openOrders', user: user_address, dex: 'builder-dex' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.open_orders(user_address, dex: 'builder-dex')
+      expect(result).to eq(expected_response)
+    end
   end
 
   describe '#frontend_open_orders' do
