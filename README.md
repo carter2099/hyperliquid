@@ -1,4 +1,4 @@
-[HYPERLIQUID_GEM_WRITE_OPERATIONS_SPEC.md](../../AI/HyperSense/backend/docs/HYPERLIQUID_GEM_WRITE_OPERATIONS_SPEC.md)# Hyperliquid Ruby SDK
+# Hyperliquid Ruby SDK
 
 A Ruby SDK for interacting with the Hyperliquid decentralized exchange API.
 
