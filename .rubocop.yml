@@ -14,7 +14,12 @@ Metrics/AbcSize:
 Metrics/ClassLength:
   Enabled: false
 
-# Allow longer blocks in specs - this is normal for tests
+# Allow longer blocks in specs and gemspec
 Metrics/BlockLength:
   Exclude:
     - 'spec/**/*'
+    - '*.gemspec'
+
+# Exchange methods require many parameters for trading operations
+Metrics/ParameterLists:
+  CountKeywordArgs: false

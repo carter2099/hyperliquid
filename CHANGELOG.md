@@ -1,5 +1,15 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [0.4.0] - 2025-12-23
+
+- Add Exchange API for write operations (trading)
+  - Order placement: `order`, `bulk_orders`, `market_order`
+  - Order cancellation: `cancel`, `cancel_by_cloid`, `bulk_cancel`
+  - Vault trading support via optional `vault_address` parameter
+- Add EIP-712 signing infrastructure for authenticated requests
+- Add `eth` gem dependency for cryptographic operations
+- SDK now accepts optional `private_key` parameter to enable exchange operations
+
 ## [0.3.0] - 2025-09-24
 
 - Full parity with all Hyperliquid Info APIs
