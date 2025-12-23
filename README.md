@@ -2,7 +2,7 @@
 
 A Ruby SDK for interacting with the Hyperliquid decentralized exchange API.
 
-The current version is a read-only implementation supporting only the Info endpoints.
+The SDK supports both read operations (Info API) and write operations (Exchange API) for trading.
 
 ## Installation
 
@@ -27,14 +27,23 @@ Or install it yourself as:
 ```ruby
 require 'hyperliquid'
 
-# Create SDK instance (mainnet by default)
+# Create SDK instance for read-only operations (mainnet by default)
 sdk = Hyperliquid.new
 
 # Or use testnet
 testnet_sdk = Hyperliquid.new(testnet: true)
 
-# Access the Info API
+# Access the Info API (read operations)
 info = sdk.info
+
+# For trading operations, provide a private key
+trading_sdk = Hyperliquid.new(
+  testnet: true,
+  private_key: ENV["HYPERLIQUID_PRIVATE_KEY"]
+)
+
+# Access the Exchange API (write operations)
+exchange = trading_sdk.exchange
 ```
 
 ### Supported APIs
@@ -287,6 +296,97 @@ details = sdk.info.token_details("0x00000000000000000000000000000000")
 # => { "name" => "TEST", "maxSupply" => "...", "midPx" => "...", ... }
 ```
 
+#### Exchange Methods (Trading)
+
+**Note:** Exchange methods require initializing the SDK with a `private_key`.
+
+- `order(coin:, is_buy:, size:, limit_px:, ...)` - Place a single limit order
+- `bulk_orders(orders:, grouping:, ...)` - Place multiple orders in a batch
+- `market_order(coin:, is_buy:, size:, slippage:, ...)` - Place a market order with slippage
+- `cancel(coin:, oid:, ...)` - Cancel an order by order ID
+- `cancel_by_cloid(coin:, cloid:, ...)` - Cancel an order by client order ID
+- `bulk_cancel(cancels:, ...)` - Cancel multiple orders
+- `address` - Get the wallet address associated with the private key
+
+All exchange methods support an optional `vault_address:` parameter for vault trading.
+
+##### Examples: Exchange (Trading)
+
+```ruby
+# Initialize SDK with private key for trading
+sdk = Hyperliquid.new(
+  testnet: true,
+  private_key: ENV["HYPERLIQUID_PRIVATE_KEY"]
+)
+
+# Get wallet address
+address = sdk.exchange.address
+# => "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+
+# Place a limit buy order
+result = sdk.exchange.order(
+  coin: "BTC",
+  is_buy: true,
+  size: "0.01",
+  limit_px: "95000",
+  order_type: { limit: { tif: "Gtc" } }  # Good-til-canceled
+)
+# => { "status" => "ok", "response" => { "type" => "order", "data" => { "statuses" => [...] } } }
+
+# Place a limit sell order with client order ID
+result = sdk.exchange.order(
+  coin: "ETH",
+  is_buy: false,
+  size: "0.5",
+  limit_px: "3500",
+  cloid: "my-order-123"
+)
+
+# Place a market order (IoC with slippage)
+result = sdk.exchange.market_order(
+  coin: "BTC",
+  is_buy: true,
+  size: "0.01",
+  slippage: 0.03  # 3% slippage tolerance
+)
+
+# Place multiple orders at once
+orders = [
+  { coin: "BTC", is_buy: true, size: "0.01", limit_px: "94000" },
+  { coin: "BTC", is_buy: false, size: "0.01", limit_px: "96000" }
+]
+result = sdk.exchange.bulk_orders(orders: orders)
+
+# Cancel an order by order ID
+oid = result.dig("response", "data", "statuses", 0, "resting", "oid")
+sdk.exchange.cancel(coin: "BTC", oid: oid)
+
+# Cancel an order by client order ID
+sdk.exchange.cancel_by_cloid(coin: "ETH", cloid: "my-order-123")
+
+# Cancel multiple orders
+cancels = [
+  { coin: "BTC", oid: 12345 },
+  { coin: "ETH", oid: 12346 }
+]
+sdk.exchange.bulk_cancel(cancels: cancels)
+
+# Vault trading (trade on behalf of a vault)
+vault_address = "0x..."
+sdk.exchange.order(
+  coin: "BTC",
+  is_buy: true,
+  size: "1.0",
+  limit_px: "95000",
+  vault_address: vault_address
+)
+```
+
+**Order Types:**
+- `{ limit: { tif: "Gtc" } }` - Good-til-canceled (default)
+- `{ limit: { tif: "Ioc" } }` - Immediate-or-cancel
+- `{ limit: { tif: "Alo" } }` - Add-liquidity-only (post-only)
+
 ### Configuration
 
 ```ruby
@@ -296,12 +396,23 @@ sdk = Hyperliquid.new(timeout: 60)
 # Enable retry logic for handling transient failures (default: disabled)
 sdk = Hyperliquid.new(retry_enabled: true)
 
+# Enable trading with a private key
+sdk = Hyperliquid.new(private_key: ENV["HYPERLIQUID_PRIVATE_KEY"])
+
 # Combine multiple configuration options
-sdk = Hyperliquid.new(testnet: true, timeout: 60, retry_enabled: true)
+sdk = Hyperliquid.new(
+  testnet: true,
+  timeout: 60,
+  retry_enabled: true,
+  private_key: ENV["HYPERLIQUID_PRIVATE_KEY"]
+)
 
 # Check which environment you're using
 sdk.testnet?  # => false
 sdk.base_url  # => "https://api.hyperliquid.xyz"
+
+# Check if exchange is available (private_key was provided)
+sdk.exchange  # => nil if no private_key, Hyperliquid::Exchange instance otherwise
 ```
 
 #### Retry Configuration
@@ -380,11 +491,11 @@ rake rubocop
 
 ## Roadmap
 
-The latest version implements read-only Info API support. Future versions will include:
+The SDK now supports both Info API (read) and Exchange API (trading). Future versions will include:
 
-- Trading API (place orders, cancel orders, etc.)
 - WebSocket support for real-time data
-- Advanced trading features
+- Additional exchange operations (leverage, margin adjustments, transfers)
+- Advanced trading features (TWAP, etc.)
 
 ## Contributing
 
