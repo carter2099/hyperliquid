@@ -104,5 +104,31 @@ RSpec.describe Hyperliquid::Signing::Signer do
         expect(mainnet_sig).not_to eq(testnet_sig)
       end
     end
+
+    context 'with vault_address' do
+      let(:vault_address) { '0x1234567890123456789012345678901234567890' }
+
+      it 'produces different signature when vault_address is provided' do
+        sig_without_vault = signer.sign_l1_action(action, nonce)
+        sig_with_vault = signer.sign_l1_action(action, nonce, vault_address: vault_address)
+
+        expect(sig_without_vault).not_to eq(sig_with_vault)
+      end
+
+      it 'produces consistent signatures with same vault_address' do
+        sig1 = signer.sign_l1_action(action, nonce, vault_address: vault_address)
+        sig2 = signer.sign_l1_action(action, nonce, vault_address: vault_address)
+
+        expect(sig1).to eq(sig2)
+      end
+
+      it 'produces different signatures for different vault addresses' do
+        vault_address2 = '0x9876543210987654321098765432109876543210'
+        sig1 = signer.sign_l1_action(action, nonce, vault_address: vault_address)
+        sig2 = signer.sign_l1_action(action, nonce, vault_address: vault_address2)
+
+        expect(sig1).not_to eq(sig2)
+      end
+    end
   end
 end

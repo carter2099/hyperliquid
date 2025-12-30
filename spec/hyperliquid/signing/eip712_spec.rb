@@ -4,21 +4,21 @@ require 'spec_helper'
 
 RSpec.describe Hyperliquid::Signing::EIP712 do
   describe '.l1_action_domain' do
-    it 'returns mainnet domain with correct chain ID' do
+    it 'returns domain with correct chain ID and name for mainnet' do
       domain = described_class.l1_action_domain(mainnet: true)
 
-      expect(domain[:name]).to eq('HyperliquidSignTransaction')
+      expect(domain[:name]).to eq('Exchange')
       expect(domain[:version]).to eq('1')
-      expect(domain[:chainId]).to eq(42_161)
+      expect(domain[:chainId]).to eq(1337)
       expect(domain[:verifyingContract]).to eq('0x0000000000000000000000000000000000000000')
     end
 
-    it 'returns testnet domain with correct chain ID' do
+    it 'returns same domain for testnet (L1 chain ID is always 1337)' do
       domain = described_class.l1_action_domain(mainnet: false)
 
-      expect(domain[:name]).to eq('HyperliquidSignTransaction')
+      expect(domain[:name]).to eq('Exchange')
       expect(domain[:version]).to eq('1')
-      expect(domain[:chainId]).to eq(421_614)
+      expect(domain[:chainId]).to eq(1337)
       expect(domain[:verifyingContract]).to eq('0x0000000000000000000000000000000000000000')
     end
   end
@@ -58,12 +58,8 @@ RSpec.describe Hyperliquid::Signing::EIP712 do
   end
 
   describe 'constants' do
-    it 'defines mainnet chain ID' do
-      expect(described_class::MAINNET_CHAIN_ID).to eq(42_161)
-    end
-
-    it 'defines testnet chain ID' do
-      expect(described_class::TESTNET_CHAIN_ID).to eq(421_614)
+    it 'defines L1 chain ID as 1337' do
+      expect(described_class::L1_CHAIN_ID).to eq(1337)
     end
   end
 end

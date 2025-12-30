@@ -4,8 +4,8 @@ module Hyperliquid
   module Signing
     # EIP-712 domain and type definitions for Hyperliquid
     class EIP712
-      MAINNET_CHAIN_ID = 42_161   # Arbitrum One
-      TESTNET_CHAIN_ID = 421_614  # Arbitrum Sepolia
+      # Hyperliquid L1 chain ID (same for mainnet and testnet)
+      L1_CHAIN_ID = 1337
 
       # Source identifier for phantom agent
       MAINNET_SOURCE = 'a'
@@ -13,13 +13,13 @@ module Hyperliquid
 
       class << self
         # Domain for L1 actions (orders, cancels, leverage, etc.)
-        # @param mainnet [Boolean] Whether to use mainnet chain ID
+        # @param mainnet [Boolean] Whether to use mainnet source identifier
         # @return [Hash] EIP-712 domain configuration
-        def l1_action_domain(mainnet:)
+        def l1_action_domain(mainnet:) # rubocop:disable Lint/UnusedMethodArgument
           {
-            name: 'HyperliquidSignTransaction',
+            name: 'Exchange',
             version: '1',
-            chainId: mainnet ? MAINNET_CHAIN_ID : TESTNET_CHAIN_ID,
+            chainId: L1_CHAIN_ID,
             verifyingContract: '0x0000000000000000000000000000000000000000'
           }
         end

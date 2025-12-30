@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'eth'
-require 'json'
+require 'msgpack'
 
 module Hyperliquid
   module Signing
@@ -24,9 +24,10 @@ module Hyperliquid
       # Sign an L1 action (orders, cancels, leverage updates, etc.)
       # @param action [Hash] The action payload to sign
       # @param nonce [Integer] Timestamp in milliseconds
+      # @param vault_address [String, nil] Optional vault address for vault trading
       # @return [Hash] Signature with :r, :s, :v components
-      def sign_l1_action(action, nonce)
-        phantom_agent = construct_phantom_agent(action, nonce)
+      def sign_l1_action(action, nonce, vault_address: nil)
+        phantom_agent = construct_phantom_agent(action, nonce, vault_address)
 
         typed_data = {
           types: {
@@ -53,22 +54,34 @@ module Hyperliquid
       # Construct the phantom agent for signing
       # @param action [Hash] Action payload
       # @param nonce [Integer] Nonce timestamp
+      # @param vault_address [String, nil] Optional vault address
       # @return [Hash] Phantom agent with source and connectionId
-      def construct_phantom_agent(action, nonce)
-        # Hash the action JSON and combine with nonce to create connectionId
-        action_hash = Eth::Util.keccak256(action.to_json)
+      def construct_phantom_agent(action, nonce, vault_address = nil)
+        # Compute action hash per Python SDK spec:
+        # data = msgpack(action) + nonce(8 bytes BE) + vault_flag + [vault_addr]
+        data = action.to_msgpack
+        data += [nonce].pack('Q>') # 8-byte big-endian uint64
 
-        # Encode (bytes32, uint64) tuple and hash it
-        encoded = Eth::Abi.encode(
-          %w[bytes32 uint64],
-          [action_hash, nonce]
-        )
-        connection_id = Eth::Util.keccak256(encoded)
+        if vault_address.nil?
+          data += "\x00"  # no vault flag
+        else
+          data += "\x01"  # has vault flag
+          data += address_to_bytes(vault_address.downcase)
+        end
+
+        connection_id = Eth::Util.keccak256(data)
 
         {
           source: EIP712.source(mainnet: @mainnet),
           connectionId: bin_to_hex(connection_id)
         }
+      end
+
+      # Convert hex address to 20-byte binary
+      # @param address [String] Ethereum address with 0x prefix
+      # @return [String] 20-byte binary representation
+      def address_to_bytes(address)
+        [address.sub(/\A0x/i, '')].pack('H*')
       end
 
       # Sign EIP-712 typed data using eth gem's built-in method

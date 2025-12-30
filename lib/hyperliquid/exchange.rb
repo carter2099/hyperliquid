@@ -50,7 +50,7 @@ module Hyperliquid
         grouping: 'na'
       }
 
-      signature = @signer.sign_l1_action(action, nonce)
+      signature = @signer.sign_l1_action(action, nonce, vault_address: vault_address)
       post_action(action, signature, nonce, vault_address)
     end
 
@@ -81,7 +81,7 @@ module Hyperliquid
         grouping: grouping
       }
 
-      signature = @signer.sign_l1_action(action, nonce)
+      signature = @signer.sign_l1_action(action, nonce, vault_address: vault_address)
       post_action(action, signature, nonce, vault_address)
     end
 
@@ -128,7 +128,7 @@ module Hyperliquid
         cancels: [{ a: asset_index(coin), o: oid }]
       }
 
-      signature = @signer.sign_l1_action(action, nonce)
+      signature = @signer.sign_l1_action(action, nonce, vault_address: vault_address)
       post_action(action, signature, nonce, vault_address)
     end
 
@@ -145,7 +145,7 @@ module Hyperliquid
         cancels: [{ asset: asset_index(coin), cloid: cloid }]
       }
 
-      signature = @signer.sign_l1_action(action, nonce)
+      signature = @signer.sign_l1_action(action, nonce, vault_address: vault_address)
       post_action(action, signature, nonce, vault_address)
     end
 
@@ -170,7 +170,7 @@ module Hyperliquid
         action = { type: 'cancel', cancels: cancel_wires }
       end
 
-      signature = @signer.sign_l1_action(action, nonce)
+      signature = @signer.sign_l1_action(action, nonce, vault_address: vault_address)
       post_action(action, signature, nonce, vault_address)
     end
 
