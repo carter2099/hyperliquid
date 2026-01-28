@@ -155,5 +155,80 @@ RSpec.describe Hyperliquid::Signing::Signer do
         expect(sig1).not_to eq(sig2)
       end
     end
+
+    # Python SDK parity tests
+    # These use the exact test vectors from the official Python SDK to verify signing parity
+    # Source: https://github.com/hyperliquid-dex/hyperliquid-python-sdk/blob/master/tests/signing_test.py
+    context 'Python SDK parity' do
+      let(:parity_private_key) { '0x0123456789012345678901234567890123456789012345678901234567890123' }
+      let(:mainnet_signer) { described_class.new(private_key: parity_private_key, testnet: false) }
+      let(:testnet_signer) { described_class.new(private_key: parity_private_key, testnet: true) }
+
+      # Order action matching Python SDK test_l1_action_signing_order_matches
+      # Order: asset 1, buy, 100 sz, 100 limit_px, Gtc tif
+      let(:order_action) do
+        {
+          type: 'order',
+          orders: [{
+            a: 1,
+            b: true,
+            p: '100',
+            s: '100',
+            r: false,
+            t: { limit: { tif: 'Gtc' } }
+          }],
+          grouping: 'na'
+        }
+      end
+
+      it 'signs order action matching Python SDK (mainnet)' do
+        sig = mainnet_signer.sign_l1_action(order_action, 0)
+
+        expect(sig[:r]).to eq('0xd65369825a9df5d80099e513cce430311d7d26ddf477f5b3a33d2806b100d78e')
+        expect(sig[:s]).to eq('0x2b54116ff64054968aa237c20ca9ff68000f977c93289157748a3162b6ea940e')
+        expect(sig[:v]).to eq(28)
+      end
+
+      it 'signs order action matching Python SDK (testnet)' do
+        sig = testnet_signer.sign_l1_action(order_action, 0)
+
+        expect(sig[:r]).to eq('0x82b2ba28e76b3d761093aaded1b1cdad4960b3af30212b343fb2e6cdfa4e3d54')
+        expect(sig[:s]).to eq('0x6b53878fc99d26047f4d7e8c90eb98955a109f44209163f52d8dc4278cbbd9f5')
+        expect(sig[:v]).to eq(27)
+      end
+
+      # Order with cloid matching Python SDK test_l1_action_signing_order_with_cloid_matches
+      let(:order_with_cloid_action) do
+        {
+          type: 'order',
+          orders: [{
+            a: 1,
+            b: true,
+            p: '100',
+            s: '100',
+            r: false,
+            t: { limit: { tif: 'Gtc' } },
+            c: '0x00000000000000000000000000000001'
+          }],
+          grouping: 'na'
+        }
+      end
+
+      it 'signs order with cloid matching Python SDK (mainnet)' do
+        sig = mainnet_signer.sign_l1_action(order_with_cloid_action, 0)
+
+        expect(sig[:r]).to eq('0x041ae18e8239a56cacbc5dad94d45d0b747e5da11ad564077fcac71277a946e3')
+        expect(sig[:s]).to eq('0x3c61f667e747404fe7eea8f90ab0e76cc12ce60270438b2058324681a00116da')
+        expect(sig[:v]).to eq(27)
+      end
+
+      it 'signs order with cloid matching Python SDK (testnet)' do
+        sig = testnet_signer.sign_l1_action(order_with_cloid_action, 0)
+
+        expect(sig[:r]).to eq('0xeba0664bed2676fc4e5a743bf89e5c7501aa6d870bdb9446e122c9466c5cd16d')
+        expect(sig[:s]).to eq('0x7f3e74825c9114bc59086f1eebea2928c190fdfbfde144827cb02b85bbe90988')
+        expect(sig[:v]).to eq(28)
+      end
+    end
   end
 end
