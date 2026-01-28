@@ -1,5 +1,15 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [0.5.0] - 2026-01-28
+
+- Add core trading features to Exchange API (Tier 1 parity with Python SDK)
+  - Order modification: `modify_order`, `batch_modify`
+  - Position management: `update_leverage`, `update_isolated_margin`, `market_close`
+  - Dead man's switch: `schedule_cancel`
+- Add `market_close` helper for closing positions at market price with auto-detection of size and direction
+- Add integration tests for leverage updates, order modification, and market close
+- Add GitHub Release workflow (`.github/workflows/release.yml`)
+
 ## [0.4.1] - 2026-01-28
 
 - Reorganize documentation for improved readability
