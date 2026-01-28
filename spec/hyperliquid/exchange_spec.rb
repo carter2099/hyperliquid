@@ -25,10 +25,26 @@ RSpec.describe Hyperliquid::Exchange do
     }
   end
 
+  let(:spot_meta_response) do
+    {
+      'universe' => [
+        { 'name' => 'PURR/USDC', 'szDecimals' => 2, 'tokens' => [1, 0] }
+      ],
+      'tokens' => [
+        { 'name' => 'USDC', 'index' => 0 },
+        { 'name' => 'PURR', 'index' => 1 }
+      ]
+    }
+  end
+
   before do
     stub_request(:post, info_endpoint)
       .with(body: { type: 'meta' }.to_json)
       .to_return(status: 200, body: meta_response.to_json)
+
+    stub_request(:post, info_endpoint)
+      .with(body: { type: 'spotMeta' }.to_json)
+      .to_return(status: 200, body: spot_meta_response.to_json)
   end
 
   describe '#address' do

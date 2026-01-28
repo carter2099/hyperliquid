@@ -1,6 +1,8 @@
 AllCops:
   NewCops: enable
   TargetRubyVersion: 3.4.3
+  Exclude:
+    - 'test_*.rb'  # Exclude ad-hoc integration test scripts
 
 # Allow longer methods for complex logic
 Metrics/MethodLength:

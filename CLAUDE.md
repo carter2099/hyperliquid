@@ -43,6 +43,19 @@ bin/console
 ruby example.rb
 ```
 
+### Integration Testing (Testnet)
+```bash
+# Run the testnet integration test (requires private key)
+# Get testnet funds from: https://app.hyperliquid-testnet.xyz
+HYPERLIQUID_PRIVATE_KEY=0x... ruby test_integration.rb
+```
+
+The integration test executes real trades on testnet:
+1. Spot market roundtrip (buy/sell PURR/USDC)
+2. Spot limit order (place and cancel)
+3. Perp market roundtrip (long/close BTC)
+4. Perp limit order (place short, cancel)
+
 ### Setup
 ```bash
 # Install dependencies

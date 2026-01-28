@@ -256,17 +256,30 @@ module Hyperliquid
       @asset_cache[:metadata][coin] || raise(ArgumentError, "Unknown asset: #{coin}")
     end
 
-    # Load asset metadata from Info API
+    # Load asset metadata from Info API (perps and spot)
     def load_asset_cache
-      meta = @info.meta
       @asset_cache = { indices: {}, metadata: {} }
 
+      # Load perpetual assets
+      meta = @info.meta
       meta['universe'].each_with_index do |asset, index|
         name = asset['name']
         @asset_cache[:indices][name] = index
         @asset_cache[:metadata][name] = {
           sz_decimals: asset['szDecimals'],
-          is_spot: index >= SPOT_ASSET_THRESHOLD
+          is_spot: false
+        }
+      end
+
+      # Load spot assets (index starts at SPOT_ASSET_THRESHOLD)
+      spot_meta = @info.spot_meta
+      spot_meta['universe'].each_with_index do |pair, index|
+        name = pair['name']
+        spot_index = index + SPOT_ASSET_THRESHOLD
+        @asset_cache[:indices][name] = spot_index
+        @asset_cache[:metadata][name] = {
+          sz_decimals: pair['szDecimals'] || 0,
+          is_spot: true
         }
       end
     end
