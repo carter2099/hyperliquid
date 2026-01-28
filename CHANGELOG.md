@@ -1,6 +1,6 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
-## [0.4.1] - 2025-01-28
+## [0.4.1] - 2026-01-28
 
 - Reorganize documentation for improved readability
   - Streamline README with basic setup and links to detailed docs
@@ -10,7 +10,7 @@
   - Add `docs/ERRORS.md` with error handling guide
   - Add `docs/DEVELOPMENT.md` with setup and testing instructions
 
-## [0.4.0] - 2025-01-27
+## [0.4.0] - 2026-01-27
 
 - Add Exchange API for authenticated write operations (trading)
   - Order placement: `order`, `bulk_orders`, `market_order`
