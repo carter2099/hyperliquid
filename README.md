@@ -58,14 +58,6 @@ exchange = trading_sdk.exchange
 - [Error Handling](docs/ERRORS.md) - Error types and handling
 - [Development](docs/DEVELOPMENT.md) - Contributing and running tests
 
-## Roadmap
-
-The SDK now supports both Info API (read) and Exchange API (trading). Future versions will include:
-
-- WebSocket support for real-time data
-- Additional exchange operations (leverage, margin adjustments, transfers)
-- Advanced trading features (TWAP, etc.)
-
 ## Contributing
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/carter2099/hyperliquid.
