@@ -1,3 +1,5 @@
+require: []  # Explicitly disable auto-requiring of plugins
+
 AllCops:
   NewCops: enable
   TargetRubyVersion: 3.4.3
