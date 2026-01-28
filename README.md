@@ -2,7 +2,7 @@
 
 [![Gem Version](https://badge.fury.io/rb/hyperliquid.svg)](https://rubygems.org/gems/hyperliquid)
 [![Downloads](https://img.shields.io/gem/dt/hyperliquid.svg)](https://rubygems.org/gems/hyperliquid)
-[![CI](https://github.com/yourname/hyperliquid/actions/workflows/ci.yml/badge.svg)](https://github.com/yourname/hyperliquid/actions)
+[![CI](https://github.com/carter2099/hyperliquid/actions/workflows/main.yml/badge.svg)](https://github.com/carter2099/hyperliquid/actions)
 
 A Ruby SDK for interacting with the Hyperliquid decentralized exchange API.
 
