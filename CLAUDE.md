@@ -45,16 +45,15 @@ ruby example.rb
 
 ### Integration Testing (Testnet)
 ```bash
-# Run the testnet integration test (requires private key)
+# Run all integration tests (requires private key)
 # Get testnet funds from: https://app.hyperliquid-testnet.xyz
-HYPERLIQUID_PRIVATE_KEY=0x... ruby test_integration.rb
+HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_all.rb
+
+# Run a single integration test
+HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_08_usd_class_transfer.rb
 ```
 
-The integration test executes real trades on testnet:
-1. Spot market roundtrip (buy/sell PURR/USDC)
-2. Spot limit order (place and cancel)
-3. Perp market roundtrip (long/close BTC)
-4. Perp limit order (place short, cancel)
+Integration tests live in `scripts/` as individual files. Each can be run standalone for debugging. `test_integration.rb` at the project root is a convenience wrapper that runs them all.
 
 ### Setup
 ```bash

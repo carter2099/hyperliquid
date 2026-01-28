@@ -84,11 +84,24 @@ Read-only methods for querying market data and user information.
 - `update_leverage(coin:, leverage:, is_cross:, ...)` - Set cross or isolated leverage for a coin
 - `update_isolated_margin(coin:, amount:, ...)` - Add or remove isolated margin for a position
 
+### Transfers & Account Management
+
+- `usd_send(amount:, destination:)` - Transfer USDC to another address
+- `spot_send(amount:, destination:, token:)` - Transfer a spot token to another address
+- `usd_class_transfer(amount:, to_perp:)` - Move USDC between perp and spot accounts
+- `withdraw_from_bridge(amount:, destination:)` - Withdraw USDC via the bridge
+- `send_asset(destination:, source_dex:, destination_dex:, token:, amount:)` - Move assets between DEX instances
+- `create_sub_account(name:)` - Create a sub-account
+- `sub_account_transfer(sub_account_user:, is_deposit:, usd:)` - Transfer USDC to/from a sub-account
+- `sub_account_spot_transfer(sub_account_user:, is_deposit:, token:, amount:)` - Transfer spot tokens to/from a sub-account
+- `vault_transfer(vault_address:, is_deposit:, usd:)` - Deposit or withdraw USDC to/from a vault
+- `set_referrer(code:)` - Set referral code
+
 ### Other
 
 - `address` - Get the wallet address associated with the private key
 
-All exchange methods support an optional `vault_address:` parameter for vault trading.
+Order placement and management methods support an optional `vault_address:` parameter for vault trading.
 
 ### Order Types
 

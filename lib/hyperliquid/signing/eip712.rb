@@ -12,6 +12,61 @@ module Hyperliquid
       MAINNET_SOURCE = 'a'
       TESTNET_SOURCE = 'b'
 
+      # Chain ID for user-signed actions (Arbitrum Sepolia: 0x66eee = 421614)
+      USER_SIGNED_CHAIN_ID = 421_614
+
+      # EIP-712 type definitions for user-signed actions
+
+      USD_SEND_TYPES = {
+        'HyperliquidTransaction:UsdSend': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :destination, type: 'string' },
+          { name: :amount, type: 'string' },
+          { name: :time, type: 'uint64' }
+        ]
+      }.freeze
+
+      SPOT_SEND_TYPES = {
+        'HyperliquidTransaction:SpotSend': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :destination, type: 'string' },
+          { name: :token, type: 'string' },
+          { name: :amount, type: 'string' },
+          { name: :time, type: 'uint64' }
+        ]
+      }.freeze
+
+      USD_CLASS_TRANSFER_TYPES = {
+        'HyperliquidTransaction:UsdClassTransfer': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :amount, type: 'string' },
+          { name: :toPerp, type: 'bool' },
+          { name: :nonce, type: 'uint64' }
+        ]
+      }.freeze
+
+      WITHDRAW_TYPES = {
+        'HyperliquidTransaction:Withdraw': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :destination, type: 'string' },
+          { name: :amount, type: 'string' },
+          { name: :time, type: 'uint64' }
+        ]
+      }.freeze
+
+      SEND_ASSET_TYPES = {
+        'HyperliquidTransaction:SendAsset': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :destination, type: 'string' },
+          { name: :sourceDex, type: 'string' },
+          { name: :destinationDex, type: 'string' },
+          { name: :token, type: 'string' },
+          { name: :amount, type: 'string' },
+          { name: :fromSubAccount, type: 'string' },
+          { name: :nonce, type: 'uint64' }
+        ]
+      }.freeze
+
       class << self
         # Domain for L1 actions (orders, cancels, leverage, etc.)
         # @return [Hash] EIP-712 domain configuration
@@ -20,6 +75,17 @@ module Hyperliquid
             name: 'Exchange',
             version: '1',
             chainId: L1_CHAIN_ID,
+            verifyingContract: '0x0000000000000000000000000000000000000000'
+          }
+        end
+
+        # Domain for user-signed actions (transfers, withdrawals, etc.)
+        # @return [Hash] EIP-712 domain configuration
+        def user_signed_domain
+          {
+            name: 'HyperliquidSignTransaction',
+            version: '1',
+            chainId: USER_SIGNED_CHAIN_ID,
             verifyingContract: '0x0000000000000000000000000000000000000000'
           }
         end
@@ -49,6 +115,13 @@ module Hyperliquid
         # @return [String] Source identifier ('a' for mainnet, 'b' for testnet)
         def source(testnet:)
           testnet ? TESTNET_SOURCE : MAINNET_SOURCE
+        end
+
+        # Get hyperliquid chain name for user-signed actions
+        # @param testnet [Boolean] Whether testnet
+        # @return [String] "Mainnet" or "Testnet"
+        def hyperliquid_chain(testnet:)
+          testnet ? 'Testnet' : 'Mainnet'
         end
       end
     end

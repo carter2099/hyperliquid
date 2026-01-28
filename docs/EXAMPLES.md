@@ -388,6 +388,97 @@ sdk.exchange.order(
 )
 ```
 
+### Transfers & Account Management
+
+```ruby
+# Transfer USDC to another address
+sdk.exchange.usd_send(
+  amount: '100',
+  destination: '0x...'
+)
+
+# Transfer a spot token to another address
+sdk.exchange.spot_send(
+  amount: '50',
+  destination: '0x...',
+  token: 'PURR'
+)
+
+# Move USDC between perp and spot accounts
+sdk.exchange.usd_class_transfer(amount: '100', to_perp: false)   # perp -> spot
+sdk.exchange.usd_class_transfer(amount: '100', to_perp: true)    # spot -> perp
+
+# Withdraw USDC via the bridge
+sdk.exchange.withdraw_from_bridge(
+  amount: '100',
+  destination: '0x...'
+)
+
+# Move assets between DEX instances
+sdk.exchange.send_asset(
+  destination: '0x...',
+  source_dex: 'dex1',
+  destination_dex: 'dex2',
+  token: 'USDC',
+  amount: '100'
+)
+```
+
+### Sub-Account Management
+
+```ruby
+# Create a sub-account
+result = sdk.exchange.create_sub_account(name: 'my-sub-account')
+sub_address = result.dig('response', 'data', 'subAccountUser')
+
+# Deposit USDC into a sub-account
+sdk.exchange.sub_account_transfer(
+  sub_account_user: sub_address,
+  is_deposit: true,
+  usd: 100
+)
+
+# Withdraw USDC from a sub-account
+sdk.exchange.sub_account_transfer(
+  sub_account_user: sub_address,
+  is_deposit: false,
+  usd: 50
+)
+
+# Transfer spot tokens to a sub-account
+sdk.exchange.sub_account_spot_transfer(
+  sub_account_user: sub_address,
+  is_deposit: true,
+  token: 'PURR',
+  amount: '10'
+)
+```
+
+### Vault Operations
+
+```ruby
+# Deposit USDC into a vault
+sdk.exchange.vault_transfer(
+  vault_address: '0x...',
+  is_deposit: true,
+  usd: 100
+)
+
+# Withdraw USDC from a vault
+sdk.exchange.vault_transfer(
+  vault_address: '0x...',
+  is_deposit: false,
+  usd: 50
+)
+```
+
+### Referral
+
+```ruby
+# Set a referral code
+sdk.exchange.set_referrer(code: 'MY_REFERRAL_CODE')
+```
+
 ### Client Order IDs (Cloid)
 
 ```ruby

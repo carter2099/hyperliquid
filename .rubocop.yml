@@ -4,6 +4,7 @@ AllCops:
   SuggestExtensions: false
   Exclude:
     - 'test_*.rb'  # Exclude ad-hoc integration test scripts
+    - 'scripts/**/*'  # Exclude integration test scripts
     - 'vendor/**/*'  # Exclude vendored gems (CI bundles here)
 
 # Allow longer methods for complex logic

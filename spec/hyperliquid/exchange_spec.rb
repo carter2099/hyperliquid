@@ -988,6 +988,306 @@ RSpec.describe Hyperliquid::Exchange do
     end
   end
 
+  describe '#usd_send' do
+    let(:send_response) { { 'status' => 'ok', 'response' => { 'type' => 'usdSend' } } }
+
+    it 'sends USD with correct action structure' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'usdSend' &&
+            action['destination'] == '0x1234567890123456789012345678901234567890' &&
+            action['amount'] == '100' &&
+            action['time'].is_a?(Integer) &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet'
+        end
+        .to_return(status: 200, body: send_response.to_json)
+
+      result = exchange.usd_send(
+        amount: 100,
+        destination: '0x1234567890123456789012345678901234567890'
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes signature in request' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['signature'].is_a?(Hash) &&
+            body['signature']['r']&.start_with?('0x')
+        end
+        .to_return(status: 200, body: send_response.to_json)
+
+      result = exchange.usd_send(amount: '50', destination: '0x1234567890123456789012345678901234567890')
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#spot_send' do
+    let(:send_response) { { 'status' => 'ok', 'response' => { 'type' => 'spotSend' } } }
+
+    it 'sends spot token with correct action structure' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'spotSend' &&
+            action['destination'] == '0x1234567890123456789012345678901234567890' &&
+            action['token'] == 'PURR' &&
+            action['amount'] == '10' &&
+            action['time'].is_a?(Integer) &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet'
+        end
+        .to_return(status: 200, body: send_response.to_json)
+
+      result = exchange.spot_send(
+        amount: 10,
+        destination: '0x1234567890123456789012345678901234567890',
+        token: 'PURR'
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#usd_class_transfer' do
+    let(:transfer_response) { { 'status' => 'ok', 'response' => { 'type' => 'usdClassTransfer' } } }
+
+    it 'transfers to perp with correct action structure' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'usdClassTransfer' &&
+            action['amount'] == '100' &&
+            action['toPerp'] == true &&
+            action['nonce'].is_a?(Integer) &&
+            action['signatureChainId'] == '0x66eee'
+        end
+        .to_return(status: 200, body: transfer_response.to_json)
+
+      result = exchange.usd_class_transfer(amount: 100, to_perp: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'transfers to spot with toPerp false' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['toPerp'] == false
+        end
+        .to_return(status: 200, body: transfer_response.to_json)
+
+      result = exchange.usd_class_transfer(amount: 50, to_perp: false)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#withdraw_from_bridge' do
+    let(:withdraw_response) { { 'status' => 'ok', 'response' => { 'type' => 'withdraw3' } } }
+
+    it 'withdraws with correct action structure' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'withdraw3' &&
+            action['destination'] == '0x1234567890123456789012345678901234567890' &&
+            action['amount'] == '100' &&
+            action['time'].is_a?(Integer) &&
+            action['signatureChainId'] == '0x66eee'
+        end
+        .to_return(status: 200, body: withdraw_response.to_json)
+
+      result = exchange.withdraw_from_bridge(
+        amount: 100,
+        destination: '0x1234567890123456789012345678901234567890'
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#send_asset' do
+    let(:send_response) { { 'status' => 'ok', 'response' => { 'type' => 'sendAsset' } } }
+
+    it 'sends asset with correct action structure' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'sendAsset' &&
+            action['destination'] == '0x1234567890123456789012345678901234567890' &&
+            action['sourceDex'] == 'dex1' &&
+            action['destinationDex'] == 'dex2' &&
+            action['token'] == 'USDC' &&
+            action['amount'] == '100' &&
+            action['fromSubAccount'] == '' &&
+            action['nonce'].is_a?(Integer) &&
+            action['signatureChainId'] == '0x66eee'
+        end
+        .to_return(status: 200, body: send_response.to_json)
+
+      result = exchange.send_asset(
+        destination: '0x1234567890123456789012345678901234567890',
+        source_dex: 'dex1',
+        destination_dex: 'dex2',
+        token: 'USDC',
+        amount: 100
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#create_sub_account' do
+    let(:create_response) { { 'status' => 'ok', 'response' => { 'type' => 'createSubAccount' } } }
+
+    it 'creates sub-account with correct action structure' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'createSubAccount' &&
+            action['name'] == 'my-sub' &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: create_response.to_json)
+
+      result = exchange.create_sub_account(name: 'my-sub')
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#sub_account_transfer' do
+    let(:transfer_response) { { 'status' => 'ok', 'response' => { 'type' => 'subAccountTransfer' } } }
+
+    it 'deposits USD to sub-account with correct action structure' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'subAccountTransfer' &&
+            action['subAccountUser'] == '0x1234567890123456789012345678901234567890' &&
+            action['isDeposit'] == true &&
+            action['usd'] == 10_000_000
+        end
+        .to_return(status: 200, body: transfer_response.to_json)
+
+      result = exchange.sub_account_transfer(
+        sub_account_user: '0x1234567890123456789012345678901234567890',
+        is_deposit: true,
+        usd: 10
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'withdraws USD from sub-account' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['isDeposit'] == false && action['usd'] == 5_000_000
+        end
+        .to_return(status: 200, body: transfer_response.to_json)
+
+      result = exchange.sub_account_transfer(
+        sub_account_user: '0x1234567890123456789012345678901234567890',
+        is_deposit: false,
+        usd: 5
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#sub_account_spot_transfer' do
+    let(:transfer_response) { { 'status' => 'ok', 'response' => { 'type' => 'subAccountSpotTransfer' } } }
+
+    it 'transfers spot tokens to sub-account with correct action structure' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'subAccountSpotTransfer' &&
+            action['subAccountUser'] == '0x1234567890123456789012345678901234567890' &&
+            action['isDeposit'] == true &&
+            action['token'] == 'PURR' &&
+            action['amount'] == '100'
+        end
+        .to_return(status: 200, body: transfer_response.to_json)
+
+      result = exchange.sub_account_spot_transfer(
+        sub_account_user: '0x1234567890123456789012345678901234567890',
+        is_deposit: true,
+        token: 'PURR',
+        amount: 100
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#vault_transfer' do
+    let(:vault_response) { { 'status' => 'ok', 'response' => { 'type' => 'vaultTransfer' } } }
+
+    it 'deposits to vault with correct action structure' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'vaultTransfer' &&
+            action['vaultAddress'] == '0x1234567890123456789012345678901234567890' &&
+            action['isDeposit'] == true &&
+            action['usd'] == 10_000_000
+        end
+        .to_return(status: 200, body: vault_response.to_json)
+
+      result = exchange.vault_transfer(
+        vault_address: '0x1234567890123456789012345678901234567890',
+        is_deposit: true,
+        usd: 10
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'withdraws from vault' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['isDeposit'] == false && action['usd'] == 5_000_000
+        end
+        .to_return(status: 200, body: vault_response.to_json)
+
+      result = exchange.vault_transfer(
+        vault_address: '0x1234567890123456789012345678901234567890',
+        is_deposit: false,
+        usd: 5
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#set_referrer' do
+    let(:referrer_response) { { 'status' => 'ok', 'response' => { 'type' => 'setReferrer' } } }
+
+    it 'sets referrer with correct action structure' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'setReferrer' &&
+            action['code'] == 'MY_CODE' &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: referrer_response.to_json)
+
+      result = exchange.set_referrer(code: 'MY_CODE')
+      expect(result['status']).to eq('ok')
+    end
+  end
+
   describe '#market_close' do
     let(:user_state_response) do
       {

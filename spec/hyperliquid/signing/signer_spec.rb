@@ -229,6 +229,137 @@ RSpec.describe Hyperliquid::Signing::Signer do
         expect(sig[:s]).to eq('0x7f3e74825c9114bc59086f1eebea2928c190fdfbfde144827cb02b85bbe90988')
         expect(sig[:v]).to eq(28)
       end
+
+      # Create sub-account L1 action signing
+      let(:create_sub_account_action) { { type: 'createSubAccount', name: 'example' } }
+
+      it 'signs createSubAccount matching Python SDK (mainnet)' do
+        sig = mainnet_signer.sign_l1_action(create_sub_account_action, 0)
+
+        expect(sig[:r]).to eq('0x51096fe3239421d16b671e192f574ae24ae14329099b6db28e479b86cdd6caa7')
+        expect(sig[:s]).to eq('0x0b71f7d293af92d3772572afb8b102d167a7cef7473388286bc01f52a5c5b423')
+        expect(sig[:v]).to eq(27)
+      end
+
+      it 'signs createSubAccount matching Python SDK (testnet)' do
+        sig = testnet_signer.sign_l1_action(create_sub_account_action, 0)
+
+        expect(sig[:r]).to eq('0xa699e3ed5c2b89628c746d3298b5dc1cca604694c2c855da8bb8250ec8014a5b')
+        expect(sig[:s]).to eq('0x53f1b8153a301c72ecc655b1c315d64e1dcea3ee58921fd7507e35818fcc1584')
+        expect(sig[:v]).to eq(28)
+      end
+
+      # Sub-account transfer L1 action signing
+      let(:sub_account_transfer_action) do
+        {
+          type: 'subAccountTransfer',
+          subAccountUser: '0x1d9470d4b963f552e6f671a81619d395877bf409',
+          isDeposit: true,
+          usd: 10
+        }
+      end
+
+      it 'signs subAccountTransfer matching Python SDK (mainnet)' do
+        sig = mainnet_signer.sign_l1_action(sub_account_transfer_action, 0)
+
+        expect(sig[:r]).to eq('0x43592d7c6c7d816ece2e206f174be61249d651944932b13343f4d13f306ae602')
+        expect(sig[:s]).to eq('0x71a926cb5c9a7c01c3359ec4c4c34c16ff8107d610994d4de0e6430e5cc0f4c9')
+        expect(sig[:v]).to eq(28)
+      end
+
+      it 'signs subAccountTransfer matching Python SDK (testnet)' do
+        sig = testnet_signer.sign_l1_action(sub_account_transfer_action, 0)
+
+        expect(sig[:r]).to eq('0xe26574013395ad55ee2f4e0575310f003c5bb3351b5425482e2969fa51543927')
+        expect(sig[:s]).to eq('0x0efb08999196366871f919fd0e138b3a7f30ee33e678df7cfaf203e25f0a4278')
+        expect(sig[:v]).to eq(28)
+      end
+    end
+  end
+
+  describe '#sign_user_signed_action' do
+    let(:signer) { described_class.new(private_key: test_private_key, testnet: false) }
+
+    it 'returns signature with r, s, v components' do
+      action = { destination: '0x1234', amount: '1', time: 1_000_000 }
+      sig = signer.sign_user_signed_action(
+        action,
+        'HyperliquidTransaction:UsdSend',
+        Hyperliquid::Signing::EIP712::USD_SEND_TYPES
+      )
+
+      expect(sig).to have_key(:r)
+      expect(sig).to have_key(:s)
+      expect(sig).to have_key(:v)
+      expect(sig[:r]).to start_with('0x')
+      expect(sig[:r].length).to eq(66)
+      expect(sig[:s]).to start_with('0x')
+      expect(sig[:s].length).to eq(66)
+      expect([27, 28]).to include(sig[:v])
+    end
+
+    it 'produces consistent signatures for same input' do
+      action = { destination: '0x1234', amount: '1', time: 1_000_000 }
+      sig1 = signer.sign_user_signed_action(
+        action, 'HyperliquidTransaction:UsdSend', Hyperliquid::Signing::EIP712::USD_SEND_TYPES
+      )
+      sig2 = signer.sign_user_signed_action(
+        action, 'HyperliquidTransaction:UsdSend', Hyperliquid::Signing::EIP712::USD_SEND_TYPES
+      )
+
+      expect(sig1).to eq(sig2)
+    end
+
+    context 'with testnet signer' do
+      let(:testnet_signer) { described_class.new(private_key: test_private_key, testnet: true) }
+
+      it 'produces different signature than mainnet for same action' do
+        action = { destination: '0x1234', amount: '1', time: 1_000_000 }
+        mainnet_sig = signer.sign_user_signed_action(
+          action, 'HyperliquidTransaction:UsdSend', Hyperliquid::Signing::EIP712::USD_SEND_TYPES
+        )
+        testnet_sig = testnet_signer.sign_user_signed_action(
+          action, 'HyperliquidTransaction:UsdSend', Hyperliquid::Signing::EIP712::USD_SEND_TYPES
+        )
+
+        expect(mainnet_sig).not_to eq(testnet_sig)
+      end
+    end
+
+    # Python SDK parity tests for user-signed actions
+    context 'Python SDK parity' do
+      let(:parity_private_key) { '0x0123456789012345678901234567890123456789012345678901234567890123' }
+      let(:testnet_signer) { described_class.new(private_key: parity_private_key, testnet: true) }
+
+      it 'signs usdSend matching Python SDK (testnet)' do
+        action = {
+          destination: '0x5e9ee1089755c3435139848e47e6635505d5a13a',
+          amount: '1',
+          time: 1_687_816_341_423
+        }
+        sig = testnet_signer.sign_user_signed_action(
+          action, 'HyperliquidTransaction:UsdSend', Hyperliquid::Signing::EIP712::USD_SEND_TYPES
+        )
+
+        expect(sig[:r]).to eq('0x637b37dd731507cdd24f46532ca8ba6eec616952c56218baeff04144e4a77073')
+        expect(sig[:s]).to eq('0x11a6a24900e6e314136d2592e2f8d502cd89b7c15b198e1bee043c9589f9fad7')
+        expect(sig[:v]).to eq(27)
+      end
+
+      it 'signs withdraw matching Python SDK (testnet)' do
+        action = {
+          destination: '0x5e9ee1089755c3435139848e47e6635505d5a13a',
+          amount: '1',
+          time: 1_687_816_341_423
+        }
+        sig = testnet_signer.sign_user_signed_action(
+          action, 'HyperliquidTransaction:Withdraw', Hyperliquid::Signing::EIP712::WITHDRAW_TYPES
+        )
+
+        expect(sig[:r]).to eq('0x8363524c799e90ce9bc41022f7c39b4e9bdba786e5f9c72b20e43e1462c37cf9')
+        expect(sig[:s]).to eq('0x58b1411a775938b83e29182e8ef74975f9054c8e97ebf5ec2dc8d51bfc893881')
+        expect(sig[:v]).to eq(28)
+      end
     end
   end
 end

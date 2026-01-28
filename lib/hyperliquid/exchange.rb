@@ -374,6 +374,201 @@ module Hyperliquid
       )
     end
 
+    # Transfer USDC to another address
+    # @param amount [String, Numeric] Amount to send
+    # @param destination [String] Destination wallet address
+    # @return [Hash] Transfer response
+    def usd_send(amount:, destination:)
+      nonce = timestamp_ms
+      action = {
+        type: 'usdSend',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @signer.instance_variable_get(:@testnet)),
+        destination: destination,
+        amount: amount.to_s,
+        time: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { destination: destination, amount: amount.to_s, time: nonce },
+        'HyperliquidTransaction:UsdSend',
+        Signing::EIP712::USD_SEND_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Transfer a spot token to another address
+    # @param amount [String, Numeric] Amount to send
+    # @param destination [String] Destination wallet address
+    # @param token [String] Token identifier
+    # @return [Hash] Transfer response
+    def spot_send(amount:, destination:, token:)
+      nonce = timestamp_ms
+      action = {
+        type: 'spotSend',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @signer.instance_variable_get(:@testnet)),
+        destination: destination,
+        token: token,
+        amount: amount.to_s,
+        time: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { destination: destination, token: token, amount: amount.to_s, time: nonce },
+        'HyperliquidTransaction:SpotSend',
+        Signing::EIP712::SPOT_SEND_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Move USDC between perp and spot accounts
+    # @param amount [String, Numeric] Amount to transfer
+    # @param to_perp [Boolean] True to move to perp, false to move to spot
+    # @return [Hash] Transfer response
+    def usd_class_transfer(amount:, to_perp:)
+      nonce = timestamp_ms
+      action = {
+        type: 'usdClassTransfer',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @signer.instance_variable_get(:@testnet)),
+        amount: amount.to_s,
+        toPerp: to_perp,
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { amount: amount.to_s, toPerp: to_perp, nonce: nonce },
+        'HyperliquidTransaction:UsdClassTransfer',
+        Signing::EIP712::USD_CLASS_TRANSFER_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Withdraw USDC via the bridge
+    # @param amount [String, Numeric] Amount to withdraw
+    # @param destination [String] Destination wallet address
+    # @return [Hash] Withdrawal response
+    def withdraw_from_bridge(amount:, destination:)
+      nonce = timestamp_ms
+      action = {
+        type: 'withdraw3',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @signer.instance_variable_get(:@testnet)),
+        destination: destination,
+        amount: amount.to_s,
+        time: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { destination: destination, amount: amount.to_s, time: nonce },
+        'HyperliquidTransaction:Withdraw',
+        Signing::EIP712::WITHDRAW_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Move assets between DEX instances
+    # @param destination [String] Destination wallet address
+    # @param source_dex [String] Source DEX identifier
+    # @param destination_dex [String] Destination DEX identifier
+    # @param token [String] Token identifier
+    # @param amount [String, Numeric] Amount to send
+    # @return [Hash] Transfer response
+    def send_asset(destination:, source_dex:, destination_dex:, token:, amount:)
+      nonce = timestamp_ms
+      action = {
+        type: 'sendAsset',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @signer.instance_variable_get(:@testnet)),
+        destination: destination,
+        sourceDex: source_dex,
+        destinationDex: destination_dex,
+        token: token,
+        amount: amount.to_s,
+        fromSubAccount: '',
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        {
+          destination: destination, sourceDex: source_dex, destinationDex: destination_dex,
+          token: token, amount: amount.to_s, fromSubAccount: '', nonce: nonce
+        },
+        'HyperliquidTransaction:SendAsset',
+        Signing::EIP712::SEND_ASSET_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Create a sub-account
+    # @param name [String] Sub-account name
+    # @return [Hash] Creation response
+    def create_sub_account(name:)
+      nonce = timestamp_ms
+      action = { type: 'createSubAccount', name: name }
+      signature = @signer.sign_l1_action(action, nonce)
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Transfer USDC to/from a sub-account
+    # @param sub_account_user [String] Sub-account wallet address
+    # @param is_deposit [Boolean] True to deposit into sub-account, false to withdraw
+    # @param usd [Numeric] Amount in USD
+    # @return [Hash] Transfer response
+    def sub_account_transfer(sub_account_user:, is_deposit:, usd:)
+      nonce = timestamp_ms
+      action = {
+        type: 'subAccountTransfer',
+        subAccountUser: sub_account_user,
+        isDeposit: is_deposit,
+        usd: float_to_usd_int(usd)
+      }
+      signature = @signer.sign_l1_action(action, nonce)
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Transfer spot tokens to/from a sub-account
+    # @param sub_account_user [String] Sub-account wallet address
+    # @param is_deposit [Boolean] True to deposit into sub-account, false to withdraw
+    # @param token [String] Token identifier
+    # @param amount [String, Numeric] Amount to transfer
+    # @return [Hash] Transfer response
+    def sub_account_spot_transfer(sub_account_user:, is_deposit:, token:, amount:)
+      nonce = timestamp_ms
+      action = {
+        type: 'subAccountSpotTransfer',
+        subAccountUser: sub_account_user,
+        isDeposit: is_deposit,
+        token: token,
+        amount: amount.to_s
+      }
+      signature = @signer.sign_l1_action(action, nonce)
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Deposit or withdraw USDC to/from a vault
+    # @param vault_address [String] Vault wallet address
+    # @param is_deposit [Boolean] True to deposit, false to withdraw
+    # @param usd [Numeric] Amount in USD
+    # @return [Hash] Vault transfer response
+    def vault_transfer(vault_address:, is_deposit:, usd:)
+      nonce = timestamp_ms
+      action = {
+        type: 'vaultTransfer',
+        vaultAddress: vault_address,
+        isDeposit: is_deposit,
+        usd: float_to_usd_int(usd)
+      }
+      signature = @signer.sign_l1_action(action, nonce)
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Set referral code
+    # @param code [String] Referral code
+    # @return [Hash] Set referrer response
+    def set_referrer(code:)
+      nonce = timestamp_ms
+      action = { type: 'setReferrer', code: code }
+      signature = @signer.sign_l1_action(action, nonce)
+      post_action(action, signature, nonce, nil)
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!

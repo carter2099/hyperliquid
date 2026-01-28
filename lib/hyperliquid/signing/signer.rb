@@ -44,6 +44,31 @@ module Hyperliquid
         sign_typed_data(typed_data)
       end
 
+      # Sign a user-signed action (transfers, withdrawals, etc.)
+      # Uses direct EIP-712 typed data signing with HyperliquidSignTransaction domain
+      # @param action [Hash] The action message to sign (will have chain fields injected)
+      # @param primary_type [String] EIP-712 primary type (e.g., "HyperliquidTransaction:UsdSend")
+      # @param sign_types [Hash] EIP-712 type definitions for the action
+      # @return [Hash] Signature with :r, :s, :v components
+      def sign_user_signed_action(action, primary_type, sign_types)
+        # Inject chain fields into a copy of the action
+        message = action.merge(
+          hyperliquidChain: EIP712.hyperliquid_chain(testnet: @testnet),
+          signatureChainId: '0x66eee'
+        )
+
+        typed_data = {
+          types: {
+            EIP712Domain: EIP712.domain_type
+          }.merge(sign_types),
+          primaryType: primary_type,
+          domain: EIP712.user_signed_domain,
+          message: message
+        }
+
+        sign_typed_data(typed_data)
+      end
+
       private
 
       # Normalize private key format
@@ -54,7 +79,7 @@ module Hyperliquid
       end
 
       # Construct the phantom agent for signing
-      # Maintains parity with Python SDK
+      # Maintains parity with official Python SDK
       # @param action [Hash] Action payload
       # @param nonce [Integer] Nonce timestamp
       # @param vault_address [String, nil] Optional vault address
@@ -62,7 +87,7 @@ module Hyperliquid
       # @return [Hash] Phantom agent with source and connectionId
       def construct_phantom_agent(action, nonce, vault_address, expires_after)
         # Compute action hash
-        # Maintains parity with Python SDK
+        # Maintains parity with official Python SDK
         # data = msgpack(action) + nonce(8 bytes BE) + vault_flag + [vault_addr] + [expires_flag + expires_after]
         # - Note: expires_flag is only included if expires_after exists. A bit odd but that's what the
         #     Python SDK does.
