@@ -59,13 +59,33 @@ Read-only methods for querying market data and user information.
 
 **Note:** Exchange methods require initializing the SDK with a `private_key`.
 
+### Order Placement
+
 - `order(coin:, is_buy:, size:, limit_px:, ...)` - Place a single limit order
 - `bulk_orders(orders:, grouping:, ...)` - Place multiple orders in a batch
 - `market_order(coin:, is_buy:, size:, slippage:, ...)` - Place a market order with slippage
+
+### Order Modification
+
+- `modify_order(oid:, coin:, is_buy:, size:, limit_px:, ...)` - Modify an existing order by oid or cloid
+- `batch_modify(modifies:, ...)` - Modify multiple orders at once
+
+### Order Cancellation
+
 - `cancel(coin:, oid:, ...)` - Cancel an order by order ID
 - `cancel_by_cloid(coin:, cloid:, ...)` - Cancel an order by client order ID
 - `bulk_cancel(cancels:, ...)` - Cancel multiple orders by order ID
 - `bulk_cancel_by_cloid(cancels:, ...)` - Cancel multiple orders by client order ID
+- `schedule_cancel(time:, ...)` - Auto-cancel all orders at a given time
+
+### Position Management
+
+- `market_close(coin:, size:, slippage:, ...)` - Close a position at market price (auto-detects position size)
+- `update_leverage(coin:, leverage:, is_cross:, ...)` - Set cross or isolated leverage for a coin
+- `update_isolated_margin(coin:, amount:, ...)` - Add or remove isolated margin for a position
+
+### Other
+
 - `address` - Get the wallet address associated with the private key
 
 All exchange methods support an optional `vault_address:` parameter for vault trading.

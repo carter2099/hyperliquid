@@ -107,7 +107,8 @@ RSpec.describe Hyperliquid::Exchange do
         end
         .to_return(status: 200, body: order_response.to_json)
 
-      exchange.order(coin: 'BTC', is_buy: true, size: '0.01', limit_px: '95000')
+      result = exchange.order(coin: 'BTC', is_buy: true, size: '0.01', limit_px: '95000')
+      expect(result['status']).to eq('ok')
     end
 
     it 'includes signature in request' do
@@ -123,7 +124,8 @@ RSpec.describe Hyperliquid::Exchange do
         end
         .to_return(status: 200, body: order_response.to_json)
 
-      exchange.order(coin: 'BTC', is_buy: true, size: '0.01', limit_px: '95000')
+      result = exchange.order(coin: 'BTC', is_buy: true, size: '0.01', limit_px: '95000')
+      expect(result['status']).to eq('ok')
     end
 
     it 'includes nonce in request' do
@@ -134,7 +136,8 @@ RSpec.describe Hyperliquid::Exchange do
         end
         .to_return(status: 200, body: order_response.to_json)
 
-      exchange.order(coin: 'BTC', is_buy: true, size: '0.01', limit_px: '95000')
+      result = exchange.order(coin: 'BTC', is_buy: true, size: '0.01', limit_px: '95000')
+      expect(result['status']).to eq('ok')
     end
 
     it 'includes client order ID when provided as Cloid' do
@@ -147,13 +150,14 @@ RSpec.describe Hyperliquid::Exchange do
         end
         .to_return(status: 200, body: order_response.to_json)
 
-      exchange.order(
+      result = exchange.order(
         coin: 'BTC',
         is_buy: true,
         size: '0.01',
         limit_px: '95000',
         cloid: cloid
       )
+      expect(result['status']).to eq('ok')
     end
 
     it 'includes client order ID when provided as string' do
@@ -166,13 +170,14 @@ RSpec.describe Hyperliquid::Exchange do
         end
         .to_return(status: 200, body: order_response.to_json)
 
-      exchange.order(
+      result = exchange.order(
         coin: 'BTC',
         is_buy: true,
         size: '0.01',
         limit_px: '95000',
         cloid: cloid_str
       )
+      expect(result['status']).to eq('ok')
     end
 
     it 'raises ArgumentError for invalid cloid string format' do
@@ -197,19 +202,221 @@ RSpec.describe Hyperliquid::Exchange do
         end
         .to_return(status: 200, body: order_response.to_json)
 
-      exchange.order(
+      result = exchange.order(
         coin: 'BTC',
         is_buy: true,
         size: '0.01',
         limit_px: '95000',
         vault_address: vault_addr
       )
+      expect(result['status']).to eq('ok')
     end
 
     it 'raises ArgumentError for unknown asset' do
       expect do
         exchange.order(coin: 'UNKNOWN', is_buy: true, size: '1', limit_px: '100')
       end.to raise_error(ArgumentError, /Unknown asset/)
+    end
+
+    context 'with trigger types' do
+      it 'places stop loss order' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            order = body['action']['orders'][0]
+            trigger = order['t']['trigger']
+
+            trigger['tpsl'] == 'sl' &&
+              trigger['isMarket'] == true &&
+              trigger['triggerPx'].is_a?(String)
+          end
+          .to_return(status: 200, body: order_response.to_json)
+
+        result = exchange.order(
+          coin: 'BTC',
+          is_buy: false,
+          size: '0.1',
+          limit_px: '89900',
+          order_type: {
+            trigger: {
+              trigger_px: 90_000,
+              is_market: true,
+              tpsl: 'sl'
+            }
+          }
+        )
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'places take profit order' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            trigger = body['action']['orders'][0]['t']['trigger']
+            trigger['tpsl'] == 'tp'
+          end
+          .to_return(status: 200, body: order_response.to_json)
+
+        result = exchange.order(
+          coin: 'BTC',
+          is_buy: false,
+          size: '0.1',
+          limit_px: '100100',
+          order_type: {
+            trigger: {
+              trigger_px: 100_000,
+              is_market: false,
+              tpsl: 'tp'
+            }
+          }
+        )
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'formats triggerPx with float_to_wire (no scientific notation)' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            trigger_px = body['action']['orders'][0]['t']['trigger']['triggerPx']
+            !trigger_px.include?('e') && !trigger_px.include?('E')
+          end
+          .to_return(status: 200, body: order_response.to_json)
+
+        result = exchange.order(
+          coin: 'BTC',
+          is_buy: false,
+          size: '0.1',
+          limit_px: '89900',
+          order_type: {
+            trigger: {
+              trigger_px: 0.00001,
+              is_market: true,
+              tpsl: 'sl'
+            }
+          }
+        )
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'raises error for missing trigger_px' do
+        expect do
+          exchange.order(
+            coin: 'BTC',
+            is_buy: false,
+            size: '0.1',
+            limit_px: '89900',
+            order_type: {
+              trigger: {
+                is_market: true,
+                tpsl: 'sl'
+              }
+            }
+          )
+        end.to raise_error(ArgumentError, /require :trigger_px/)
+      end
+
+      it 'raises error for missing tpsl' do
+        expect do
+          exchange.order(
+            coin: 'BTC',
+            is_buy: false,
+            size: '0.1',
+            limit_px: '89900',
+            order_type: {
+              trigger: {
+                trigger_px: 90_000,
+                is_market: true
+              }
+            }
+          )
+        end.to raise_error(ArgumentError, /require :tpsl/)
+      end
+
+      it 'raises error for invalid tpsl value' do
+        expect do
+          exchange.order(
+            coin: 'BTC',
+            is_buy: false,
+            size: '0.1',
+            limit_px: '89900',
+            order_type: {
+              trigger: {
+                trigger_px: 90_000,
+                is_market: true,
+                tpsl: 'invalid'
+              }
+            }
+          )
+        end.to raise_error(ArgumentError, /must be 'tp' or 'sl'/)
+      end
+    end
+
+    context 'with wire formatting' do
+      it 'formats prices without scientific notation' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            price = body['action']['orders'][0]['p']
+            !price.include?('e') && !price.include?('E')
+          end
+          .to_return(status: 200, body: order_response.to_json)
+
+        result = exchange.order(
+          coin: 'BTC',
+          is_buy: true,
+          size: '0.00001',
+          limit_px: '0.00001'
+        )
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'normalizes trailing zeros' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            price = body['action']['orders'][0]['p']
+            # 95000.00 should become "95000"
+            price == '95000'
+          end
+          .to_return(status: 200, body: order_response.to_json)
+
+        result = exchange.order(
+          coin: 'BTC',
+          is_buy: true,
+          size: '0.01',
+          limit_px: '95000.00'
+        )
+        expect(result['status']).to eq('ok')
+      end
+    end
+
+    context 'with expires_after' do
+      let(:expires_after) { (Time.now.to_f * 1000).to_i + 30_000 }
+      let(:exchange_with_expiry) do
+        described_class.new(
+          client: client,
+          signer: signer,
+          info: info,
+          expires_after: expires_after
+        )
+      end
+
+      it 'includes expiresAfter in payload' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            body['expiresAfter'] == expires_after
+          end
+          .to_return(status: 200, body: { 'status' => 'ok' }.to_json)
+
+        result = exchange_with_expiry.order(
+          coin: 'BTC',
+          is_buy: true,
+          size: '0.01',
+          limit_px: '95000'
+        )
+        expect(result['status']).to eq('ok')
+      end
     end
   end
 
@@ -260,7 +467,8 @@ RSpec.describe Hyperliquid::Exchange do
         { coin: 'BTC', is_buy: false, size: '0.01', limit_px: '100000' }
       ]
 
-      exchange.bulk_orders(orders: orders, grouping: 'normalTpsl')
+      result = exchange.bulk_orders(orders: orders, grouping: 'normalTpsl')
+      expect(result['status']).to eq('ok')
     end
   end
 
@@ -296,7 +504,8 @@ RSpec.describe Hyperliquid::Exchange do
         end
         .to_return(status: 200, body: { 'status' => 'ok' }.to_json)
 
-      exchange.market_order(coin: 'BTC', is_buy: true, size: '0.01', slippage: 0.05)
+      result = exchange.market_order(coin: 'BTC', is_buy: true, size: '0.01', slippage: 0.05)
+      expect(result['status']).to eq('ok')
     end
 
     it 'applies slippage correctly for sell orders (price decreases)' do
@@ -309,7 +518,8 @@ RSpec.describe Hyperliquid::Exchange do
         end
         .to_return(status: 200, body: { 'status' => 'ok' }.to_json)
 
-      exchange.market_order(coin: 'BTC', is_buy: false, size: '0.01', slippage: 0.05)
+      result = exchange.market_order(coin: 'BTC', is_buy: false, size: '0.01', slippage: 0.05)
+      expect(result['status']).to eq('ok')
     end
 
     it 'raises error for unknown asset' do
@@ -443,215 +653,446 @@ RSpec.describe Hyperliquid::Exchange do
     end
   end
 
-  describe 'trigger orders' do
-    let(:order_response) do
+  describe '#modify_order' do
+    let(:modify_response) do
       {
         'status' => 'ok',
         'response' => {
-          'type' => 'order',
-          'data' => { 'statuses' => [{ 'resting' => { 'oid' => 12_345 } }] }
+          'type' => 'batchModify',
+          'data' => { 'statuses' => [{ 'filled' => { 'oid' => 99_999 } }] }
         }
       }
     end
 
-    it 'places stop loss order' do
+    it 'modifies an order with integer oid' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'batchModify' &&
+            action['modifies'].length == 1 &&
+            action['modifies'][0]['oid'] == 12_345 &&
+            action['modifies'][0]['order']['a'] == 0 &&
+            action['modifies'][0]['order']['b'] == true &&
+            action['modifies'][0]['order']['p'].is_a?(String) &&
+            action['modifies'][0]['order']['s'].is_a?(String) &&
+            action['modifies'][0]['order']['r'] == false &&
+            action['modifies'][0]['order']['t'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: modify_response.to_json)
+
+      result = exchange.modify_order(
+        oid: 12_345,
+        coin: 'BTC',
+        is_buy: true,
+        size: '0.02',
+        limit_px: '96000'
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'modifies an order with Cloid oid' do
+      cloid = Hyperliquid::Cloid.from_int(456)
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['modifies'][0]['oid'] == cloid.to_raw
+        end
+        .to_return(status: 200, body: modify_response.to_json)
+
+      result = exchange.modify_order(
+        oid: cloid,
+        coin: 'BTC',
+        is_buy: true,
+        size: '0.02',
+        limit_px: '96000'
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes signature and nonce' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['signature'].is_a?(Hash) &&
+            body['signature']['r']&.start_with?('0x') &&
+            body['nonce'].is_a?(Integer) && body['nonce'].positive?
+        end
+        .to_return(status: 200, body: modify_response.to_json)
+
+      result = exchange.modify_order(
+        oid: 12_345,
+        coin: 'BTC',
+        is_buy: true,
+        size: '0.02',
+        limit_px: '96000'
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'supports vault_address' do
+      vault_addr = '0x1234567890123456789012345678901234567890'
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == vault_addr
+        end
+        .to_return(status: 200, body: modify_response.to_json)
+
+      result = exchange.modify_order(
+        oid: 12_345,
+        coin: 'BTC',
+        is_buy: true,
+        size: '0.02',
+        limit_px: '96000',
+        vault_address: vault_addr
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'raises ArgumentError for invalid oid type' do
+      expect do
+        exchange.modify_order(
+          oid: 12.5,
+          coin: 'BTC',
+          is_buy: true,
+          size: '0.02',
+          limit_px: '96000'
+        )
+      end.to raise_error(ArgumentError, /oid must be Integer, Cloid, or String/)
+    end
+  end
+
+  describe '#batch_modify' do
+    let(:batch_modify_response) do
+      {
+        'status' => 'ok',
+        'response' => {
+          'type' => 'batchModify',
+          'data' => {
+            'statuses' => [
+              { 'filled' => { 'oid' => 99_999 } },
+              { 'filled' => { 'oid' => 99_998 } }
+            ]
+          }
+        }
+      }
+    end
+
+    it 'modifies multiple orders' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'batchModify' &&
+            action['modifies'].length == 2
+        end
+        .to_return(status: 200, body: batch_modify_response.to_json)
+
+      modifies = [
+        { oid: 111, coin: 'BTC', is_buy: true, size: '0.01', limit_px: '95000' },
+        { oid: 222, coin: 'ETH', is_buy: false, size: '0.5', limit_px: '3200' }
+      ]
+
+      result = exchange.batch_modify(modifies: modifies)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes oid and order wire fields in each entry' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          m = body['action']['modifies'][0]
+          m['oid'] == 111 &&
+            m['order']['a'].is_a?(Integer) &&
+            m['order']['b'] == true &&
+            m['order']['p'].is_a?(String) &&
+            m['order']['s'].is_a?(String) &&
+            m['order']['r'] == false &&
+            m['order']['t'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: batch_modify_response.to_json)
+
+      modifies = [
+        { oid: 111, coin: 'BTC', is_buy: true, size: '0.01', limit_px: '95000' },
+        { oid: 222, coin: 'ETH', is_buy: false, size: '0.5', limit_px: '3200' }
+      ]
+
+      result = exchange.batch_modify(modifies: modifies)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'supports mixed oid types (Integer and Cloid)' do
+      cloid = Hyperliquid::Cloid.from_int(789)
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          modifies = body['action']['modifies']
+          modifies[0]['oid'] == 111 &&
+            modifies[1]['oid'] == cloid.to_raw
+        end
+        .to_return(status: 200, body: batch_modify_response.to_json)
+
+      modifies = [
+        { oid: 111, coin: 'BTC', is_buy: true, size: '0.01', limit_px: '95000' },
+        { oid: cloid, coin: 'ETH', is_buy: false, size: '0.5', limit_px: '3200' }
+      ]
+
+      result = exchange.batch_modify(modifies: modifies)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#update_leverage' do
+    let(:leverage_response) do
+      { 'status' => 'ok', 'response' => { 'type' => 'updateLeverage' } }
+    end
+
+    it 'sets cross leverage' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'updateLeverage' &&
+            action['isCross'] == true &&
+            action['leverage'] == 5 &&
+            action['asset'] == 0
+        end
+        .to_return(status: 200, body: leverage_response.to_json)
+
+      result = exchange.update_leverage(coin: 'BTC', leverage: 5)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'sets isolated leverage' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['isCross'] == false && action['leverage'] == 10
+        end
+        .to_return(status: 200, body: leverage_response.to_json)
+
+      result = exchange.update_leverage(coin: 'BTC', leverage: 10, is_cross: false)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'resolves asset index correctly' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['asset'] == 1 # ETH is index 1
+        end
+        .to_return(status: 200, body: leverage_response.to_json)
+
+      result = exchange.update_leverage(coin: 'ETH', leverage: 3)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'raises ArgumentError for unknown asset' do
+      expect do
+        exchange.update_leverage(coin: 'UNKNOWN', leverage: 5)
+      end.to raise_error(ArgumentError, /Unknown asset/)
+    end
+  end
+
+  describe '#update_isolated_margin' do
+    let(:margin_response) do
+      { 'status' => 'ok', 'response' => { 'type' => 'updateIsolatedMargin' } }
+    end
+
+    it 'adds margin with correct action structure' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'updateIsolatedMargin' &&
+            action['asset'] == 0 &&
+            action['isBuy'] == true &&
+            action['ntli'].is_a?(Integer)
+        end
+        .to_return(status: 200, body: margin_response.to_json)
+
+      result = exchange.update_isolated_margin(coin: 'BTC', amount: 100)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'converts amount to USD int correctly' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['ntli'] == 100_500_000
+        end
+        .to_return(status: 200, body: margin_response.to_json)
+
+      result = exchange.update_isolated_margin(coin: 'BTC', amount: 100.5)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes signature' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['signature'].is_a?(Hash) &&
+            body['signature']['r']&.start_with?('0x')
+        end
+        .to_return(status: 200, body: margin_response.to_json)
+
+      result = exchange.update_isolated_margin(coin: 'BTC', amount: 50)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'raises ArgumentError for amount that causes rounding' do
+      expect do
+        exchange.update_isolated_margin(coin: 'BTC', amount: 100.0000019)
+      end.to raise_error(ArgumentError, /float_to_usd_int causes rounding/)
+    end
+  end
+
+  describe '#schedule_cancel' do
+    let(:schedule_response) do
+      { 'status' => 'ok', 'response' => { 'type' => 'scheduleCancel' } }
+    end
+
+    it 'schedules cancel with time' do
+      cancel_time = 1_700_000_000_000
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'scheduleCancel' &&
+            action['time'] == cancel_time
+        end
+        .to_return(status: 200, body: schedule_response.to_json)
+
+      result = exchange.schedule_cancel(time: cancel_time)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'schedules cancel without time' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'scheduleCancel' &&
+            !action.key?('time')
+        end
+        .to_return(status: 200, body: schedule_response.to_json)
+
+      result = exchange.schedule_cancel
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#market_close' do
+    let(:user_state_response) do
+      {
+        'assetPositions' => [
+          {
+            'position' => {
+              'coin' => 'BTC',
+              'szi' => '0.05'
+            }
+          },
+          {
+            'position' => {
+              'coin' => 'ETH',
+              'szi' => '-1.5'
+            }
+          }
+        ],
+        'marginSummary' => {}
+      }
+    end
+
+    let(:mids_response) { { 'BTC' => '96000', 'ETH' => '3100' } }
+
+    before do
+      stub_request(:post, info_endpoint)
+        .with(body: hash_including('type' => 'clearinghouseState'))
+        .to_return(status: 200, body: user_state_response.to_json)
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'allMids' }.to_json)
+        .to_return(status: 200, body: mids_response.to_json)
+    end
+
+    it 'closes long position with sell IoC order' do
       stub_request(:post, exchange_endpoint)
         .with do |req|
           body = JSON.parse(req.body)
           order = body['action']['orders'][0]
-          trigger = order['t']['trigger']
-
-          trigger['tpsl'] == 'sl' &&
-            trigger['isMarket'] == true &&
-            trigger['triggerPx'].is_a?(String)
-        end
-        .to_return(status: 200, body: order_response.to_json)
-
-      exchange.order(
-        coin: 'BTC',
-        is_buy: false,
-        size: '0.1',
-        limit_px: '89900',
-        order_type: {
-          trigger: {
-            trigger_px: 90_000,
-            is_market: true,
-            tpsl: 'sl'
-          }
-        }
-      )
-    end
-
-    it 'places take profit order' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          trigger = body['action']['orders'][0]['t']['trigger']
-          trigger['tpsl'] == 'tp'
-        end
-        .to_return(status: 200, body: order_response.to_json)
-
-      exchange.order(
-        coin: 'BTC',
-        is_buy: false,
-        size: '0.1',
-        limit_px: '100100',
-        order_type: {
-          trigger: {
-            trigger_px: 100_000,
-            is_market: false,
-            tpsl: 'tp'
-          }
-        }
-      )
-    end
-
-    it 'formats triggerPx with float_to_wire (no scientific notation)' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          trigger_px = body['action']['orders'][0]['t']['trigger']['triggerPx']
-          !trigger_px.include?('e') && !trigger_px.include?('E')
-        end
-        .to_return(status: 200, body: order_response.to_json)
-
-      exchange.order(
-        coin: 'BTC',
-        is_buy: false,
-        size: '0.1',
-        limit_px: '89900',
-        order_type: {
-          trigger: {
-            trigger_px: 0.00001,
-            is_market: true,
-            tpsl: 'sl'
-          }
-        }
-      )
-    end
-
-    it 'raises error for missing trigger_px' do
-      expect do
-        exchange.order(
-          coin: 'BTC',
-          is_buy: false,
-          size: '0.1',
-          limit_px: '89900',
-          order_type: {
-            trigger: {
-              is_market: true,
-              tpsl: 'sl'
-            }
-          }
-        )
-      end.to raise_error(ArgumentError, /require :trigger_px/)
-    end
-
-    it 'raises error for missing tpsl' do
-      expect do
-        exchange.order(
-          coin: 'BTC',
-          is_buy: false,
-          size: '0.1',
-          limit_px: '89900',
-          order_type: {
-            trigger: {
-              trigger_px: 90_000,
-              is_market: true
-            }
-          }
-        )
-      end.to raise_error(ArgumentError, /require :tpsl/)
-    end
-
-    it 'raises error for invalid tpsl value' do
-      expect do
-        exchange.order(
-          coin: 'BTC',
-          is_buy: false,
-          size: '0.1',
-          limit_px: '89900',
-          order_type: {
-            trigger: {
-              trigger_px: 90_000,
-              is_market: true,
-              tpsl: 'invalid'
-            }
-          }
-        )
-      end.to raise_error(ArgumentError, /must be 'tp' or 'sl'/)
-    end
-  end
-
-  describe 'float_to_wire' do
-    let(:order_response) { { 'status' => 'ok' } }
-
-    before do
-      stub_request(:post, exchange_endpoint)
-        .to_return(status: 200, body: order_response.to_json)
-    end
-
-    it 'formats prices without scientific notation' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          price = body['action']['orders'][0]['p']
-          !price.include?('e') && !price.include?('E')
-        end
-        .to_return(status: 200, body: order_response.to_json)
-
-      exchange.order(
-        coin: 'BTC',
-        is_buy: true,
-        size: '0.00001',
-        limit_px: '0.00001'
-      )
-    end
-
-    it 'normalizes trailing zeros' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          price = body['action']['orders'][0]['p']
-          # 95000.00 should become "95000"
-          price == '95000'
-        end
-        .to_return(status: 200, body: order_response.to_json)
-
-      exchange.order(
-        coin: 'BTC',
-        is_buy: true,
-        size: '0.01',
-        limit_px: '95000.00'
-      )
-    end
-  end
-
-  describe 'with expires_after' do
-    let(:expires_after) { (Time.now.to_f * 1000).to_i + 30_000 }
-    let(:exchange_with_expiry) do
-      described_class.new(
-        client: client,
-        signer: signer,
-        info: info,
-        expires_after: expires_after
-      )
-    end
-
-    it 'includes expiresAfter in payload' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['expiresAfter'] == expires_after
+          order['b'] == false && # sell to close long
+            order['r'] == true && # reduce_only
+            order['t']['limit']['tif'] == 'Ioc'
         end
         .to_return(status: 200, body: { 'status' => 'ok' }.to_json)
 
-      exchange_with_expiry.order(
-        coin: 'BTC',
-        is_buy: true,
-        size: '0.01',
-        limit_px: '95000'
-      )
+      result = exchange.market_close(coin: 'BTC')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'closes short position with buy IoC order' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          order = body['action']['orders'][0]
+          order['b'] == true # buy to close short
+        end
+        .to_return(status: 200, body: { 'status' => 'ok' }.to_json)
+
+      result = exchange.market_close(coin: 'ETH')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'uses correct position size from user_state' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          order = body['action']['orders'][0]
+          order['s'] == '0.05' # BTC position size
+        end
+        .to_return(status: 200, body: { 'status' => 'ok' }.to_json)
+
+      result = exchange.market_close(coin: 'BTC')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'custom size parameter overrides position size' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          order = body['action']['orders'][0]
+          order['s'] == '0.02'
+        end
+        .to_return(status: 200, body: { 'status' => 'ok' }.to_json)
+
+      result = exchange.market_close(coin: 'BTC', size: 0.02)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'raises ArgumentError when no position found' do
+      expect do
+        exchange.market_close(coin: 'SOL')
+      end.to raise_error(ArgumentError, /No open position found for SOL/)
+    end
+
+    it 'applies slippage correctly for closing long (sell side)' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          limit_px = body['action']['orders'][0]['p'].to_f
+          # Selling with slippage: 96000 * 0.95 = 91200
+          limit_px < 92_000
+        end
+        .to_return(status: 200, body: { 'status' => 'ok' }.to_json)
+
+      result = exchange.market_close(coin: 'BTC', slippage: 0.05)
+      expect(result['status']).to eq('ok')
     end
   end
 end

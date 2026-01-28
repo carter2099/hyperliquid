@@ -276,6 +276,70 @@ cloid_cancels = [
 sdk.exchange.bulk_cancel_by_cloid(cancels: cloid_cancels)
 ```
 
+### Modifying Orders
+
+```ruby
+# Modify an existing order by order ID
+oid = result.dig('response', 'data', 'statuses', 0, 'resting', 'oid')
+sdk.exchange.modify_order(
+  oid: oid,
+  coin: 'BTC',
+  is_buy: true,
+  size: '0.02',
+  limit_px: '96000'
+)
+
+# Modify an order by client order ID
+cloid = Hyperliquid::Cloid.from_int(123)
+sdk.exchange.modify_order(
+  oid: cloid,
+  coin: 'BTC',
+  is_buy: true,
+  size: '0.02',
+  limit_px: '96000'
+)
+
+# Modify multiple orders at once
+modifies = [
+  { oid: 12345, coin: 'BTC', is_buy: true, size: '0.01', limit_px: '95000' },
+  { oid: 12346, coin: 'ETH', is_buy: false, size: '0.5', limit_px: '3200' }
+]
+sdk.exchange.batch_modify(modifies: modifies)
+```
+
+### Position Management
+
+```ruby
+# Set cross leverage (default)
+sdk.exchange.update_leverage(coin: 'BTC', leverage: 5)
+
+# Set isolated leverage
+sdk.exchange.update_leverage(coin: 'BTC', leverage: 10, is_cross: false)
+
+# Add isolated margin to a position (positive amount)
+sdk.exchange.update_isolated_margin(coin: 'BTC', amount: 100.0)
+
+# Remove isolated margin from a position (negative amount)
+sdk.exchange.update_isolated_margin(coin: 'BTC', amount: -50.0)
+
+# Close an entire position at market price (auto-detects size and direction)
+sdk.exchange.market_close(coin: 'BTC')
+
+# Close a partial position with custom slippage
+sdk.exchange.market_close(coin: 'BTC', size: 0.01, slippage: 0.03)
+```
+
+### Schedule Cancel
+
+```ruby
+# Schedule auto-cancel of all orders at a specific time
+cancel_time = (Time.now.to_f * 1000).to_i + 60_000  # 60 seconds from now
+sdk.exchange.schedule_cancel(time: cancel_time)
+
+# Activate schedule cancel without specifying a time (server default)
+sdk.exchange.schedule_cancel
+```
+
 ### Vault Trading
 
 ```ruby

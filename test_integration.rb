@@ -247,6 +247,127 @@ else
 end
 
 # ============================================================
+# TEST 5: Update Leverage (BTC)
+# ============================================================
+separator('TEST 5: Update Leverage (BTC)')
+
+if btc_price&.positive?
+  puts 'Setting BTC to 5x cross leverage...'
+  result = sdk.exchange.update_leverage(coin: perp_coin, leverage: 5, is_cross: true)
+  puts "Result: #{result.inspect}"
+  puts
+
+  wait_with_countdown(WAIT_SECONDS, 'Waiting before next leverage update...')
+
+  puts 'Setting BTC to 3x isolated leverage...'
+  result = sdk.exchange.update_leverage(coin: perp_coin, leverage: 3, is_cross: false)
+  puts "Result: #{result.inspect}"
+  puts
+
+  wait_with_countdown(WAIT_SECONDS, 'Waiting before resetting leverage...')
+
+  puts 'Resetting BTC to 1x cross leverage...'
+  result = sdk.exchange.update_leverage(coin: perp_coin, leverage: 1, is_cross: true)
+  puts "Result: #{result.inspect}"
+else
+  puts "SKIPPED: Could not get #{perp_coin} price"
+end
+
+# ============================================================
+# TEST 6: Modify Order (BTC)
+# ============================================================
+separator('TEST 6: Modify Order (BTC)')
+
+if btc_price&.positive?
+  # Place limit buy well below market (won't fill)
+  original_price = (btc_price * 0.50).round(0).to_i
+  modified_price = (btc_price * 0.51).round(0).to_i
+  perp_size = (20.0 / btc_price).ceil(sz_decimals)
+
+  puts "#{perp_coin} mid: $#{btc_price.round(2)}"
+  puts "Original limit: $#{original_price} (50% below mid)"
+  puts "Modified limit: $#{modified_price} (49% below mid)"
+  puts "Size: #{perp_size} BTC"
+  puts
+
+  puts 'Placing limit BUY order...'
+  result = sdk.exchange.order(
+    coin: perp_coin,
+    is_buy: true,
+    size: perp_size,
+    limit_px: original_price,
+    order_type: { limit: { tif: 'Gtc' } }
+  )
+  oid = check_result(result, 'Limit buy')
+
+  if oid.is_a?(Integer)
+    wait_with_countdown(WAIT_SECONDS, 'Order resting. Waiting before modify...')
+
+    puts "Modifying order #{oid} (price: $#{original_price} -> $#{modified_price})..."
+    result = sdk.exchange.modify_order(
+      oid: oid,
+      coin: perp_coin,
+      is_buy: true,
+      size: perp_size,
+      limit_px: modified_price
+    )
+    puts "Modify result: #{result.inspect}"
+    puts
+
+    # Extract new oid from modify result if available
+    new_status = result.dig('response', 'data', 'statuses', 0)
+    new_oid = if new_status.is_a?(Hash) && new_status['resting']
+                new_status['resting']['oid']
+              else
+                oid
+              end
+
+    wait_with_countdown(WAIT_SECONDS, 'Waiting before cancel...')
+
+    puts "Canceling modified order #{new_oid}..."
+    result = sdk.exchange.cancel(coin: perp_coin, oid: new_oid)
+    check_result(result, 'Cancel')
+  end
+else
+  puts "SKIPPED: Could not get #{perp_coin} price"
+end
+
+# ============================================================
+# TEST 7: Market Close (BTC)
+# ============================================================
+separator('TEST 7: Market Close (BTC)')
+
+if btc_price&.positive?
+  perp_size = (20.0 / btc_price).ceil(sz_decimals)
+
+  puts "#{perp_coin} mid: $#{btc_price.round(2)}"
+  puts "Size: #{perp_size} BTC"
+  puts
+
+  # Open a small long position
+  puts 'Opening LONG position (market buy)...'
+  result = sdk.exchange.market_order(
+    coin: perp_coin,
+    is_buy: true,
+    size: perp_size,
+    slippage: PERP_SLIPPAGE
+  )
+  check_result(result, 'Long open')
+
+  wait_with_countdown(WAIT_SECONDS, 'Position open. Waiting before market_close...')
+
+  # Close using market_close (auto-detect size)
+  puts 'Closing position using market_close (auto-detect size)...'
+  result = sdk.exchange.market_close(
+    coin: perp_coin,
+    slippage: PERP_SLIPPAGE
+  )
+  check_result(result, 'Market close')
+else
+  puts "SKIPPED: Could not get #{perp_coin} price"
+end
+
+# ============================================================
 # Summary
 # ============================================================
 separator('INTEGRATION TEST COMPLETE')

@@ -213,6 +213,167 @@ module Hyperliquid
       post_action(action, signature, nonce, vault_address)
     end
 
+    # Modify a single existing order
+    # @param oid [Integer, Cloid, String] Order ID or client order ID to modify
+    # @param coin [String] Asset symbol (e.g., "BTC")
+    # @param is_buy [Boolean] True for buy, false for sell
+    # @param size [String, Numeric] New order size
+    # @param limit_px [String, Numeric] New limit price
+    # @param order_type [Hash] Order type config (default: { limit: { tif: "Gtc" } })
+    # @param reduce_only [Boolean] Reduce-only flag (default: false)
+    # @param cloid [Cloid, String, nil] Client order ID for the modified order (optional)
+    # @param vault_address [String, nil] Vault address for vault trading (optional)
+    # @return [Hash] Modify response
+    def modify_order(oid:, coin:, is_buy:, size:, limit_px:,
+                     order_type: { limit: { tif: 'Gtc' } },
+                     reduce_only: false, cloid: nil, vault_address: nil)
+      batch_modify(
+        modifies: [{
+          oid: oid, coin: coin, is_buy: is_buy, size: size,
+          limit_px: limit_px, order_type: order_type,
+          reduce_only: reduce_only, cloid: cloid
+        }],
+        vault_address: vault_address
+      )
+    end
+
+    # Modify multiple orders at once
+    # @param modifies [Array<Hash>] Array of modify hashes with keys:
+    #   :oid, :coin, :is_buy, :size, :limit_px, :order_type, :reduce_only, :cloid
+    # @param vault_address [String, nil] Vault address for vault trading (optional)
+    # @return [Hash] Batch modify response
+    def batch_modify(modifies:, vault_address: nil)
+      nonce = timestamp_ms
+
+      modify_wires = modifies.map do |m|
+        order_wire = build_order_wire(
+          coin: m[:coin],
+          is_buy: m[:is_buy],
+          size: m[:size],
+          limit_px: m[:limit_px],
+          order_type: m[:order_type] || { limit: { tif: 'Gtc' } },
+          reduce_only: m[:reduce_only] || false,
+          cloid: m[:cloid]
+        )
+        { oid: normalize_oid(m[:oid]), order: order_wire }
+      end
+
+      action = {
+        type: 'batchModify',
+        modifies: modify_wires
+      }
+
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        vault_address: vault_address,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, vault_address)
+    end
+
+    # Set cross or isolated leverage for a coin
+    # @param coin [String] Asset symbol (perps only)
+    # @param leverage [Integer] Leverage value
+    # @param is_cross [Boolean] True for cross margin, false for isolated (default: true)
+    # @param vault_address [String, nil] Vault address for vault trading (optional)
+    # @return [Hash] Leverage update response
+    def update_leverage(coin:, leverage:, is_cross: true, vault_address: nil)
+      nonce = timestamp_ms
+
+      action = {
+        type: 'updateLeverage',
+        asset: asset_index(coin),
+        isCross: is_cross,
+        leverage: leverage
+      }
+
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        vault_address: vault_address,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, vault_address)
+    end
+
+    # Add or remove isolated margin for a position
+    # @param coin [String] Asset symbol (perps only)
+    # @param amount [Numeric] Amount in USD (positive to add, negative to remove)
+    # @param vault_address [String, nil] Vault address for vault trading (optional)
+    # @return [Hash] Margin update response
+    def update_isolated_margin(coin:, amount:, vault_address: nil)
+      nonce = timestamp_ms
+
+      action = {
+        type: 'updateIsolatedMargin',
+        asset: asset_index(coin),
+        isBuy: true,
+        ntli: float_to_usd_int(amount)
+      }
+
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        vault_address: vault_address,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, vault_address)
+    end
+
+    # Schedule automatic cancellation of all orders
+    # @param time [Integer, nil] UTC timestamp in milliseconds to cancel at (nil to activate with server default)
+    # @param vault_address [String, nil] Vault address for vault trading (optional)
+    # @return [Hash] Schedule cancel response
+    def schedule_cancel(time: nil, vault_address: nil)
+      nonce = timestamp_ms
+
+      action = { type: 'scheduleCancel' }
+      action[:time] = time if time
+
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        vault_address: vault_address,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, vault_address)
+    end
+
+    # Close a position at market price
+    # @param coin [String] Asset symbol (perps only)
+    # @param size [Numeric, nil] Size to close (nil = close entire position)
+    # @param slippage [Float] Slippage tolerance (default: 5%)
+    # @param cloid [Cloid, String, nil] Client order ID (optional)
+    # @param vault_address [String, nil] Vault address for vault trading (optional)
+    # @return [Hash] Order response
+    def market_close(coin:, size: nil, slippage: DEFAULT_SLIPPAGE, cloid: nil, vault_address: nil)
+      address = vault_address || @signer.address
+      state = @info.user_state(address)
+
+      position = state['assetPositions']&.find do |pos|
+        pos.dig('position', 'coin') == coin
+      end
+      raise ArgumentError, "No open position found for #{coin}" unless position
+
+      szi = position.dig('position', 'szi').to_f
+      is_buy = szi.negative?
+      close_size = size || szi.abs
+
+      mids = @info.all_mids
+      mid = mids[coin]&.to_f
+      raise ArgumentError, "Unknown asset or no price available: #{coin}" unless mid&.positive?
+
+      slippage_price = calculate_slippage_price(coin, mid, is_buy, slippage)
+
+      order(
+        coin: coin,
+        is_buy: is_buy,
+        size: close_size,
+        limit_px: slippage_price,
+        order_type: { limit: { tif: 'Ioc' } },
+        reduce_only: true,
+        cloid: cloid,
+        vault_address: vault_address
+      )
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!
@@ -343,6 +504,29 @@ module Hyperliquid
 
       # Format with fixed decimal places
       format("%.#{decimal_places}f", rounded)
+    end
+
+    # Normalize an order ID to the correct wire format
+    # @param oid [Integer, Cloid, String] Order ID or client order ID
+    # @return [Integer, String] Normalized order ID
+    def normalize_oid(oid)
+      case oid
+      when Integer then oid
+      when Cloid then oid.to_raw
+      when String then normalize_cloid(oid)
+      else raise ArgumentError, "oid must be Integer, Cloid, or String. Got: #{oid.class}"
+      end
+    end
+
+    # Convert a float USD amount to an integer (scaled by 10^6)
+    # @param value [Numeric] USD amount
+    # @return [Integer] Scaled integer value
+    def float_to_usd_int(value)
+      scaled = value.to_f * 1_000_000
+      rounded = scaled.round
+      raise ArgumentError, "float_to_usd_int causes rounding: #{value}" if (rounded - scaled).abs >= 1e-3
+
+      rounded
     end
 
     # Convert cloid to raw string format
