@@ -17,6 +17,12 @@ rake spec
 
 # Run tests and linting together (default rake task)
 rake
+
+# Run a single test file
+bundle exec rspec spec/hyperliquid/cloid_spec.rb
+
+# Run a specific test by line number
+bundle exec rspec spec/hyperliquid/cloid_spec.rb:62
 ```
 
 ### Linting
@@ -121,18 +127,12 @@ bin/setup
 - Uses RSpec for testing
 - WebMock for HTTP mocking
 - Spec helper configures WebMock to reset between tests
-- Test files mirror source structure:
-  - `spec/hyperliquid/client_spec.rb`
-  - `spec/hyperliquid/info_spec.rb`
-  - `spec/hyperliquid/exchange_spec.rb`
-  - `spec/hyperliquid/cloid_spec.rb`
-  - `spec/hyperliquid/signing/eip712_spec.rb`
-  - `spec/hyperliquid/signing/signer_spec.rb`
+- Test files mirror source structure in `spec/`
 
 ### Code Style
 
 RuboCop configuration (`.rubocop.yml`):
-- Targets Ruby 3.4.3
+- Targets Ruby 3.4.0+
 - Allows longer methods (max 50 lines) for complex logic
 - Disables class length checks (Info/Exchange classes implement many endpoints)
 - Excludes block length checks for specs
@@ -187,9 +187,3 @@ Market orders use Python SDK `_slippage_price` algorithm:
 5. Test in console: `bin/console`
 6. Run example script: `ruby example.rb`
 
-## Future Additions
-
-Future versions may include:
-- WebSocket client for real-time data streams
-- Additional exchange operations (leverage, margin adjustments, transfers)
-- Advanced trading features (TWAP, etc.)
