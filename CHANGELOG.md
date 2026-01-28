@@ -2,7 +2,7 @@
 
 ## [0.5.0] - 2026-01-28
 
-- Add core trading features to Exchange API (Tier 1 parity with Python SDK)
+- Add core trading features to Exchange API
   - Order modification: `modify_order`, `batch_modify`
   - Position management: `update_leverage`, `update_isolated_margin`, `market_close`
   - Dead man's switch: `schedule_cancel`
