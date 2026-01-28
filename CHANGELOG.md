@@ -1,5 +1,15 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [0.4.1] - 2025-01-28
+
+- Reorganize documentation for improved readability
+  - Streamline README with basic setup and links to detailed docs
+  - Add `docs/API.md` with complete method reference
+  - Add `docs/EXAMPLES.md` with Info and Exchange code examples
+  - Add `docs/CONFIGURATION.md` with SDK options and retry settings
+  - Add `docs/ERRORS.md` with error handling guide
+  - Add `docs/DEVELOPMENT.md` with setup and testing instructions
+
 ## [0.4.0] - 2025-01-27
 
 - Add Exchange API for authenticated write operations (trading)
