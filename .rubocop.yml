@@ -1,6 +1,7 @@
 AllCops:
   NewCops: enable
   TargetRubyVersion: 3.4.3
+  SuggestExtensions: false
   Exclude:
     - 'test_*.rb'  # Exclude ad-hoc integration test scripts
 
