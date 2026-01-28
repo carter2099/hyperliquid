@@ -1,5 +1,17 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [0.6.0] - 2026-01-28
+
+- Add transfers and account management to Exchange API
+  - USD transfers: `usd_send`, `usd_class_transfer`, `withdraw_from_bridge`
+  - Spot transfers: `spot_send`, `send_asset`
+  - Sub-accounts: `create_sub_account`, `sub_account_transfer`, `sub_account_spot_transfer`
+  - Vaults: `vault_transfer`
+  - Referrals: `set_referrer`
+- Add user-signed action signing (`sign_user_signed_action`) for EIP-712 typed data with `HyperliquidSignTransaction` domain
+- Add Python SDK parity test vectors for `usd_send`, `withdraw_from_bridge`, `create_sub_account`, and `sub_account_transfer`
+- Reorganize integration tests into individual scripts under `scripts/` for easier debugging
+
 ## [0.5.0] - 2026-01-28
 
 - Add core trading features to Exchange API
