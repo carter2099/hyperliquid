@@ -1,5 +1,9 @@
 # Hyperliquid Ruby SDK
 
+[![Gem Version](https://badge.fury.io/rb/hyperliquid.svg)](https://rubygems.org/gems/hyperliquid)
+[![Downloads](https://img.shields.io/gem/dt/hyperliquid.svg)](https://rubygems.org/gems/hyperliquid)
+[![CI](https://github.com/yourname/hyperliquid/actions/workflows/ci.yml/badge.svg)](https://github.com/yourname/hyperliquid/actions)
+
 A Ruby SDK for interacting with the Hyperliquid decentralized exchange API.
 
 The SDK supports both read operations (Info API) and authenticated write operations (Exchange API) for trading.
