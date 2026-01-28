@@ -1,4 +1,5 @@
-require: []  # Explicitly disable auto-requiring of plugins
+plugins:
+  - rubocop-rake
 
 AllCops:
   NewCops: enable
