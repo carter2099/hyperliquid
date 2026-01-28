@@ -14,7 +14,22 @@ Metrics/AbcSize:
 Metrics/ClassLength:
   Enabled: false
 
-# Allow longer blocks in specs - this is normal for tests
+# Allow longer blocks in specs and gemspec - this is normal for tests and gem configs
 Metrics/BlockLength:
   Exclude:
     - 'spec/**/*'
+    - '*.gemspec'
+
+# Exchange API methods require many parameters
+Metrics/ParameterLists:
+  Exclude:
+    - 'lib/hyperliquid/exchange.rb'
+
+# Allow higher complexity for order type conversion logic
+Metrics/CyclomaticComplexity:
+  Exclude:
+    - 'lib/hyperliquid/exchange.rb'
+
+Metrics/PerceivedComplexity:
+  Exclude:
+    - 'lib/hyperliquid/exchange.rb'

@@ -33,6 +33,8 @@ Gem::Specification.new do |spec|
   spec.require_paths = ['lib']
 
   # Add gem dependencies
+  spec.add_dependency 'eth', '~> 0.5'
   spec.add_dependency 'faraday', '~> 2.0'
   spec.add_dependency 'faraday-retry', '~> 2.0'
+  spec.add_dependency 'msgpack', '~> 1.7'
 end
