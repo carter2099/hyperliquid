@@ -97,11 +97,19 @@ Read-only methods for querying market data and user information.
 - `vault_transfer(vault_address:, is_deposit:, usd:)` - Deposit or withdraw USDC to/from a vault
 - `set_referrer(code:)` - Set referral code
 
+### Agent & Builder
+
+- `approve_agent(agent_address:, agent_name:)` - Authorize an agent wallet to trade on behalf of this account
+- `approve_builder_fee(builder:, max_fee_rate:)` - Approve a builder fee rate for a builder address
+- `token_delegate(validator:, wei:, is_undelegate:)` - Delegate or undelegate HYPE tokens to a validator
+
 ### Other
 
 - `address` - Get the wallet address associated with the private key
 
 Order placement and management methods support an optional `vault_address:` parameter for vault trading.
+
+Order placement methods (`order`, `bulk_orders`, `market_order`, `market_close`) support an optional `builder:` parameter for builder fee integration. The builder is a Hash with `:b` (builder address) and `:f` (fee in tenths of a basis point).
 
 ### Order Types
 

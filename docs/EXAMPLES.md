@@ -479,6 +479,62 @@ sdk.exchange.vault_transfer(
 sdk.exchange.set_referrer(code: 'MY_REFERRAL_CODE')
 ```
 
+### Agent, Builder & Delegation
+
+```ruby
+# Authorize an agent wallet to trade on your behalf
+agent_key = Eth::Key.new
+result = sdk.exchange.approve_agent(
+  agent_address: agent_key.address.to_s,
+  agent_name: 'my-trading-bot'       # optional
+)
+
+# Approve a builder fee (required before placing orders with that builder)
+sdk.exchange.approve_builder_fee(
+  builder: '0x250F311Ae04D3CEA03443C76340069eD26C47D7D',
+  max_fee_rate: '0.01%'   # 1 basis point
+)
+
+# Place an order with a builder fee
+sdk.exchange.order(
+  coin: 'BTC',
+  is_buy: true,
+  size: '0.01',
+  limit_px: '95000',
+  builder: { b: '0x250F311Ae04D3CEA03443C76340069eD26C47D7D', f: 10 }  # f=10 means 1bp
+)
+
+# Builder works with all order methods
+sdk.exchange.bulk_orders(
+  orders: [
+    { coin: 'BTC', is_buy: true, size: '0.01', limit_px: '94000' },
+    { coin: 'BTC', is_buy: false, size: '0.01', limit_px: '96000' }
+  ],
+  builder: { b: '0x250F311Ae04D3CEA03443C76340069eD26C47D7D', f: 10 }
+)
+
+sdk.exchange.market_order(
+  coin: 'BTC',
+  is_buy: true,
+  size: '0.01',
+  builder: { b: '0x250F311Ae04D3CEA03443C76340069eD26C47D7D', f: 10 }
+)
+
+# Delegate HYPE tokens to a validator (wei = float * 1e8)
+sdk.exchange.token_delegate(
+  validator: '0x...',
+  wei: 100_000_000,  # 1 HYPE
+  is_undelegate: false
+)
+
+# Undelegate HYPE tokens
+sdk.exchange.token_delegate(
+  validator: '0x...',
+  wei: 10_000_000,   # 0.1 HYPE
+  is_undelegate: true
+)
+```
+
 ### Client Order IDs (Cloid)
 
 ```ruby

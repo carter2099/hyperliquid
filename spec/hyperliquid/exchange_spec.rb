@@ -12,7 +12,7 @@ RSpec.describe Hyperliquid::Exchange do
   # Well-known test private key
   let(:test_private_key) { '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80' }
   let(:signer) { Hyperliquid::Signing::Signer.new(private_key: test_private_key, testnet: true) }
-  let(:exchange) { described_class.new(client: client, signer: signer, info: info) }
+  let(:exchange) { described_class.new(client: client, signer: signer, info: info, testnet: true) }
 
   let(:meta_response) do
     {
@@ -397,6 +397,7 @@ RSpec.describe Hyperliquid::Exchange do
           client: client,
           signer: signer,
           info: info,
+          testnet: true,
           expires_after: expires_after
         )
       end
@@ -1393,6 +1394,308 @@ RSpec.describe Hyperliquid::Exchange do
 
       result = exchange.market_close(coin: 'BTC', slippage: 0.05)
       expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#approve_agent' do
+    let(:approve_response) { { 'status' => 'ok', 'response' => { 'type' => 'approveAgent' } } }
+    let(:agent_address) { '0x1234567890123456789012345678901234567890' }
+
+    it 'approves agent with correct action structure' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'approveAgent' &&
+            action['agentAddress'] == agent_address &&
+            action['nonce'].is_a?(Integer) &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet' &&
+            !action.key?('agentName')
+        end
+        .to_return(status: 200, body: approve_response.to_json)
+
+      result = exchange.approve_agent(agent_address: agent_address)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes agentName when provided' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'approveAgent' &&
+            action['agentName'] == 'my-bot'
+        end
+        .to_return(status: 200, body: approve_response.to_json)
+
+      result = exchange.approve_agent(agent_address: agent_address, agent_name: 'my-bot')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes signature in request' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['signature'].is_a?(Hash) &&
+            body['signature']['r']&.start_with?('0x')
+        end
+        .to_return(status: 200, body: approve_response.to_json)
+
+      result = exchange.approve_agent(agent_address: agent_address)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#approve_builder_fee' do
+    let(:approve_response) { { 'status' => 'ok', 'response' => { 'type' => 'approveBuilderFee' } } }
+    let(:builder_address) { '0x250F311Ae04D3CEA03443C76340069eD26C47D7D' }
+
+    it 'approves builder fee with correct action structure' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'approveBuilderFee' &&
+            action['builder'] == builder_address &&
+            action['maxFeeRate'] == '0.01%' &&
+            action['nonce'].is_a?(Integer) &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet'
+        end
+        .to_return(status: 200, body: approve_response.to_json)
+
+      result = exchange.approve_builder_fee(builder: builder_address, max_fee_rate: '0.01%')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes signature in request' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['signature'].is_a?(Hash) &&
+            body['signature']['r']&.start_with?('0x')
+        end
+        .to_return(status: 200, body: approve_response.to_json)
+
+      result = exchange.approve_builder_fee(builder: builder_address, max_fee_rate: '0.01%')
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#token_delegate' do
+    let(:delegate_response) { { 'status' => 'ok', 'response' => { 'type' => 'tokenDelegate' } } }
+    let(:validator_address) { '0x1234567890123456789012345678901234567890' }
+
+    it 'delegates tokens with correct action structure' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'tokenDelegate' &&
+            action['validator'] == validator_address &&
+            action['wei'] == 1_000_000_000_000_000_000 &&
+            action['isUndelegate'] == false &&
+            action['nonce'].is_a?(Integer) &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet'
+        end
+        .to_return(status: 200, body: delegate_response.to_json)
+
+      result = exchange.token_delegate(
+        validator: validator_address,
+        wei: 1_000_000_000_000_000_000,
+        is_undelegate: false
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'undelegates tokens' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['isUndelegate'] == true
+        end
+        .to_return(status: 200, body: delegate_response.to_json)
+
+      result = exchange.token_delegate(
+        validator: validator_address,
+        wei: 500_000_000_000_000_000,
+        is_undelegate: true
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes signature in request' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['signature'].is_a?(Hash) &&
+            body['signature']['r']&.start_with?('0x')
+        end
+        .to_return(status: 200, body: delegate_response.to_json)
+
+      result = exchange.token_delegate(
+        validator: validator_address,
+        wei: 1_000_000_000_000_000_000,
+        is_undelegate: false
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe 'builder parameter' do
+    let(:order_response) do
+      {
+        'status' => 'ok',
+        'response' => {
+          'type' => 'order',
+          'data' => { 'statuses' => [{ 'resting' => { 'oid' => 12_345 } }] }
+        }
+      }
+    end
+
+    let(:builder) { { b: '0x250F311Ae04D3CEA03443C76340069eD26C47D7D', f: 10 } }
+
+    describe '#order with builder' do
+      it 'includes builder in action' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            action = body['action']
+            action['builder']['b'] == '0x250f311ae04d3cea03443c76340069ed26c47d7d' &&
+              action['builder']['f'] == 10
+          end
+          .to_return(status: 200, body: order_response.to_json)
+
+        result = exchange.order(
+          coin: 'BTC',
+          is_buy: true,
+          size: '0.01',
+          limit_px: '95000',
+          builder: builder
+        )
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'lowercases builder address' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            body['action']['builder']['b'] == '0x250f311ae04d3cea03443c76340069ed26c47d7d'
+          end
+          .to_return(status: 200, body: order_response.to_json)
+
+        result = exchange.order(
+          coin: 'BTC',
+          is_buy: true,
+          size: '0.01',
+          limit_px: '95000',
+          builder: builder
+        )
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'does not include builder when nil' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            !body['action'].key?('builder')
+          end
+          .to_return(status: 200, body: order_response.to_json)
+
+        result = exchange.order(
+          coin: 'BTC',
+          is_buy: true,
+          size: '0.01',
+          limit_px: '95000'
+        )
+        expect(result['status']).to eq('ok')
+      end
+    end
+
+    describe '#bulk_orders with builder' do
+      it 'includes builder in action' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            action = body['action']
+            action['builder']['b'] == '0x250f311ae04d3cea03443c76340069ed26c47d7d' &&
+              action['builder']['f'] == 10 &&
+              action['orders'].length == 2
+          end
+          .to_return(status: 200, body: order_response.to_json)
+
+        orders = [
+          { coin: 'BTC', is_buy: true, size: '0.01', limit_px: '95000' },
+          { coin: 'ETH', is_buy: false, size: '0.5', limit_px: '3200' }
+        ]
+        result = exchange.bulk_orders(orders: orders, builder: builder)
+        expect(result['status']).to eq('ok')
+      end
+    end
+
+    describe '#market_order with builder' do
+      let(:mids_response) { { 'BTC' => '96000' } }
+
+      before do
+        stub_request(:post, info_endpoint)
+          .with(body: { type: 'allMids' }.to_json)
+          .to_return(status: 200, body: mids_response.to_json)
+      end
+
+      it 'passes builder through to order' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            body['action']['builder']['b'] == '0x250f311ae04d3cea03443c76340069ed26c47d7d'
+          end
+          .to_return(status: 200, body: order_response.to_json)
+
+        result = exchange.market_order(
+          coin: 'BTC',
+          is_buy: true,
+          size: '0.01',
+          builder: builder
+        )
+        expect(result['status']).to eq('ok')
+      end
+    end
+
+    describe '#market_close with builder' do
+      let(:user_state_response) do
+        {
+          'assetPositions' => [
+            { 'position' => { 'coin' => 'BTC', 'szi' => '0.05' } }
+          ],
+          'marginSummary' => {}
+        }
+      end
+
+      let(:mids_response) { { 'BTC' => '96000' } }
+
+      before do
+        stub_request(:post, info_endpoint)
+          .with(body: hash_including('type' => 'clearinghouseState'))
+          .to_return(status: 200, body: user_state_response.to_json)
+
+        stub_request(:post, info_endpoint)
+          .with(body: { type: 'allMids' }.to_json)
+          .to_return(status: 200, body: mids_response.to_json)
+      end
+
+      it 'passes builder through to order' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            body['action']['builder']['b'] == '0x250f311ae04d3cea03443c76340069ed26c47d7d'
+          end
+          .to_return(status: 200, body: order_response.to_json)
+
+        result = exchange.market_close(coin: 'BTC', builder: builder)
+        expect(result['status']).to eq('ok')
+      end
     end
   end
 end

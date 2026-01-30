@@ -22,6 +22,12 @@ module Hyperliquid
         @key.address.to_s
       end
 
+      # Whether the signer targets testnet
+      # @return [Boolean]
+      def testnet?
+        @testnet
+      end
+
       # Sign an L1 action (orders, cancels, leverage updates, etc.)
       # @param action [Hash] The action payload to sign
       # @param nonce [Integer] Timestamp in milliseconds

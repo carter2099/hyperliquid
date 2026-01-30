@@ -67,6 +67,34 @@ module Hyperliquid
         ]
       }.freeze
 
+      APPROVE_AGENT_TYPES = {
+        'HyperliquidTransaction:ApproveAgent': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :agentAddress, type: 'address' },
+          { name: :agentName, type: 'string' },
+          { name: :nonce, type: 'uint64' }
+        ]
+      }.freeze
+
+      APPROVE_BUILDER_FEE_TYPES = {
+        'HyperliquidTransaction:ApproveBuilderFee': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :maxFeeRate, type: 'string' },
+          { name: :builder, type: 'address' },
+          { name: :nonce, type: 'uint64' }
+        ]
+      }.freeze
+
+      TOKEN_DELEGATE_TYPES = {
+        'HyperliquidTransaction:TokenDelegate': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :validator, type: 'address' },
+          { name: :wei, type: 'uint64' },
+          { name: :isUndelegate, type: 'bool' },
+          { name: :nonce, type: 'uint64' }
+        ]
+      }.freeze
+
       class << self
         # Domain for L1 actions (orders, cancels, leverage, etc.)
         # @return [Hash] EIP-712 domain configuration

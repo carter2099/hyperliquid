@@ -28,7 +28,9 @@ SCRIPTS = [
   'test_07_market_close.rb',
   'test_08_usd_class_transfer.rb',
   'test_09_sub_account_lifecycle.rb',
-  'test_10_vault_transfer.rb'
+  'test_10_vault.rb',
+  'test_11_builder_fee.rb',
+  'test_12_staking.rb'
 ].freeze
 
 def green(text)

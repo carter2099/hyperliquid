@@ -58,6 +58,7 @@ module Hyperliquid
         client: client,
         signer: signer,
         info: @info,
+        testnet: testnet,
         expires_after: expires_after
       )
     end

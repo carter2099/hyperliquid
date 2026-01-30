@@ -16,11 +16,13 @@ module Hyperliquid
     # @param client [Hyperliquid::Client] HTTP client
     # @param signer [Hyperliquid::Signing::Signer] EIP-712 signer
     # @param info [Hyperliquid::Info] Info API client for metadata
+    # @param testnet [Boolean] Whether targeting testnet (default: false)
     # @param expires_after [Integer, nil] Optional global expiration timestamp
-    def initialize(client:, signer:, info:, expires_after: nil)
+    def initialize(client:, signer:, info:, testnet: false, expires_after: nil)
       @client = client
       @signer = signer
       @info = info
+      @testnet = testnet
       @expires_after = expires_after
       @asset_cache = nil
     end
@@ -40,9 +42,10 @@ module Hyperliquid
     # @param reduce_only [Boolean] Reduce-only flag (default: false)
     # @param cloid [Cloid, String, nil] Client order ID (optional)
     # @param vault_address [String, nil] Vault address for vault trading (optional)
+    # @param builder [Hash, nil] Builder fee config { b: "0xaddress", f: fee_in_tenths_of_bp } (optional)
     # @return [Hash] Order response
     def order(coin:, is_buy:, size:, limit_px:, order_type: { limit: { tif: 'Gtc' } },
-              reduce_only: false, cloid: nil, vault_address: nil)
+              reduce_only: false, cloid: nil, vault_address: nil, builder: nil)
       nonce = timestamp_ms
 
       order_wire = build_order_wire(
@@ -60,6 +63,7 @@ module Hyperliquid
         orders: [order_wire],
         grouping: 'na'
       }
+      action[:builder] = normalize_builder(builder) if builder
 
       signature = @signer.sign_l1_action(
         action, nonce,
@@ -74,8 +78,9 @@ module Hyperliquid
     #   :coin, :is_buy, :size, :limit_px, :order_type, :reduce_only, :cloid
     # @param grouping [String] Order grouping ("na", "normalTpsl", "positionTpsl")
     # @param vault_address [String, nil] Vault address for vault trading (optional)
+    # @param builder [Hash, nil] Builder fee config { b: "0xaddress", f: fee_in_tenths_of_bp } (optional)
     # @return [Hash] Bulk order response
-    def bulk_orders(orders:, grouping: 'na', vault_address: nil)
+    def bulk_orders(orders:, grouping: 'na', vault_address: nil, builder: nil)
       nonce = timestamp_ms
 
       order_wires = orders.map do |o|
@@ -95,6 +100,7 @@ module Hyperliquid
         orders: order_wires,
         grouping: grouping
       }
+      action[:builder] = normalize_builder(builder) if builder
 
       signature = @signer.sign_l1_action(
         action, nonce,
@@ -110,8 +116,9 @@ module Hyperliquid
     # @param size [String, Numeric] Order size
     # @param slippage [Float] Slippage tolerance (default: 0.05 = 5%)
     # @param vault_address [String, nil] Vault address for vault trading (optional)
+    # @param builder [Hash, nil] Builder fee config { b: "0xaddress", f: fee_in_tenths_of_bp } (optional)
     # @return [Hash] Order response
-    def market_order(coin:, is_buy:, size:, slippage: DEFAULT_SLIPPAGE, vault_address: nil)
+    def market_order(coin:, is_buy:, size:, slippage: DEFAULT_SLIPPAGE, vault_address: nil, builder: nil)
       # Get current mid price
       mids = @info.all_mids
       mid = mids[coin]&.to_f
@@ -126,7 +133,8 @@ module Hyperliquid
         size: size,
         limit_px: slippage_price,
         order_type: { limit: { tif: 'Ioc' } },
-        vault_address: vault_address
+        vault_address: vault_address,
+        builder: builder
       )
     end
 
@@ -342,8 +350,9 @@ module Hyperliquid
     # @param slippage [Float] Slippage tolerance (default: 5%)
     # @param cloid [Cloid, String, nil] Client order ID (optional)
     # @param vault_address [String, nil] Vault address for vault trading (optional)
+    # @param builder [Hash, nil] Builder fee config { b: "0xaddress", f: fee_in_tenths_of_bp } (optional)
     # @return [Hash] Order response
-    def market_close(coin:, size: nil, slippage: DEFAULT_SLIPPAGE, cloid: nil, vault_address: nil)
+    def market_close(coin:, size: nil, slippage: DEFAULT_SLIPPAGE, cloid: nil, vault_address: nil, builder: nil)
       address = vault_address || @signer.address
       state = @info.user_state(address)
 
@@ -370,7 +379,8 @@ module Hyperliquid
         order_type: { limit: { tif: 'Ioc' } },
         reduce_only: true,
         cloid: cloid,
-        vault_address: vault_address
+        vault_address: vault_address,
+        builder: builder
       )
     end
 
@@ -383,7 +393,7 @@ module Hyperliquid
       action = {
         type: 'usdSend',
         signatureChainId: '0x66eee',
-        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @signer.instance_variable_get(:@testnet)),
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
         destination: destination,
         amount: amount.to_s,
         time: nonce
@@ -406,7 +416,7 @@ module Hyperliquid
       action = {
         type: 'spotSend',
         signatureChainId: '0x66eee',
-        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @signer.instance_variable_get(:@testnet)),
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
         destination: destination,
         token: token,
         amount: amount.to_s,
@@ -429,7 +439,7 @@ module Hyperliquid
       action = {
         type: 'usdClassTransfer',
         signatureChainId: '0x66eee',
-        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @signer.instance_variable_get(:@testnet)),
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
         amount: amount.to_s,
         toPerp: to_perp,
         nonce: nonce
@@ -451,7 +461,7 @@ module Hyperliquid
       action = {
         type: 'withdraw3',
         signatureChainId: '0x66eee',
-        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @signer.instance_variable_get(:@testnet)),
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
         destination: destination,
         amount: amount.to_s,
         time: nonce
@@ -476,7 +486,7 @@ module Hyperliquid
       action = {
         type: 'sendAsset',
         signatureChainId: '0x66eee',
-        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @signer.instance_variable_get(:@testnet)),
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
         destination: destination,
         sourceDex: source_dex,
         destinationDex: destination_dex,
@@ -566,6 +576,77 @@ module Hyperliquid
       nonce = timestamp_ms
       action = { type: 'setReferrer', code: code }
       signature = @signer.sign_l1_action(action, nonce)
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Authorize an agent wallet to trade on behalf of this account
+    # @param agent_address [String] Agent's Ethereum address
+    # @param agent_name [String, nil] Optional agent name (omitted from action if nil)
+    # @return [Hash] Approve agent response
+    def approve_agent(agent_address:, agent_name: nil)
+      nonce = timestamp_ms
+      action = {
+        type: 'approveAgent',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
+        agentAddress: agent_address,
+        nonce: nonce
+      }
+      # agentName is always included in the signed message (empty string if nil),
+      # but only included in the posted action if a name was provided (matches Python SDK)
+      action[:agentName] = agent_name if agent_name
+      signature = @signer.sign_user_signed_action(
+        { agentAddress: agent_address, agentName: agent_name || '', nonce: nonce },
+        'HyperliquidTransaction:ApproveAgent',
+        Signing::EIP712::APPROVE_AGENT_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Approve a builder fee rate for a builder address
+    # Users must approve a builder before orders with that builder can be placed.
+    # @param builder [String] Builder's Ethereum address
+    # @param max_fee_rate [String] Maximum fee rate (e.g., "0.01%" for 1 basis point)
+    # @return [Hash] Approve builder fee response
+    def approve_builder_fee(builder:, max_fee_rate:)
+      nonce = timestamp_ms
+      action = {
+        type: 'approveBuilderFee',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
+        maxFeeRate: max_fee_rate,
+        builder: builder,
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { maxFeeRate: max_fee_rate, builder: builder, nonce: nonce },
+        'HyperliquidTransaction:ApproveBuilderFee',
+        Signing::EIP712::APPROVE_BUILDER_FEE_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Delegate or undelegate HYPE tokens to a validator
+    # @param validator [String] Validator's Ethereum address
+    # @param wei [Integer] Amount as float * 1e8 (e.g., 1 HYPE = 100_000_000)
+    # @param is_undelegate [Boolean] True to undelegate, false to delegate
+    # @return [Hash] Token delegate response
+    def token_delegate(validator:, wei:, is_undelegate:)
+      nonce = timestamp_ms
+      action = {
+        type: 'tokenDelegate',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
+        validator: validator,
+        wei: wei,
+        isUndelegate: is_undelegate,
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { validator: validator, wei: wei, isUndelegate: is_undelegate, nonce: nonce },
+        'HyperliquidTransaction:TokenDelegate',
+        Signing::EIP712::TOKEN_DELEGATE_TYPES
+      )
       post_action(action, signature, nonce, nil)
     end
 
@@ -743,6 +824,13 @@ module Hyperliquid
       else
         raise ArgumentError, "cloid must be Cloid, String, or nil. Got: #{cloid.class}"
       end
+    end
+
+    # Normalize builder fee config for inclusion in action payload
+    # @param builder [Hash] Builder config with :b (address) and :f (fee)
+    # @return [Hash] Normalized builder config with lowercased address
+    def normalize_builder(builder)
+      { b: builder[:b].downcase, f: builder[:f] }
     end
 
     # Convert order type to wire format
