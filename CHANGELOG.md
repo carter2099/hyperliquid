@@ -1,5 +1,15 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [0.7.0] - 2026-01-30
+
+- Add agent, builder & delegation actions to Exchange API
+  - `approve_agent` — authorize an agent wallet to trade on behalf of the account
+  - `approve_builder_fee` — approve a builder fee rate for a builder address
+  - `token_delegate` — delegate or undelegate HYPE tokens to a validator
+- Add builder fee support on order placement
+  - Optional `builder:` parameter on `order`, `bulk_orders`, `market_order`, `market_close`
+- Add EIP-712 type definitions for `ApproveAgent`, `ApproveBuilderFee`, and `TokenDelegate`
+
 ## [0.6.0] - 2026-01-28
 
 - Add transfers and account management to Exchange API
