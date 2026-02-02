@@ -54,6 +54,7 @@ exchange = trading_sdk.exchange
 
 - [API Reference](docs/API.md) - Complete list of available methods
 - [Examples](docs/EXAMPLES.md) - Code examples for Info and Exchange APIs
+- [Web Sockets](docs/WS.md) - Web Sockets implementation
 - [Configuration](docs/CONFIGURATION.md) - SDK configuration options
 - [Error Handling](docs/ERRORS.md) - Error types and handling
 - [Development](docs/DEVELOPMENT.md) - Contributing and running tests
