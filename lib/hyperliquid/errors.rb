@@ -35,4 +35,7 @@ module Hyperliquid
 
   # Error for network connectivity issues
   class NetworkError < Error; end
+
+  # Error for WebSocket issues
+  class WebSocketError < Error; end
 end

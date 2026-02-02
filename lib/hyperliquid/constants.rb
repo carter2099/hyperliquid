@@ -11,6 +11,11 @@ module Hyperliquid
     INFO_ENDPOINT = '/info'
     EXCHANGE_ENDPOINT = '/exchange'
 
+    # WebSocket
+    WS_ENDPOINT = '/ws'
+    WS_PING_INTERVAL = 50        # seconds between pings
+    WS_MAX_QUEUE_SIZE = 1024     # max queued messages before dropping
+
     # Request timeouts (seconds)
     DEFAULT_TIMEOUT = 30
     DEFAULT_READ_TIMEOUT = 30

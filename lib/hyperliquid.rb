@@ -9,6 +9,7 @@ require_relative 'hyperliquid/cloid'
 require_relative 'hyperliquid/signing/eip712'
 require_relative 'hyperliquid/signing/signer'
 require_relative 'hyperliquid/exchange'
+require_relative 'hyperliquid/ws/client'
 
 # Ruby SDK for Hyperliquid API
 # Provides access to Hyperliquid's decentralized exchange API
@@ -34,7 +35,7 @@ module Hyperliquid
 
   # Main SDK class
   class SDK
-    attr_reader :info, :exchange
+    attr_reader :info, :exchange, :ws
 
     # Initialize the SDK
     # @param testnet [Boolean] Whether to use testnet (default: false for mainnet)
@@ -50,6 +51,7 @@ module Hyperliquid
       @info = Info.new(client)
       @testnet = testnet
       @exchange = nil
+      @ws = WS::Client.new(testnet: testnet)
 
       return unless private_key
 

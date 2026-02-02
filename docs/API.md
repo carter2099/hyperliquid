@@ -134,3 +134,39 @@ Factory methods:
 - `Hyperliquid::Cloid.from_str(s)` - Create from hex string
 - `Hyperliquid::Cloid.from_uuid(uuid)` - Create from UUID
 - `Hyperliquid::Cloid.random` - Generate random
+
+## WebSocket
+
+Real-time data streaming via WebSocket. No private key required.
+
+### Connection
+
+- `ws.connect` - Connect to the WebSocket server (also called automatically on first `subscribe`)
+- `ws.connected?` - Check if the WebSocket is connected
+- `ws.close` - Disconnect and stop all background threads
+
+### Subscriptions
+
+- `ws.subscribe(subscription, &callback)` - Subscribe to a channel. Returns a subscription ID.
+- `ws.unsubscribe(id)` - Unsubscribe by subscription ID. Sends unsubscribe to server when the last callback for a channel is removed.
+
+### Lifecycle Events
+
+- `ws.on(:open, &callback)` - Called when connection is established
+- `ws.on(:close, &callback)` - Called when connection is closed
+- `ws.on(:error, &callback)` - Called on connection error
+
+### Monitoring
+
+- `ws.dropped_message_count` - Number of messages dropped due to a full internal queue (callbacks too slow)
+
+### Available Channels
+
+- `l2Book` - Level 2 order book updates. Subscription: `{ type: 'l2Book', coin: 'ETH' }`
+
+### Configuration
+
+`Hyperliquid::WS::Client.new` accepts:
+- `testnet:` (Boolean, default: false) - Use testnet WebSocket endpoint
+- `max_queue_size:` (Integer, default: 1024) - Max messages buffered before dropping
+- `reconnect:` (Boolean, default: true) - Auto-reconnect on unexpected disconnect

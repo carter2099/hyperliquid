@@ -30,10 +30,11 @@ Metrics/ParameterLists:
   Exclude:
     - 'lib/hyperliquid/exchange.rb'
 
-# Allow higher complexity for order type conversion logic
+# Allow higher complexity for order type conversion logic and WS message handling
 Metrics/CyclomaticComplexity:
   Exclude:
     - 'lib/hyperliquid/exchange.rb'
+    - 'lib/hyperliquid/ws/client.rb'
 
 Metrics/PerceivedComplexity:
   Exclude:

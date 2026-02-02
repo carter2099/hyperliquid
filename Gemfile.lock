@@ -6,6 +6,7 @@ PATH
       faraday (~> 2.0)
       faraday-retry (~> 2.0)
       msgpack (~> 1.7)
+      websocket-client-simple (~> 0.9)
 
 GEM
   remote: https://rubygems.org/
@@ -35,6 +36,7 @@ GEM
       openssl (~> 3.3)
       rbsecp256k1 (~> 6.0)
       scrypt (~> 3.0)
+    event_emitter (0.2.6)
     faraday (2.13.4)
       faraday-net_http (>= 2.0, < 3.5)
       json
@@ -68,6 +70,7 @@ GEM
     logger (1.7.0)
     mini_portile2 (2.8.9)
     msgpack (1.8.0)
+    mutex_m (0.3.0)
     net-http (0.6.0)
       uri
     openssl (3.3.2)
@@ -139,6 +142,12 @@ GEM
       addressable (>= 2.8.0)
       crack (>= 0.3.2)
       hashdiff (>= 0.4.0, < 2.0.0)
+    websocket (1.2.11)
+    websocket-client-simple (0.9.0)
+      base64
+      event_emitter
+      mutex_m
+      websocket
 
 PLATFORMS
   arm64-darwin-24

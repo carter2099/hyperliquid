@@ -535,6 +535,76 @@ sdk.exchange.token_delegate(
 )
 ```
 
+## WebSocket
+
+### Basic l2Book Subscription
+
+```ruby
+sdk = Hyperliquid.new(testnet: true)
+
+# Register lifecycle callbacks (optional)
+sdk.ws.on(:open) { puts 'Connected!' }
+sdk.ws.on(:close) { puts 'Disconnected.' }
+sdk.ws.on(:error) { |e| puts "Error: #{e}" }
+
+# Subscribe to ETH l2Book -- auto-connects on first subscribe
+sub_id = sdk.ws.subscribe({ type: 'l2Book', coin: 'ETH' }) do |data|
+  levels = data['levels']
+  best_bid = levels[0]&.first  # bids
+  best_ask = levels[1]&.first  # asks
+  puts "ETH  bid=#{best_bid['px']}  ask=#{best_ask['px']}"
+end
+
+sleep 10
+
+# Unsubscribe and disconnect
+sdk.ws.unsubscribe(sub_id)
+sdk.ws.close
+```
+
+### Multiple Subscriptions
+
+```ruby
+sdk = Hyperliquid.new(testnet: true)
+
+sdk.ws.subscribe({ type: 'l2Book', coin: 'ETH' }) do |data|
+  puts "ETH update: #{data['levels'][0]&.first&.dig('px')}"
+end
+
+sdk.ws.subscribe({ type: 'l2Book', coin: 'BTC' }) do |data|
+  puts "BTC update: #{data['levels'][0]&.first&.dig('px')}"
+end
+
+sleep 10
+sdk.ws.close
+```
+
+### Handling Reconnection
+
+```ruby
+sdk = Hyperliquid.new(testnet: true)
+
+sdk.ws.on(:open) { puts 'Connected (or reconnected)!' }
+sdk.ws.on(:close) { puts 'Connection lost. Reconnecting...' }
+
+# Subscriptions are automatically replayed on reconnect
+sdk.ws.subscribe({ type: 'l2Book', coin: 'ETH' }) do |data|
+  puts "ETH: #{data['levels'][0]&.first&.dig('px')}"
+end
+
+# Monitor for dropped messages (slow callback detection)
+Thread.new do
+  loop do
+    count = sdk.ws.dropped_message_count
+    puts "Dropped messages: #{count}" if count > 0
+    sleep 60
+  end
+end
+
+sleep 300
+sdk.ws.close
+```
+
 ### Client Order IDs (Cloid)
 
 ```ruby
