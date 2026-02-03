@@ -1545,6 +1545,114 @@ RSpec.describe Hyperliquid::Exchange do
     end
   end
 
+  describe '#user_dex_abstraction' do
+    let(:dex_response) { { 'status' => 'ok', 'response' => { 'type' => 'userDexAbstraction' } } }
+
+    it 'enables DEX abstraction with correct action structure' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'userDexAbstraction' &&
+            action['user'] == exchange.address &&
+            action['enabled'] == true &&
+            action['nonce'].is_a?(Integer) &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet'
+        end
+        .to_return(status: 200, body: dex_response.to_json)
+
+      result = exchange.user_dex_abstraction(enabled: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'disables DEX abstraction' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['enabled'] == false
+        end
+        .to_return(status: 200, body: dex_response.to_json)
+
+      result = exchange.user_dex_abstraction(enabled: false)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'uses custom user address when provided' do
+      custom_user = '0x1234567890123456789012345678901234567890'
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['user'] == custom_user
+        end
+        .to_return(status: 200, body: dex_response.to_json)
+
+      result = exchange.user_dex_abstraction(enabled: true, user: custom_user)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes signature in request' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['signature'].is_a?(Hash) &&
+            body['signature']['r']&.start_with?('0x')
+        end
+        .to_return(status: 200, body: dex_response.to_json)
+
+      result = exchange.user_dex_abstraction(enabled: true)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#agent_enable_dex_abstraction' do
+    let(:dex_response) { { 'status' => 'ok', 'response' => { 'type' => 'agentEnableDexAbstraction' } } }
+
+    it 'enables DEX abstraction via agent with correct action structure' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'agentEnableDexAbstraction' &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: dex_response.to_json)
+
+      result = exchange.agent_enable_dex_abstraction
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes vault address when provided' do
+      vault_addr = '0x1234567890123456789012345678901234567890'
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == vault_addr
+        end
+        .to_return(status: 200, body: dex_response.to_json)
+
+      result = exchange.agent_enable_dex_abstraction(vault_address: vault_addr)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes signature in request' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['signature'].is_a?(Hash) &&
+            body['signature']['r']&.start_with?('0x')
+        end
+        .to_return(status: 200, body: dex_response.to_json)
+
+      result = exchange.agent_enable_dex_abstraction
+      expect(result['status']).to eq('ok')
+    end
+  end
+
   describe 'builder parameter' do
     let(:order_response) do
       {
@@ -1696,6 +1804,63 @@ RSpec.describe Hyperliquid::Exchange do
         result = exchange.market_close(coin: 'BTC', builder: builder)
         expect(result['status']).to eq('ok')
       end
+    end
+  end
+
+  describe 'HIP-3 dex support' do
+    let(:hip3_meta_response) do
+      {
+        'universe' => [
+          { 'name' => 'xyz:GOLD', 'szDecimals' => 4 },
+          { 'name' => 'xyz:SILVER', 'szDecimals' => 2 }
+        ]
+      }
+    end
+
+    let(:order_response) do
+      {
+        'status' => 'ok',
+        'response' => {
+          'type' => 'order',
+          'data' => { 'statuses' => [{ 'resting' => { 'oid' => 12_345 } }] }
+        }
+      }
+    end
+
+    it 'lazily loads HIP-3 dex metadata when ordering a prefixed asset' do
+      # Stub perpDexs to return xyz at index 2 (perp_dex_index = 2)
+      perp_dexs_response = [nil, nil, { 'name' => 'xyz', 'deployer' => '0x123' }]
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpDexs' }.to_json)
+        .to_return(status: 200, body: perp_dexs_response.to_json)
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'meta', dex: 'xyz' }.to_json)
+        .to_return(status: 200, body: hip3_meta_response.to_json)
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          # HIP-3 asset ID: 100000 + 2*10000 + 0 = 120000
+          action['type'] == 'order' && action['orders'][0]['a'] == 120_000
+        end
+        .to_return(status: 200, body: order_response.to_json)
+
+      result = exchange.order(
+        coin: 'xyz:GOLD',
+        is_buy: true,
+        size: '1.0',
+        limit_px: '2500'
+      )
+
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'extracts dex prefix correctly' do
+      expect(exchange.send(:extract_dex_prefix, 'xyz:GOLD')).to eq('xyz')
+      expect(exchange.send(:extract_dex_prefix, 'BTC')).to be_nil
+      expect(exchange.send(:extract_dex_prefix, 'PURR/USDC')).to be_nil
     end
   end
 end

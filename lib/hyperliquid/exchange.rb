@@ -119,8 +119,9 @@ module Hyperliquid
     # @param builder [Hash, nil] Builder fee config { b: "0xaddress", f: fee_in_tenths_of_bp } (optional)
     # @return [Hash] Order response
     def market_order(coin:, is_buy:, size:, slippage: DEFAULT_SLIPPAGE, vault_address: nil, builder: nil)
-      # Get current mid price
-      mids = @info.all_mids
+      # Get current mid price (use dex-specific endpoint for HIP-3 assets)
+      dex_prefix = extract_dex_prefix(coin)
+      mids = dex_prefix ? @info.all_mids(dex: dex_prefix) : @info.all_mids
       mid = mids[coin]&.to_f
       raise ArgumentError, "Unknown asset or no price available: #{coin}" unless mid&.positive?
 
@@ -354,7 +355,8 @@ module Hyperliquid
     # @return [Hash] Order response
     def market_close(coin:, size: nil, slippage: DEFAULT_SLIPPAGE, cloid: nil, vault_address: nil, builder: nil)
       address = vault_address || @signer.address
-      state = @info.user_state(address)
+      dex_prefix = extract_dex_prefix(coin)
+      state = dex_prefix ? @info.user_state(address, dex: dex_prefix) : @info.user_state(address)
 
       position = state['assetPositions']&.find do |pos|
         pos.dig('position', 'coin') == coin
@@ -365,7 +367,7 @@ module Hyperliquid
       is_buy = szi.negative?
       close_size = size || szi.abs
 
-      mids = @info.all_mids
+      mids = dex_prefix ? @info.all_mids(dex: dex_prefix) : @info.all_mids
       mid = mids[coin]&.to_f
       raise ArgumentError, "Unknown asset or no price available: #{coin}" unless mid&.positive?
 
@@ -650,6 +652,45 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Enable or disable HIP-3 DEX abstraction for automatic collateral transfers
+    # When enabled, collateral is automatically transferred to HIP-3 dexes when trading
+    # @param enabled [Boolean] True to enable, false to disable DEX abstraction
+    # @param user [String, nil] User address (defaults to signer address)
+    # @return [Hash] User DEX abstraction response
+    def user_dex_abstraction(enabled:, user: nil)
+      nonce = timestamp_ms
+      user_address = user || @signer.address
+      action = {
+        type: 'userDexAbstraction',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
+        user: user_address,
+        enabled: enabled,
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { user: user_address, enabled: enabled, nonce: nonce },
+        'HyperliquidTransaction:UserDexAbstraction',
+        Signing::EIP712::USER_DEX_ABSTRACTION_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Enable HIP-3 DEX abstraction via agent (L1 action, enable only)
+    # This allows agents to enable DEX abstraction for the account they're trading on behalf of
+    # @param vault_address [String, nil] Vault address if trading on behalf of a vault
+    # @return [Hash] Agent enable DEX abstraction response
+    def agent_enable_dex_abstraction(vault_address: nil)
+      nonce = timestamp_ms
+      action = { type: 'agentEnableDexAbstraction' }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        vault_address: vault_address,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, vault_address)
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!
@@ -678,26 +719,54 @@ module Hyperliquid
     end
 
     # Get asset index for a coin symbol
-    # @param coin [String] Asset symbol
+    # @param coin [String] Asset symbol (supports HIP-3 prefixed names like "xyz:GOLD")
     # @return [Integer] Asset index
     def asset_index(coin)
       load_asset_cache unless @asset_cache
+
+      # If not found and has a dex prefix (e.g., "xyz:GOLD"), try loading that dex
+      unless @asset_cache[:indices][coin]
+        dex_prefix = extract_dex_prefix(coin)
+        load_hip3_dex_cache(dex_prefix) if dex_prefix && !@loaded_dexes&.include?(dex_prefix)
+      end
+
       @asset_cache[:indices][coin] || raise(ArgumentError, "Unknown asset: #{coin}")
     end
 
     # Get asset metadata for a coin symbol
-    # @param coin [String] Asset symbol
+    # @param coin [String] Asset symbol (supports HIP-3 prefixed names like "xyz:GOLD")
     # @return [Hash] Asset metadata with :sz_decimals and :is_spot
     def asset_metadata(coin)
       load_asset_cache unless @asset_cache
+
+      # If not found and has a dex prefix, try loading that dex
+      unless @asset_cache[:metadata][coin]
+        dex_prefix = extract_dex_prefix(coin)
+        load_hip3_dex_cache(dex_prefix) if dex_prefix && !@loaded_dexes&.include?(dex_prefix)
+      end
+
       @asset_cache[:metadata][coin] || raise(ArgumentError, "Unknown asset: #{coin}")
+    end
+
+    # Extract dex prefix from a coin name (e.g., "xyz:GOLD" -> "xyz")
+    # @param coin [String] Coin name
+    # @return [String, nil] Dex prefix or nil if no prefix
+    def extract_dex_prefix(coin)
+      return nil unless coin.include?(':')
+
+      prefix = coin.split(':').first
+      # Spot pairs like "PURR/USDC" don't count as dex prefixes
+      return nil if prefix.include?('/')
+
+      prefix
     end
 
     # Load asset metadata from Info API (perps and spot)
     def load_asset_cache
       @asset_cache = { indices: {}, metadata: {} }
+      @loaded_dexes = Set.new
 
-      # Load perpetual assets
+      # Load perpetual assets from default dex
       meta = @info.meta
       meta['universe'].each_with_index do |asset, index|
         name = asset['name']
@@ -717,6 +786,33 @@ module Hyperliquid
         @asset_cache[:metadata][name] = {
           sz_decimals: pair['szDecimals'] || 0,
           is_spot: true
+        }
+      end
+    end
+
+    # Load asset metadata for a HIP-3 dex
+    # HIP-3 asset IDs use formula: 100000 + perp_dex_index * 10000 + index_in_meta
+    # @param dex [String] Dex name (e.g., "xyz")
+    def load_hip3_dex_cache(dex)
+      return if @loaded_dexes.include?(dex)
+
+      @loaded_dexes.add(dex)
+
+      # Get perp_dex_index from perp_dexs list (position in array)
+      perp_dexs = @info.perp_dexs
+      perp_dex_index = perp_dexs.index { |d| d && d['name'] == dex }
+      return unless perp_dex_index
+
+      meta = @info.meta(dex: dex)
+      meta['universe']&.each_with_index do |asset, index|
+        name = asset['name']
+        # HIP-3 asset ID: 100000 + perp_dex_index * 10000 + index_in_meta
+        hip3_asset_id = 100_000 + (perp_dex_index * 10_000) + index
+        @asset_cache[:indices][name] = hip3_asset_id
+        @asset_cache[:metadata][name] = {
+          sz_decimals: asset['szDecimals'],
+          is_spot: false,
+          dex: dex
         }
       end
     end

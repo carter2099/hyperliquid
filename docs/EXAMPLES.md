@@ -9,11 +9,19 @@
 mids = sdk.info.all_mids
 # => { "BTC" => "50000", "ETH" => "3000", ... }
 
+# Retrieve mids for a HIP-3 perp dex (e.g., xyz)
+hip3_mids = sdk.info.all_mids(dex: 'xyz')
+# => { "xyz:GOLD" => "2500", "xyz:SILVER" => "30", ... }
+
 user_address = "0x..."
 
 # Retrieve a user's open orders
 orders = sdk.info.open_orders(user_address)
 # => [{ "coin" => "BTC", "sz" => "0.1", "px" => "50000", "side" => "A" }]
+
+# Retrieve a user's open orders on a HIP-3 dex
+hip3_orders = sdk.info.open_orders(user_address, dex: 'xyz')
+# => [{ "coin" => "xyz:GOLD", "sz" => "1.0", ... }]
 
 # Retrieve a user's open orders with additional frontend info
 frontend_orders = sdk.info.frontend_open_orders(user_address)
@@ -545,6 +553,32 @@ sdk.exchange.token_delegate(
   wei: 10_000_000,   # 0.1 HYPE
   is_undelegate: true
 )
+```
+
+### HIP-3 DEX Abstraction
+
+HIP-3 DEX abstraction allows automatic collateral transfers when trading on builder-deployed perpetual DEXs.
+
+```ruby
+# Enable DEX abstraction for your account (user-signed action)
+sdk.exchange.user_dex_abstraction(enabled: true)
+
+# Disable DEX abstraction
+sdk.exchange.user_dex_abstraction(enabled: false)
+
+# Enable for a specific user address
+sdk.exchange.user_dex_abstraction(enabled: true, user: '0x...')
+
+# Enable DEX abstraction via agent (L1 action, enable only)
+# Use this when trading as an agent on behalf of another account
+sdk.exchange.agent_enable_dex_abstraction
+
+# Enable DEX abstraction for a vault via agent
+sdk.exchange.agent_enable_dex_abstraction(vault_address: '0x...')
+
+# Check current DEX abstraction status
+status = sdk.info.user_dex_abstraction(sdk.exchange.address)
+# => { "enabled" => true }
 ```
 
 ## WebSocket

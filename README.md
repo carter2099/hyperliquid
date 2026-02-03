@@ -6,7 +6,7 @@
 
 A Ruby SDK for interacting with the Hyperliquid decentralized exchange API.
 
-The SDK supports both read operations (Info API) and authenticated write operations (Exchange API) for trading.
+Full-featured SDK with Info API (market data), Exchange API (trading), real-time WebSocket streaming, and HIP-3 builder-deployed perpetuals support.
 
 ## Installation
 

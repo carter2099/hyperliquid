@@ -23,6 +23,17 @@ RSpec.describe Hyperliquid::Info do
       result = info.all_mids
       expect(result).to eq(expected_response)
     end
+
+    it 'supports optional dex parameter for HIP-3 perp dexs' do
+      expected_response = { 'xyz:GOLD' => '2500', 'xyz:SILVER' => '30' }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'allMids', dex: 'xyz' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.all_mids(dex: 'xyz')
+      expect(result).to eq(expected_response)
+    end
   end
 
   describe '#open_orders' do

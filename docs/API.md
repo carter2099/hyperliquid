@@ -6,8 +6,8 @@ Read-only methods for querying market data and user information.
 
 ### General Info
 
-- `all_mids()` - Retrieve mids for all coins
-- `open_orders(user)` - Retrieve a user's open orders
+- `all_mids(dex: nil)` - Retrieve mids for all coins (optional dex for HIP-3 perp dexs; spot mids only included with default dex)
+- `open_orders(user, dex: nil)` - Retrieve a user's open orders (optional dex for HIP-3)
 - `frontend_open_orders(user, dex: nil)` - Retrieve a user's open orders with additional frontend info
 - `user_fills(user)` - Retrieve a user's fills
 - `user_fills_by_time(user, start_time, end_time = nil)` - Retrieve a user's fills by time (optional end time)
@@ -105,6 +105,13 @@ Read-only methods for querying market data and user information.
 - `approve_agent(agent_address:, agent_name:)` - Authorize an agent wallet to trade on behalf of this account
 - `approve_builder_fee(builder:, max_fee_rate:)` - Approve a builder fee rate for a builder address
 - `token_delegate(validator:, wei:, is_undelegate:)` - Delegate or undelegate HYPE tokens to a validator
+
+### HIP-3 DEX Abstraction
+
+HIP-3 DEX abstraction allows automatic collateral transfers when trading on builder-deployed perpetual DEXs.
+
+- `user_dex_abstraction(enabled:, user: nil)` - Enable or disable DEX abstraction for an account (user-signed)
+- `agent_enable_dex_abstraction(vault_address: nil)` - Enable DEX abstraction via agent (L1 action, enable only)
 
 ### Other
 

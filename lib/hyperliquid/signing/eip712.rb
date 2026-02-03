@@ -95,6 +95,15 @@ module Hyperliquid
         ]
       }.freeze
 
+      USER_DEX_ABSTRACTION_TYPES = {
+        'HyperliquidTransaction:UserDexAbstraction': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :user, type: 'address' },
+          { name: :enabled, type: 'bool' },
+          { name: :nonce, type: 'uint64' }
+        ]
+      }.freeze
+
       class << self
         # Domain for L1 actions (orders, cancels, leverage, etc.)
         # @return [Hash] EIP-712 domain configuration

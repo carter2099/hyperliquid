@@ -1,5 +1,45 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [1.0.0] - 2026-02-03
+
+### WebSocket Support
+
+- Add real-time WebSocket client (`Hyperliquid::WS::Client`) with managed connection
+  - Three-thread architecture: read thread, dispatch thread, ping thread
+  - Automatic reconnection with exponential backoff (1s, 2s, 4s, ..., 30s cap)
+  - Heartbeat ping every 50 seconds to keep connection alive
+  - Bounded message queue (1024) with overflow detection
+  - Lifecycle callbacks: `on(:open)`, `on(:close)`, `on(:error)`
+
+- Add 9 WebSocket subscription channels
+  - `allMids` — mid prices for all coins
+  - `l2Book` — level 2 order book updates
+  - `trades` — trade feed for a coin
+  - `bbo` — best bid/offer for a coin
+  - `candle` — candlestick updates
+  - `orderUpdates` — order status changes for a user
+  - `userEvents` — all events for a user (fills, liquidations, etc.)
+  - `userFills` — fill updates for a user
+  - `userFundings` — funding payments for a user
+
+### HIP-3 Support
+
+- Add HIP-3 DEX abstraction Exchange actions
+  - `user_dex_abstraction` — enable/disable DEX abstraction for automatic collateral transfers (user-signed)
+  - `agent_enable_dex_abstraction` — enable DEX abstraction via agent (L1 action, enable only)
+- Add full HIP-3 trading support
+  - Lazy loading of HIP-3 dex asset metadata when trading prefixed coins (e.g., `xyz:GOLD`)
+  - Correct HIP-3 asset ID calculation: `100000 + perp_dex_index * 10000 + index_in_meta`
+  - `market_order` and `market_close` automatically use dex-specific price endpoints
+- Add `dex:` parameter to `all_mids` Info endpoint for HIP-3 perp dex prices
+
+### Info API
+
+- Add 3 more Info endpoints
+  - `extra_agents` — get authorized agent addresses for a user
+  - `user_to_multi_sig_signers` — get multi-sig signer mappings for a user
+  - `user_dex_abstraction` — get dex abstraction config for a user
+
 ## [0.7.0] - 2026-01-30
 
 - Add agent, builder & delegation actions to Exchange API
