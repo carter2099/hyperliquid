@@ -162,7 +162,19 @@ Real-time data streaming via WebSocket. No private key required.
 
 ### Available Channels
 
-- `l2Book` - Level 2 order book updates. Subscription: `{ type: 'l2Book', coin: 'ETH' }`
+| Channel | Subscription | Description |
+|---------|-------------|-------------|
+| `allMids` | `{ type: 'allMids' }` | Mid prices for all coins |
+| `l2Book` | `{ type: 'l2Book', coin: 'ETH' }` | Level 2 order book updates |
+| `trades` | `{ type: 'trades', coin: 'ETH' }` | Trade feed for a coin |
+| `bbo` | `{ type: 'bbo', coin: 'ETH' }` | Best bid/offer for a coin |
+| `candle` | `{ type: 'candle', coin: 'ETH', interval: '1m' }` | Candlestick updates |
+| `orderUpdates` | `{ type: 'orderUpdates', user: '0x...' }` | Order status changes for a user |
+| `userEvents` | `{ type: 'userEvents', user: '0x...' }` | All events for a user (fills, liquidations, etc.) |
+| `userFills` | `{ type: 'userFills', user: '0x...' }` | Fill updates for a user |
+| `userFundings` | `{ type: 'userFundings', user: '0x...' }` | Funding payments for a user |
+
+Candle intervals: `1m`, `3m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `8h`, `12h`, `1d`, `3d`, `1w`, `1M`
 
 ### Configuration
 

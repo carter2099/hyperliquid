@@ -537,28 +537,108 @@ sdk.exchange.token_delegate(
 
 ## WebSocket
 
-### Basic l2Book Subscription
+### l2Book (Order Book)
 
 ```ruby
 sdk = Hyperliquid.new(testnet: true)
 
-# Register lifecycle callbacks (optional)
 sdk.ws.on(:open) { puts 'Connected!' }
-sdk.ws.on(:close) { puts 'Disconnected.' }
-sdk.ws.on(:error) { |e| puts "Error: #{e}" }
 
-# Subscribe to ETH l2Book -- auto-connects on first subscribe
 sub_id = sdk.ws.subscribe({ type: 'l2Book', coin: 'ETH' }) do |data|
   levels = data['levels']
-  best_bid = levels[0]&.first  # bids
-  best_ask = levels[1]&.first  # asks
+  best_bid = levels[0]&.first
+  best_ask = levels[1]&.first
   puts "ETH  bid=#{best_bid['px']}  ask=#{best_ask['px']}"
 end
 
 sleep 10
-
-# Unsubscribe and disconnect
 sdk.ws.unsubscribe(sub_id)
+sdk.ws.close
+```
+
+### allMids (Mid Prices)
+
+```ruby
+sdk = Hyperliquid.new(testnet: true)
+
+sdk.ws.subscribe({ type: 'allMids' }) do |data|
+  puts "BTC mid: #{data['mids']['BTC']}"
+  puts "ETH mid: #{data['mids']['ETH']}"
+end
+
+sleep 10
+sdk.ws.close
+```
+
+### trades
+
+```ruby
+sdk = Hyperliquid.new(testnet: true)
+
+sdk.ws.subscribe({ type: 'trades', coin: 'ETH' }) do |trades|
+  trades.each do |t|
+    side = t['side'] == 'B' ? 'BUY' : 'SELL'
+    puts "#{side} #{t['sz']} ETH @ #{t['px']}"
+  end
+end
+
+sleep 30
+sdk.ws.close
+```
+
+### bbo (Best Bid/Offer)
+
+```ruby
+sdk = Hyperliquid.new(testnet: true)
+
+sdk.ws.subscribe({ type: 'bbo', coin: 'BTC' }) do |data|
+  puts "BTC  bid=#{data['bid']}  ask=#{data['ask']}"
+end
+
+sleep 10
+sdk.ws.close
+```
+
+### candle (Candlesticks)
+
+```ruby
+sdk = Hyperliquid.new(testnet: true)
+
+sdk.ws.subscribe({ type: 'candle', coin: 'ETH', interval: '1m' }) do |data|
+  puts "ETH 1m candle  o=#{data['o']} h=#{data['h']} l=#{data['l']} c=#{data['c']}"
+end
+
+sleep 120
+sdk.ws.close
+```
+
+### User Channels
+
+```ruby
+sdk = Hyperliquid.new(testnet: true, private_key: ENV['HYPERLIQUID_PRIVATE_KEY'])
+user = sdk.exchange.address
+
+# Order status changes
+sdk.ws.subscribe({ type: 'orderUpdates', user: user }) do |updates|
+  updates.each { |u| puts "Order #{u['order']['oid']}: #{u['status']}" }
+end
+
+# Fill notifications
+sdk.ws.subscribe({ type: 'userFills', user: user }) do |data|
+  data['fills'].each { |f| puts "Fill: #{f['sz']} #{f['coin']} @ #{f['px']}" }
+end
+
+# Funding payments
+sdk.ws.subscribe({ type: 'userFundings', user: user }) do |data|
+  puts "Funding update for #{data['user']}"
+end
+
+# All user events (fills, liquidations, etc.)
+sdk.ws.subscribe({ type: 'userEvents', user: user }) do |data|
+  puts "User event received"
+end
+
+sleep 60
 sdk.ws.close
 ```
 
@@ -568,11 +648,15 @@ sdk.ws.close
 sdk = Hyperliquid.new(testnet: true)
 
 sdk.ws.subscribe({ type: 'l2Book', coin: 'ETH' }) do |data|
-  puts "ETH update: #{data['levels'][0]&.first&.dig('px')}"
+  puts "ETH book: #{data['levels'][0]&.first&.dig('px')}"
 end
 
 sdk.ws.subscribe({ type: 'l2Book', coin: 'BTC' }) do |data|
-  puts "BTC update: #{data['levels'][0]&.first&.dig('px')}"
+  puts "BTC book: #{data['levels'][0]&.first&.dig('px')}"
+end
+
+sdk.ws.subscribe({ type: 'trades', coin: 'ETH' }) do |trades|
+  puts "ETH trade: #{trades.first['px']}" if trades.any?
 end
 
 sleep 10
@@ -590,15 +674,6 @@ sdk.ws.on(:close) { puts 'Connection lost. Reconnecting...' }
 # Subscriptions are automatically replayed on reconnect
 sdk.ws.subscribe({ type: 'l2Book', coin: 'ETH' }) do |data|
   puts "ETH: #{data['levels'][0]&.first&.dig('px')}"
-end
-
-# Monitor for dropped messages (slow callback detection)
-Thread.new do
-  loop do
-    count = sdk.ws.dropped_message_count
-    puts "Dropped messages: #{count}" if count > 0
-    sleep 60
-  end
 end
 
 sleep 300

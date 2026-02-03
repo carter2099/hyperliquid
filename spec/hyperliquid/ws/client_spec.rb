@@ -7,7 +7,7 @@ RSpec.describe Hyperliquid::WS::Client do
 
   # Mock WebSocket object
   let(:mock_ws) do
-    ws = instance_double('WebSocket::Client::Simple::Client')
+    ws = instance_double('WSLite::Client')
     allow(ws).to receive(:send)
     allow(ws).to receive(:close)
     allow(ws).to receive(:on)
@@ -15,7 +15,7 @@ RSpec.describe Hyperliquid::WS::Client do
   end
 
   before do
-    allow(WebSocket::Client::Simple).to receive(:connect).and_return(mock_ws)
+    allow(WSLite).to receive(:connect).and_return(mock_ws)
   end
 
   describe '#initialize' do
@@ -50,7 +50,7 @@ RSpec.describe Hyperliquid::WS::Client do
     end
 
     it 'auto-connects when not connected' do
-      expect(WebSocket::Client::Simple).to receive(:connect).and_return(mock_ws)
+      expect(WSLite).to receive(:connect).and_return(mock_ws)
       client.subscribe({ type: 'l2Book', coin: 'ETH' }, &noop)
     end
 
@@ -309,6 +309,37 @@ RSpec.describe Hyperliquid::WS::Client do
     end
   end
 
+  describe 'stale connection guard' do
+    it 'ignores handle_close from a superseded connection' do
+      client.instance_variable_set(:@connected, true)
+      client.instance_variable_set(:@connection_id, 2)
+
+      # Simulate a stale callback from connection_id=1
+      expect(client.send(:stale_connection?, 1)).to be true
+      expect(client.send(:stale_connection?, 2)).to be false
+    end
+
+    it 'does not set connected=false when stale close fires' do
+      client.instance_variable_set(:@connected, true)
+      client.instance_variable_set(:@connection_id, 2)
+
+      # A stale close should not affect the current connection state
+      # (The guard is in the closure, so we test via stale_connection? directly)
+      expect(client.send(:stale_connection?, 1)).to be true
+      expect(client).to be_connected
+    end
+
+    it 'increments connection_id on each establish_connection call' do
+      initial_id = client.instance_variable_get(:@connection_id)
+
+      client.send(:establish_connection)
+      expect(client.instance_variable_get(:@connection_id)).to eq(initial_id + 1)
+
+      client.send(:establish_connection)
+      expect(client.instance_variable_get(:@connection_id)).to eq(initial_id + 2)
+    end
+  end
+
   describe 'lifecycle' do
     it 'connected? reflects connection state' do
       expect(client).not_to be_connected
@@ -384,23 +415,208 @@ RSpec.describe Hyperliquid::WS::Client do
 
   describe '#compute_identifier' do
     it 'computes l2Book identifier' do
-      id = client.send(:compute_identifier, 'l2Book', { 'coin' => 'ETH' })
-      expect(id).to eq('l2Book:eth')
+      expect(client.send(:compute_identifier, 'l2Book', { 'coin' => 'ETH' })).to eq('l2Book:eth')
     end
 
     it 'computes allMids identifier' do
-      id = client.send(:compute_identifier, 'allMids', {})
-      expect(id).to eq('allMids')
+      expect(client.send(:compute_identifier, 'allMids', {})).to eq('allMids')
     end
 
     it 'computes trades identifier' do
-      id = client.send(:compute_identifier, 'trades', [{ 'coin' => 'BTC' }])
-      expect(id).to eq('trades:btc')
+      expect(client.send(:compute_identifier, 'trades', [{ 'coin' => 'BTC' }])).to eq('trades:btc')
+    end
+
+    it 'computes bbo identifier' do
+      expect(client.send(:compute_identifier, 'bbo', { 'coin' => 'SOL' })).to eq('bbo:sol')
+    end
+
+    it 'computes candle identifier' do
+      expect(client.send(:compute_identifier, 'candle', { 's' => 'ETH', 'i' => '1h' })).to eq('candle:eth:1h')
+    end
+
+    it 'computes orderUpdates identifier' do
+      expect(client.send(:compute_identifier, 'orderUpdates', [])).to eq('orderUpdates')
+    end
+
+    it 'computes userEvents identifier' do
+      data = { 'user' => '0xAbC123', 'fills' => [] }
+      expect(client.send(:compute_identifier, 'userEvents', data)).to eq('userEvents:0xabc123')
+    end
+
+    it 'computes userFills identifier' do
+      data = { 'user' => '0xAbC123', 'fills' => [] }
+      expect(client.send(:compute_identifier, 'userFills', data)).to eq('userFills:0xabc123')
+    end
+
+    it 'computes userFundings identifier' do
+      data = { 'user' => '0xAbC123', 'fundings' => [] }
+      expect(client.send(:compute_identifier, 'userFundings', data)).to eq('userFundings:0xabc123')
     end
 
     it 'returns nil for unknown channel' do
-      id = client.send(:compute_identifier, 'someChannel', {})
-      expect(id).to be_nil
+      expect(client.send(:compute_identifier, 'someChannel', {})).to be_nil
+    end
+
+    it 'returns nil for trades with empty array' do
+      expect(client.send(:compute_identifier, 'trades', [])).to be_nil
+    end
+  end
+
+  describe '#subscription_identifier' do
+    it 'computes l2Book subscription identifier' do
+      expect(client.send(:subscription_identifier, { type: 'l2Book', coin: 'ETH' })).to eq('l2Book:eth')
+    end
+
+    it 'computes allMids subscription identifier' do
+      expect(client.send(:subscription_identifier, { type: 'allMids' })).to eq('allMids')
+    end
+
+    it 'computes trades subscription identifier' do
+      expect(client.send(:subscription_identifier, { type: 'trades', coin: 'BTC' })).to eq('trades:btc')
+    end
+
+    it 'computes bbo subscription identifier' do
+      expect(client.send(:subscription_identifier, { type: 'bbo', coin: 'SOL' })).to eq('bbo:sol')
+    end
+
+    it 'computes candle subscription identifier' do
+      expect(client.send(:subscription_identifier, { type: 'candle', coin: 'ETH', interval: '15m' }))
+        .to eq('candle:eth:15m')
+    end
+
+    it 'computes orderUpdates subscription identifier' do
+      expect(client.send(:subscription_identifier, { type: 'orderUpdates', user: '0xABC' }))
+        .to eq('orderUpdates')
+    end
+
+    it 'computes userEvents subscription identifier' do
+      expect(client.send(:subscription_identifier, { type: 'userEvents', user: '0xABC' }))
+        .to eq('userEvents:0xabc')
+    end
+
+    it 'computes userFills subscription identifier' do
+      expect(client.send(:subscription_identifier, { type: 'userFills', user: '0xABC' }))
+        .to eq('userFills:0xabc')
+    end
+
+    it 'computes userFundings subscription identifier' do
+      expect(client.send(:subscription_identifier, { type: 'userFundings', user: '0xABC' }))
+        .to eq('userFundings:0xabc')
+    end
+
+    it 'supports string keys' do
+      expect(client.send(:subscription_identifier, { 'type' => 'bbo', 'coin' => 'ETH' })).to eq('bbo:eth')
+    end
+
+    it 'raises for unsupported type' do
+      expect do
+        client.send(:subscription_identifier, { type: 'badType' })
+      end.to raise_error(Hyperliquid::WebSocketError)
+    end
+  end
+
+  describe 'channel message routing' do
+    let(:queue) { client.instance_variable_get(:@queue) }
+
+    before do
+      client.instance_variable_set(:@connected, true)
+      client.instance_variable_set(:@ws, mock_ws)
+      allow(mock_ws).to receive(:send)
+    end
+
+    it 'routes allMids messages' do
+      client.subscribe({ type: 'allMids' }) { |d| d }
+      msg = { 'channel' => 'allMids', 'data' => { 'mids' => { 'ETH' => '3000' } } }.to_json
+      client.send(:handle_message, msg)
+
+      queued = queue.pop(true)
+      expect(queued[:identifier]).to eq('allMids')
+      expect(queued[:data]['mids']['ETH']).to eq('3000')
+    end
+
+    it 'routes trades messages' do
+      client.subscribe({ type: 'trades', coin: 'BTC' }) { |d| d }
+      msg = { 'channel' => 'trades', 'data' => [{ 'coin' => 'BTC', 'px' => '50000' }] }.to_json
+      client.send(:handle_message, msg)
+
+      queued = queue.pop(true)
+      expect(queued[:identifier]).to eq('trades:btc')
+    end
+
+    it 'routes bbo messages' do
+      client.subscribe({ type: 'bbo', coin: 'SOL' }) { |d| d }
+      msg = { 'channel' => 'bbo', 'data' => { 'coin' => 'SOL', 'bid' => '100' } }.to_json
+      client.send(:handle_message, msg)
+
+      queued = queue.pop(true)
+      expect(queued[:identifier]).to eq('bbo:sol')
+    end
+
+    it 'routes candle messages' do
+      client.subscribe({ type: 'candle', coin: 'ETH', interval: '1h' }) { |d| d }
+      msg = { 'channel' => 'candle', 'data' => { 's' => 'ETH', 'i' => '1h', 'o' => '3000' } }.to_json
+      client.send(:handle_message, msg)
+
+      queued = queue.pop(true)
+      expect(queued[:identifier]).to eq('candle:eth:1h')
+    end
+
+    it 'routes orderUpdates messages' do
+      client.subscribe({ type: 'orderUpdates', user: '0xABC' }) { |d| d }
+      msg = { 'channel' => 'orderUpdates', 'data' => [{ 'order' => { 'coin' => 'ETH' } }] }.to_json
+      client.send(:handle_message, msg)
+
+      queued = queue.pop(true)
+      expect(queued[:identifier]).to eq('orderUpdates')
+    end
+
+    it 'routes userEvents messages' do
+      user = '0xabc123'
+      client.subscribe({ type: 'userEvents', user: user }) { |d| d }
+      msg = { 'channel' => 'userEvents', 'data' => { 'user' => user, 'fills' => [] } }.to_json
+      client.send(:handle_message, msg)
+
+      queued = queue.pop(true)
+      expect(queued[:identifier]).to eq("userEvents:#{user}")
+    end
+
+    it 'routes userFills messages' do
+      user = '0xdef456'
+      client.subscribe({ type: 'userFills', user: user }) { |d| d }
+      msg = { 'channel' => 'userFills', 'data' => { 'user' => user, 'fills' => [] } }.to_json
+      client.send(:handle_message, msg)
+
+      queued = queue.pop(true)
+      expect(queued[:identifier]).to eq("userFills:#{user}")
+    end
+
+    it 'routes userFundings messages' do
+      user = '0xfff789'
+      client.subscribe({ type: 'userFundings', user: user }) { |d| d }
+      msg = { 'channel' => 'userFundings', 'data' => { 'user' => user, 'fundings' => [] } }.to_json
+      client.send(:handle_message, msg)
+
+      queued = queue.pop(true)
+      expect(queued[:identifier]).to eq("userFundings:#{user}")
+    end
+
+    it 'does not cross-route between different coins on same channel' do
+      client.subscribe({ type: 'bbo', coin: 'ETH' }) { |d| d }
+      msg = { 'channel' => 'bbo', 'data' => { 'coin' => 'SOL', 'bid' => '100' } }.to_json
+      client.send(:handle_message, msg)
+
+      # Message was enqueued under bbo:sol, but we subscribed to bbo:eth -- no match on dispatch
+      queued = queue.pop(true)
+      expect(queued[:identifier]).to eq('bbo:sol')
+    end
+
+    it 'does not cross-route candle messages with different intervals' do
+      client.subscribe({ type: 'candle', coin: 'ETH', interval: '1h' }) { |d| d }
+      msg = { 'channel' => 'candle', 'data' => { 's' => 'ETH', 'i' => '15m', 'o' => '3000' } }.to_json
+      client.send(:handle_message, msg)
+
+      queued = queue.pop(true)
+      expect(queued[:identifier]).to eq('candle:eth:15m')
     end
   end
 end

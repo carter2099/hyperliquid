@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'websocket-client-simple'
+require 'ws_lite'
 require 'json'
 
 module Hyperliquid
@@ -31,6 +31,7 @@ module Hyperliquid
 
         @lifecycle_callbacks = {}
         @reconnect_attempts = 0
+        @connection_id = 0
       end
 
       def connect
@@ -118,24 +119,38 @@ module Hyperliquid
       def establish_connection
         client = self
         url = @url
+        @connection_id += 1
+        active_id = @connection_id
 
-        @ws = ::WebSocket::Client::Simple.connect(url) do |ws|
+        @ws = ::WSLite.connect(url) do |ws|
           ws.on :open do
+            next if client.send(:stale_connection?, active_id)
+
             client.send(:handle_open)
           end
 
           ws.on :message do |msg|
+            next if client.send(:stale_connection?, active_id)
+
             client.send(:handle_message, msg.data)
           end
 
           ws.on :error do |e|
+            next if client.send(:stale_connection?, active_id)
+
             client.send(:handle_error, e)
           end
 
           ws.on :close do |e|
+            next if client.send(:stale_connection?, active_id)
+
             client.send(:handle_close, e)
           end
         end
+      end
+
+      def stale_connection?(id)
+        id != @connection_id
       end
 
       def handle_open
@@ -185,26 +200,38 @@ module Hyperliquid
 
       def compute_identifier(channel, data)
         case channel
-        when 'l2Book'   then "l2Book:#{data['coin'].downcase}"
-        when 'allMids'  then 'allMids'
-        when 'trades'   then data.is_a?(Array) && data[0] ? "trades:#{data[0]['coin'].downcase}" : nil
+        when 'l2Book'        then "l2Book:#{data['coin'].downcase}"
+        when 'trades'        then data.is_a?(Array) && data[0] ? "trades:#{data[0]['coin'].downcase}" : nil
+        when 'bbo'           then "bbo:#{data['coin'].downcase}"
+        when 'candle'        then "candle:#{data['s'].downcase}:#{data['i']}"
+        when 'allMids'       then 'allMids'
+        when 'orderUpdates'  then 'orderUpdates'
+        when 'userEvents'    then "userEvents:#{data['user'].downcase}"
+        when 'userFills'     then "userFills:#{data['user'].downcase}"
+        when 'userFundings'  then "userFundings:#{data['user'].downcase}"
         end
       end
 
       def subscription_identifier(subscription)
-        type = subscription[:type] || subscription['type']
+        type = sub_field(subscription, 'type')
         case type
-        when 'l2Book'
-          coin = subscription[:coin] || subscription['coin']
-          "l2Book:#{coin.downcase}"
-        when 'allMids'
-          'allMids'
-        when 'trades'
-          coin = subscription[:coin] || subscription['coin']
-          "trades:#{coin.downcase}"
+        when 'l2Book'        then "l2Book:#{sub_field(subscription, 'coin').downcase}"
+        when 'trades'        then "trades:#{sub_field(subscription, 'coin').downcase}"
+        when 'bbo'           then "bbo:#{sub_field(subscription, 'coin').downcase}"
+        when 'candle'
+          "candle:#{sub_field(subscription, 'coin').downcase}:#{sub_field(subscription, 'interval')}"
+        when 'allMids'       then 'allMids'
+        when 'orderUpdates'  then 'orderUpdates'
+        when 'userEvents'    then "userEvents:#{sub_field(subscription, 'user').downcase}"
+        when 'userFills'     then "userFills:#{sub_field(subscription, 'user').downcase}"
+        when 'userFundings'  then "userFundings:#{sub_field(subscription, 'user').downcase}"
         else
           raise Hyperliquid::WebSocketError, "Unsupported subscription type: #{type}"
         end
+      end
+
+      def sub_field(subscription, key)
+        subscription[key.to_sym] || subscription[key]
       end
 
       def enqueue_message(identifier, data)

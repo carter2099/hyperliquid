@@ -31,7 +31,8 @@ SCRIPTS = [
   'test_10_vault.rb',
   'test_11_builder_fee.rb',
   'test_12_staking.rb',
-  'test_13_ws_l2_book.rb'
+  'test_13_ws_l2_book.rb',
+  'test_14_ws_candle.rb'
 ].freeze
 
 def green(text)

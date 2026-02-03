@@ -9,7 +9,7 @@ WS Read Thread ──> Bounded Queue (1024) ──> Dispatch Thread ──> User
 Ping Thread (every 50s)
 ```
 
-- **Read thread** (`websocket-client-simple`): receives frames, parses JSON, pushes onto the queue. Never blocks on user code.
+- **Read thread** (`ws_lite`): receives frames, parses JSON, pushes onto the queue. Never blocks on user code.
 - **Dispatch thread** (`hl-ws-dispatch`): pops messages from the queue and invokes matching callbacks in order. If a callback is slow, only this thread blocks.
 - **Ping thread** (`hl-ws-ping`): sends `{"method":"ping"}` every 50 seconds to keep the connection alive.
 
@@ -23,13 +23,14 @@ Ping Thread (every 50s)
 
 ## Subscription Routing
 
-Subscriptions are keyed by an identifier string derived from the channel type and coin:
+Subscriptions are keyed by an identifier string derived from the channel type and its parameters:
 
-| Channel   | Identifier format        | Example          |
-|-----------|--------------------------|------------------|
-| `l2Book`  | `l2Book:<coin_downcase>` | `l2Book:eth`     |
-| `allMids` | `allMids`                | `allMids`        |
-| `trades`  | `trades:<coin_downcase>` | `trades:btc`     |
+| Channel        | Identifier format                  | Example             |
+|----------------|------------------------------------|---------------------|
+| `allMids`      | `allMids`                          | `allMids`           |
+| `l2Book`       | `l2Book:<coin>`                    | `l2Book:eth`        |
+| `candle`       | `candle:<coin>:<interval>`         | `candle:eth:1h`     |
+| `userEvents`   | `userEvents:<user>`                | `userEvents:0xabc`  |
 
 Multiple callbacks can be registered for the same identifier. The server unsubscribe message is only sent when the last callback for an identifier is removed.
 
@@ -43,16 +44,6 @@ On unexpected disconnect (when `reconnect: true`, the default), the client spawn
 
 ## Thread Safety
 
-- `@subscriptions` and `@pending_subscriptions` are protected by a `Mutex`.
+- `@subscriptions` and `@pending_subscriptions` are protected by a `Mutex` as they are accessed across the three threads.
 - Ruby's `Queue` is inherently thread-safe.
 - Callbacks are invoked serially on the dispatch thread (never concurrently).
-
-## Files
-
-| File | Role |
-|------|------|
-| `lib/hyperliquid/ws/client.rb` | Client implementation |
-| `lib/hyperliquid/constants.rb` | `WS_ENDPOINT`, `WS_PING_INTERVAL`, `WS_MAX_QUEUE_SIZE` |
-| `lib/hyperliquid/errors.rb` | `WebSocketError` |
-| `spec/hyperliquid/ws/client_spec.rb` | Unit tests (39 examples) |
-| `scripts/test_13_ws_l2_book.rb` | Integration test (testnet, no key required) |
