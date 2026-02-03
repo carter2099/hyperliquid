@@ -12,7 +12,8 @@ module Hyperliquid
     # ============================
 
     # Get all market mid prices
-    # @param dex [String, nil] Optional perp dex name (defaults to first perp dex; spot mids only included with first perp dex)
+    # @param dex [String, nil] Optional perp dex name (defaults to first perp dex;
+    #   spot mids only included with first perp dex)
     # @return [Hash] Hash containing mid prices for all markets
     def all_mids(dex: nil)
       body = { type: 'allMids' }

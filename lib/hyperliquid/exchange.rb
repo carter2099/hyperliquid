@@ -355,34 +355,18 @@ module Hyperliquid
     # @return [Hash] Order response
     def market_close(coin:, size: nil, slippage: DEFAULT_SLIPPAGE, cloid: nil, vault_address: nil, builder: nil)
       address = vault_address || @signer.address
-      dex_prefix = extract_dex_prefix(coin)
-      state = dex_prefix ? @info.user_state(address, dex: dex_prefix) : @info.user_state(address)
-
-      position = state['assetPositions']&.find do |pos|
-        pos.dig('position', 'coin') == coin
-      end
+      position = find_position(coin, address)
       raise ArgumentError, "No open position found for #{coin}" unless position
 
       szi = position.dig('position', 'szi').to_f
       is_buy = szi.negative?
       close_size = size || szi.abs
-
-      mids = dex_prefix ? @info.all_mids(dex: dex_prefix) : @info.all_mids
-      mid = mids[coin]&.to_f
-      raise ArgumentError, "Unknown asset or no price available: #{coin}" unless mid&.positive?
-
-      slippage_price = calculate_slippage_price(coin, mid, is_buy, slippage)
+      slippage_price = calculate_slippage_price(coin, get_mid_price(coin), is_buy, slippage)
 
       order(
-        coin: coin,
-        is_buy: is_buy,
-        size: close_size,
-        limit_px: slippage_price,
-        order_type: { limit: { tif: 'Ioc' } },
-        reduce_only: true,
-        cloid: cloid,
-        vault_address: vault_address,
-        builder: builder
+        coin: coin, is_buy: is_buy, size: close_size, limit_px: slippage_price,
+        order_type: { limit: { tif: 'Ioc' } }, reduce_only: true,
+        cloid: cloid, vault_address: vault_address, builder: builder
       )
     end
 
@@ -718,6 +702,23 @@ module Hyperliquid
       (Time.now.to_f * 1000).to_i
     end
 
+    # Find a position for a coin
+    def find_position(coin, address)
+      dex_prefix = extract_dex_prefix(coin)
+      state = dex_prefix ? @info.user_state(address, dex: dex_prefix) : @info.user_state(address)
+      state['assetPositions']&.find { |pos| pos.dig('position', 'coin') == coin }
+    end
+
+    # Get mid price for a coin
+    def get_mid_price(coin)
+      dex_prefix = extract_dex_prefix(coin)
+      mids = dex_prefix ? @info.all_mids(dex: dex_prefix) : @info.all_mids
+      mid = mids[coin]&.to_f
+      raise ArgumentError, "Unknown asset or no price available: #{coin}" unless mid&.positive?
+
+      mid
+    end
+
     # Get asset index for a coin symbol
     # @param coin [String] Asset symbol (supports HIP-3 prefixed names like "xyz:GOLD")
     # @return [Integer] Asset index
@@ -766,28 +767,25 @@ module Hyperliquid
       @asset_cache = { indices: {}, metadata: {} }
       @loaded_dexes = Set.new
 
-      # Load perpetual assets from default dex
-      meta = @info.meta
-      meta['universe'].each_with_index do |asset, index|
-        name = asset['name']
-        @asset_cache[:indices][name] = index
-        @asset_cache[:metadata][name] = {
-          sz_decimals: asset['szDecimals'],
-          is_spot: false
-        }
-      end
+      load_perp_assets
+      load_spot_assets
+    end
 
-      # Load spot assets (index starts at SPOT_ASSET_THRESHOLD)
-      spot_meta = @info.spot_meta
-      spot_meta['universe'].each_with_index do |pair, index|
-        name = pair['name']
-        spot_index = index + SPOT_ASSET_THRESHOLD
-        @asset_cache[:indices][name] = spot_index
-        @asset_cache[:metadata][name] = {
-          sz_decimals: pair['szDecimals'] || 0,
-          is_spot: true
-        }
+    def load_perp_assets
+      @info.meta['universe'].each_with_index do |asset, index|
+        cache_asset(asset['name'], index, asset['szDecimals'], is_spot: false)
       end
+    end
+
+    def load_spot_assets
+      @info.spot_meta['universe'].each_with_index do |pair, index|
+        cache_asset(pair['name'], index + SPOT_ASSET_THRESHOLD, pair['szDecimals'] || 0, is_spot: true)
+      end
+    end
+
+    def cache_asset(name, index, sz_decimals, is_spot:, dex: nil)
+      @asset_cache[:indices][name] = index
+      @asset_cache[:metadata][name] = { sz_decimals: sz_decimals, is_spot: is_spot, dex: dex }.compact
     end
 
     # Load asset metadata for a HIP-3 dex
@@ -803,17 +801,9 @@ module Hyperliquid
       perp_dex_index = perp_dexs.index { |d| d && d['name'] == dex }
       return unless perp_dex_index
 
-      meta = @info.meta(dex: dex)
-      meta['universe']&.each_with_index do |asset, index|
-        name = asset['name']
-        # HIP-3 asset ID: 100000 + perp_dex_index * 10000 + index_in_meta
+      @info.meta(dex: dex)['universe']&.each_with_index do |asset, index|
         hip3_asset_id = 100_000 + (perp_dex_index * 10_000) + index
-        @asset_cache[:indices][name] = hip3_asset_id
-        @asset_cache[:metadata][name] = {
-          sz_decimals: asset['szDecimals'],
-          is_spot: false,
-          dex: dex
-        }
+        cache_asset(asset['name'], hip3_asset_id, asset['szDecimals'], is_spot: false, dex: dex)
       end
     end
 
