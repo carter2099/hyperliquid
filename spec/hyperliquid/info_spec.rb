@@ -500,6 +500,56 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#extra_agents' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's authorized agent addresses" do
+      expected_response = [
+        { 'address' => '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd', 'name' => 'agent1' }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'extraAgents', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.extra_agents(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#user_to_multi_sig_signers' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it 'requests multi-sig signer mappings' do
+      expected_response = {
+        'signers' => %w[0xaaaa 0xbbbb],
+        'threshold' => 2
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userToMultiSigSigners', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_to_multi_sig_signers(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#user_dex_abstraction' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's dex abstraction config" do
+      expected_response = { 'enabled' => true }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userDexAbstraction', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_dex_abstraction(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
   # ============================
   # Info: Perpetuals
   # ============================

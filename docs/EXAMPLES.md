@@ -114,6 +114,18 @@ history = sdk.info.delegator_history(user_address)
 # Query a user's staking rewards
 rewards = sdk.info.delegator_rewards(user_address)
 # => [{ "time" => 1_736_726_400_073, "source" => "delegation", "totalAmount" => "0.123" }, ...]
+
+# Get authorized agent addresses for a user
+agents = sdk.info.extra_agents(user_address)
+# => [{ "address" => "0x...", "name" => "agent1" }, ...]
+
+# Get multi-sig signer mappings for a user
+signers = sdk.info.user_to_multi_sig_signers(user_address)
+# => { "signers" => ["0x...", "0x..."], "threshold" => 2 }
+
+# Get dex abstraction config for a user
+dex_abstraction = sdk.info.user_dex_abstraction(user_address)
+# => { "enabled" => true }
 ```
 
 **Note:** `l2_book` and `candles_snapshot` work for both Perpetuals and Spot. For spot, use `"{BASE}/USDC"` when available (e.g., `"PURR/USDC"`). Otherwise, use the index alias `"@{index}"` from `spot_meta["universe"]`.

@@ -215,6 +215,27 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'delegatorRewards', user: user })
     end
 
+    # Get authorized agent addresses for a user
+    # @param user [String] Wallet address
+    # @return [Array] Array of authorized agent addresses
+    def extra_agents(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'extraAgents', user: user })
+    end
+
+    # Get multi-sig signer mappings for a user
+    # @param user [String] Multi-sig wallet address
+    # @return [Hash] Multi-sig signer information
+    def user_to_multi_sig_signers(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'userToMultiSigSigners', user: user })
+    end
+
+    # Get dex abstraction config for a user
+    # @param user [String] Wallet address
+    # @return [Hash] Dex abstraction configuration
+    def user_dex_abstraction(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'userDexAbstraction', user: user })
+    end
+
     # ============================
     # Info: Perpetuals
     # ============================

@@ -30,6 +30,9 @@ Read-only methods for querying market data and user information.
 - `delegator_summary(user)` - Query a user's staking summary
 - `delegator_history(user)` - Query a user's staking history
 - `delegator_rewards(user)` - Query a user's staking rewards
+- `extra_agents(user)` - Get authorized agent addresses for a user
+- `user_to_multi_sig_signers(user)` - Get multi-sig signer mappings for a user
+- `user_dex_abstraction(user)` - Get dex abstraction config for a user
 
 ### Perpetuals Methods
 
