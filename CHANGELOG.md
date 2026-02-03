@@ -1,5 +1,9 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [1.0.1] - 2026-02-03
+
+- Minor refactors to reduce method complexity
+
 ## [1.0.0] - 2026-02-03
 
 ### WebSocket Support
