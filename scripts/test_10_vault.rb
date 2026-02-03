@@ -42,6 +42,7 @@ when 'deposit'
     is_deposit: true,
     usd: 10
   )
+  dump_status(result)
   api_error?(result) || puts(green('Vault deposit successful!'))
 when 'withdraw'
   equity_f = follower&.dig('vaultEquity')&.to_f || 0
@@ -53,6 +54,7 @@ when 'withdraw'
       is_deposit: false,
       usd: withdraw_amount
     )
+    dump_status(result)
     api_error?(result) || puts(green('Vault withdrawal successful!'))
   else
     puts red("Insufficient vault equity to withdraw ($#{equity_f})")

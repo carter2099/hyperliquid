@@ -3,6 +3,7 @@
 
 # Test 5: Update Leverage (BTC)
 # Set cross, isolated, then reset leverage.
+# Requires no open BTC position (cannot switch leverage type with open position).
 
 require_relative 'test_helpers'
 
@@ -14,8 +15,16 @@ mids = sdk.info.all_mids
 btc_price = mids[perp_coin]&.to_f
 
 if btc_price&.positive?
+  # Check for open position - cannot switch leverage type with open position
+  unless check_position_and_prompt(sdk, perp_coin, timeout: 10)
+    puts
+    puts green('Test 5 Update Leverage skipped (open position).')
+    exit 0
+  end
+
   puts 'Setting BTC to 5x cross leverage...'
   result = sdk.exchange.update_leverage(coin: perp_coin, leverage: 5, is_cross: true)
+  dump_status(result)
   api_error?(result) || puts(green('5x cross leverage set'))
   puts
 
@@ -23,6 +32,7 @@ if btc_price&.positive?
 
   puts 'Setting BTC to 3x isolated leverage...'
   result = sdk.exchange.update_leverage(coin: perp_coin, leverage: 3, is_cross: false)
+  dump_status(result)
   api_error?(result) || puts(green('3x isolated leverage set'))
   puts
 
@@ -30,6 +40,7 @@ if btc_price&.positive?
 
   puts 'Resetting BTC to 1x cross leverage...'
   result = sdk.exchange.update_leverage(coin: perp_coin, leverage: 1, is_cross: true)
+  dump_status(result)
   api_error?(result) || puts(green('1x cross leverage set'))
 else
   puts red("SKIPPED: Could not get #{perp_coin} price")

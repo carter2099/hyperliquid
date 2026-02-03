@@ -50,6 +50,7 @@ when 'delegate'
     wei: delegate_amount,
     is_undelegate: false
   )
+  dump_status(result)
   api_error?(result) || puts(green('Delegation successful!'))
 when 'undelegate'
   puts "Undelegating 0.1 HYPE from #{validator}..."
@@ -58,6 +59,7 @@ when 'undelegate'
     wei: delegate_amount,
     is_undelegate: true
   )
+  dump_status(result)
   api_error?(result) || puts(green('Undelegation successful!'))
 else
   puts 'Pass "delegate" or "undelegate" as an argument to perform an action.'

@@ -16,6 +16,7 @@ perp_coin = 'BTC'
 # Step 1: Approve builder fee
 puts "Approving builder fee for #{builder_address} (max #{max_fee_rate})..."
 result = sdk.exchange.approve_builder_fee(builder: builder_address, max_fee_rate: max_fee_rate)
+dump_status(result)
 api_error?(result) || puts(green('Builder fee approved'))
 puts
 

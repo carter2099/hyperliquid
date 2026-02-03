@@ -11,6 +11,7 @@ separator('TEST 8: USD Class Transfer (Perp <-> Spot)')
 
 puts 'Transferring $10 from perp to spot...'
 result = sdk.exchange.usd_class_transfer(amount: '10', to_perp: false)
+dump_status(result)
 api_error?(result) || puts(green('Transfer to spot successful!'))
 puts
 
@@ -18,6 +19,7 @@ wait_with_countdown(WAIT_SECONDS, 'Waiting before transferring back...')
 
 puts 'Transferring $10 from spot to perp...'
 result = sdk.exchange.usd_class_transfer(amount: '10', to_perp: true)
+dump_status(result)
 api_error?(result) || puts(green('Transfer to perp successful!'))
 
 test_passed('Test 8 USD Class Transfer')

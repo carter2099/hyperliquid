@@ -5,7 +5,9 @@ require 'json'
 
 WAIT_SECONDS = 3
 SPOT_SLIPPAGE = 0.40  # 40% for illiquid testnet spot markets
-PERP_SLIPPAGE = 0.05  # 5% for perp markets
+PERP_SLIPPAGE = 0.15
+ORACLE_RETRY_ATTEMPTS = 3
+ORACLE_SLIPPAGE_INCREMENT = 0.10  # Increase slippage by 10% on each retry
 
 def green(text)
   "\e[32m#{text}\e[0m"
@@ -43,7 +45,19 @@ def api_error?(result)
   true
 end
 
+# Extract and display the status from an API response
+def dump_status(result)
+  return unless result.is_a?(Hash)
+
+  status = result.dig('response', 'data', 'statuses', 0)
+  return unless status
+
+  puts "  API status: #{status.inspect}"
+end
+
 def check_result(result, operation)
+  dump_status(result)
+
   return false if api_error?(result)
 
   status = result.dig('response', 'data', 'statuses', 0)
@@ -97,4 +111,120 @@ def build_sdk
   puts
 
   sdk
+end
+
+# Check if result has "Price too far from oracle" error
+def oracle_error?(result)
+  return false unless result.is_a?(Hash)
+
+  if result['status'] == 'err' && result['response'].to_s.include?('Price too far from oracle')
+    return true
+  end
+
+  status = result.dig('response', 'data', 'statuses', 0)
+  status.is_a?(Hash) && status['error'].to_s.include?('Price too far from oracle')
+end
+
+# Execute a market order with retry logic for oracle errors
+def market_order_with_retry(sdk, coin:, is_buy:, size:, base_slippage:)
+  slippage = base_slippage
+
+  ORACLE_RETRY_ATTEMPTS.times do |attempt|
+    result = sdk.exchange.market_order(
+      coin: coin,
+      is_buy: is_buy,
+      size: size,
+      slippage: slippage
+    )
+
+    unless oracle_error?(result)
+      return result
+    end
+
+    if attempt < ORACLE_RETRY_ATTEMPTS - 1
+      slippage += ORACLE_SLIPPAGE_INCREMENT
+      puts red("Oracle price error. Retrying with #{(slippage * 100).to_i}% slippage (attempt #{attempt + 2}/#{ORACLE_RETRY_ATTEMPTS})...")
+      sleep 1
+    else
+      return result
+    end
+  end
+end
+
+# Get position for a coin, returns nil if no position
+def get_position(sdk, coin)
+  state = sdk.info.user_state(sdk.exchange.address)
+  positions = state['assetPositions'] || []
+  positions.find { |p| p.dig('position', 'coin') == coin }
+end
+
+# Check for open position and prompt user to clean up
+# Returns true if test should continue, false if should skip
+def check_position_and_prompt(sdk, coin, timeout: 10)
+  position = get_position(sdk, coin)
+  return true unless position
+
+  size = position.dig('position', 'szi').to_f
+  return true if size.zero?
+
+  puts red("WARNING: Open #{coin} position detected (size: #{size})")
+  puts "This test requires no open #{coin} position."
+  puts
+  puts "Options:"
+  puts "  [c] Close the position and continue"
+  puts "  [s] Skip this test"
+  puts
+  print "Choice (auto-skip in #{timeout}s): "
+  $stdout.flush
+
+  # Non-blocking read with timeout
+  require 'io/wait'
+  choice = nil
+  start = Time.now
+  loop do
+    if $stdin.ready?
+      choice = $stdin.gets&.strip&.downcase
+      break
+    end
+    elapsed = Time.now - start
+    remaining = (timeout - elapsed).ceil
+    if elapsed >= timeout
+      puts
+      puts "No response, skipping test..."
+      return false
+    end
+    print "\rChoice (auto-skip in #{remaining}s): "
+    $stdout.flush
+    sleep 0.5
+  end
+
+  case choice
+  when 'c'
+    puts "Closing #{coin} position..."
+    result = sdk.exchange.market_close(coin: coin, slippage: PERP_SLIPPAGE + 0.20)
+    dump_status(result)
+    if api_error?(result)
+      puts red("Failed to close position. Skipping test.")
+      return false
+    end
+    puts green("Position closed. Waiting for settlement...")
+
+    # Wait and verify position is actually closed
+    5.times do |i|
+      sleep 2
+      position = get_position(sdk, coin)
+      remaining = position&.dig('position', 'szi').to_f.abs
+      if remaining < 0.000001
+        puts green("Position fully settled.")
+        return true
+      end
+      puts "  Still settling... (#{remaining} remaining)"
+    end
+
+    puts red("Position did not fully close. Skipping test.")
+    false
+  else
+    puts "Skipping test."
+    false
+  end
 end
