@@ -1,5 +1,11 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [1.0.2] - 2026-02-05
+
+- Lower minimum Ruby requirement to 3.3 and align RuboCop target
+- Expand CI matrix to Ruby 3.3, 3.4, and 4.0
+- Bump `ws_lite` dependency to `~> 1.0.1`
+
 ## [1.0.1] - 2026-02-03
 
 - Minor refactors to reduce method complexity
