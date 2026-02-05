@@ -6,7 +6,7 @@ This file provides guidance to AI coding agents working with this repository.
 
 Ruby SDK (v1.0.1) for the Hyperliquid decentralized exchange API. Three API surfaces: **Info** (read-only market data), **Exchange** (authenticated trading), and **WebSocket** (real-time streaming). Built on Faraday for HTTP, the `eth` gem for EIP-712 signing, `msgpack` for action serialization, and `ws_lite` for WebSocket connections.
 
-**Ruby**: >= 3.3.0 (CI tests 3.3, 3.4, 4.0)
+**Ruby**: >= 3.3.0 (CI tests 3.3, 3.4)
 
 ## Commands
 
@@ -76,7 +76,7 @@ RuboCop targets Ruby 3.3. Key relaxations: methods up to 50 lines, no class leng
 
 ### CI
 
-GitHub Actions (`.github/workflows/main.yml`): runs `bundle exec rake` (tests + lint) on Ruby 3.3, 3.4, and 4.0 for pushes to main and all PRs. Release workflow creates GitHub releases from CHANGELOG.md on version tags.
+GitHub Actions (`.github/workflows/main.yml`): runs `bundle exec rake` (tests + lint) on Ruby 3.3 and 3.4 for pushes to main and all PRs. Release workflow creates GitHub releases from CHANGELOG.md on version tags.
 
 ## Additional Docs
 
