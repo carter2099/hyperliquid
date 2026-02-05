@@ -6,7 +6,7 @@ PATH
       faraday (~> 2.0)
       faraday-retry (~> 2.0)
       msgpack (~> 1.7)
-      ws_lite (~> 1.0.0)
+      ws_lite (~> 1.0.1)
 
 GEM
   remote: https://rubygems.org/
@@ -144,7 +144,7 @@ GEM
       crack (>= 0.3.2)
       hashdiff (>= 0.4.0, < 2.0.0)
     websocket (1.2.11)
-    ws_lite (1.0.0)
+    ws_lite (1.0.1)
       base64
       event_emitter
       mutex_m

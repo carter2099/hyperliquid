@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.description = "A Ruby SDK for interacting with Hyperliquid's decentralized exchange API"
   spec.homepage = 'https://github.com/carter2099/hyperliquid'
   spec.license = 'MIT'
-  spec.required_ruby_version = '>= 3.4.0'
+  spec.required_ruby_version = '>= 3.3.0'
 
   spec.metadata['homepage_uri'] = spec.homepage
   spec.metadata['source_code_uri'] = 'https://github.com/carter2099/hyperliquid'
@@ -37,5 +37,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'faraday', '~> 2.0'
   spec.add_dependency 'faraday-retry', '~> 2.0'
   spec.add_dependency 'msgpack', '~> 1.7'
-  spec.add_dependency 'ws_lite', '~> 1.0.0'
+  spec.add_dependency 'ws_lite', '~> 1.0.1'
 end
