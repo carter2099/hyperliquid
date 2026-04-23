@@ -4,6 +4,7 @@
 # Hyperliquid Ruby SDK - Automated Integration Test Runner
 #
 # Same as test_all.rb but excludes tests unsuitable for unattended runs:
+#   - test_09_sub_account_lifecycle.rb: requires $100k traded volume on testnet to create sub-accounts
 #   - test_12_staking.rb: requires HYPE token balance (locking issues)
 #
 # Usage:
@@ -18,7 +19,6 @@ SCRIPTS = [
   'test_06_modify_order.rb',
   'test_07_market_close.rb',
   'test_08_usd_class_transfer.rb',
-  'test_09_sub_account_lifecycle.rb',
   'test_10_vault.rb',
   'test_11_builder_fee.rb',
   'test_13_ws_l2_book.rb',
