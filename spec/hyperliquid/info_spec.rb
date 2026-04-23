@@ -137,6 +137,30 @@ RSpec.describe Hyperliquid::Info do
       result = info.user_fills_by_time(user_address, start_time, end_time)
       expect(result).to eq(expected_response)
     end
+
+    it 'supports aggregate_by_time parameter' do
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userFillsByTime', user: user_address, startTime: start_time,
+                      aggregateByTime: true }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_fills_by_time(user_address, start_time, aggregate_by_time: true)
+      expect(result).to eq(expected_response)
+    end
+
+    it 'supports reversed parameter' do
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userFillsByTime', user: user_address, startTime: start_time,
+                      reversed: true }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_fills_by_time(user_address, start_time, reversed: true)
+      expect(result).to eq(expected_response)
+    end
   end
 
   describe '#user_rate_limit' do
@@ -383,6 +407,29 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#vault_summaries' do
+    it 'requests vaults less than 2 hours old' do
+      expected_response = [
+        {
+          'name' => 'Test Vault',
+          'vaultAddress' => '0x2222222222222222222222222222222222222222',
+          'leader' => '0x3333333333333333333333333333333333333333',
+          'tvl' => '10000.00',
+          'isClosed' => false,
+          'relationship' => { 'type' => 'normal' },
+          'createTimeMillis' => 1_700_000_000_000
+        }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'vaultSummaries' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.vault_summaries
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#user_role' do
     let(:user_address) { '0x1234567890123456789012345678901234567890' }
 
@@ -557,6 +604,21 @@ RSpec.describe Hyperliquid::Info do
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.user_dex_abstraction(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#user_abstraction' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's abstraction state" do
+      expected_response = 'unifiedAccount'
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userAbstraction', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_abstraction(user_address)
       expect(result).to eq(expected_response)
     end
   end

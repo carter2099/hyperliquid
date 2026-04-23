@@ -52,10 +52,15 @@ module Hyperliquid
     # @param user [String] Wallet address
     # @param start_time [Integer] Start timestamp in milliseconds
     # @param end_time [Integer, nil] Optional end timestamp in milliseconds
+    # @param aggregate_by_time [Boolean, nil] If true, partial fills are aggregated when a
+    #   crossing order fills multiple resting orders
+    # @param reversed [Boolean, nil] If true, fills are returned in reverse chronological order (newest first)
     # @return [Array]
-    def user_fills_by_time(user, start_time, end_time = nil)
+    def user_fills_by_time(user, start_time, end_time = nil, aggregate_by_time: nil, reversed: nil)
       body = { type: 'userFillsByTime', user: user, startTime: start_time }
       body[:endTime] = end_time if end_time
+      body[:aggregateByTime] = aggregate_by_time unless aggregate_by_time.nil?
+      body[:reversed] = reversed unless reversed.nil?
       @client.post(Constants::INFO_ENDPOINT, body)
     end
 
@@ -163,6 +168,13 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'userVaultEquities', user: user })
     end
 
+    # Retrieve a list of vaults less than 2 hours old
+    # @return [Array] Recently created vaults with name, address, leader, tvl, isClosed,
+    #   relationship, createTimeMillis
+    def vault_summaries
+      @client.post(Constants::INFO_ENDPOINT, { type: 'vaultSummaries' })
+    end
+
     # Query a user's role
     # @param user [String]
     # @return [Hash]
@@ -238,6 +250,14 @@ module Hyperliquid
     # @return [Hash] Dex abstraction configuration
     def user_dex_abstraction(user)
       @client.post(Constants::INFO_ENDPOINT, { type: 'userDexAbstraction', user: user })
+    end
+
+    # Query a user's abstraction state
+    # @param user [String] Wallet address
+    # @return [String] Abstraction state (e.g., "unifiedAccount", "portfolioMargin", "disabled",
+    #   "default", "dexAbstraction")
+    def user_abstraction(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'userAbstraction', user: user })
     end
 
     # ============================
