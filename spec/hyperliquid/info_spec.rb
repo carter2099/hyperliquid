@@ -733,6 +733,63 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#validator_summaries' do
+    it 'requests validator performance summaries' do
+      expected_response = [
+        {
+          'validator' => '0x1111111111111111111111111111111111111111',
+          'signer' => '0x2222222222222222222222222222222222222222',
+          'name' => 'Test Validator',
+          'description' => 'A test validator',
+          'nRecentBlocks' => 100,
+          'stake' => 1_000_000,
+          'isJailed' => false,
+          'unjailableAfter' => nil,
+          'isActive' => true,
+          'commission' => '0.05',
+          'stats' => [
+            ['day', { 'uptimeFraction' => '0.99', 'predictedApr' => '0.08', 'nSamples' => 144 }],
+            ['week', { 'uptimeFraction' => '0.98', 'predictedApr' => '0.08', 'nSamples' => 1008 }],
+            ['month', { 'uptimeFraction' => '0.97', 'predictedApr' => '0.08', 'nSamples' => 4320 }]
+          ]
+        }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'validatorSummaries' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.validator_summaries
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#exchange_status' do
+    it 'requests exchange system status information' do
+      expected_response = { 'time' => 1_700_000_000_000, 'specialStatuses' => nil }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'exchangeStatus' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.exchange_status
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#max_market_order_ntls' do
+    it 'requests maximum market order notionals per asset' do
+      expected_response = [[1_000_000, 'BTC'], [500_000, 'ETH']]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'maxMarketOrderNtls' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.max_market_order_ntls
+      expect(result).to eq(expected_response)
+    end
+  end
+
   # ============================
   # Info: Perpetuals
   # ============================

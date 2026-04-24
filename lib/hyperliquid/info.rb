@@ -296,6 +296,26 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'liquidatable' })
     end
 
+    # Retrieve validator performance summaries
+    # @return [Array] Array of validator entries with validator, signer, name, description,
+    #   nRecentBlocks, stake, isJailed, unjailableAfter, isActive, commission, and stats
+    #   (day/week/month uptime fraction, predicted APR, and sample count)
+    def validator_summaries
+      @client.post(Constants::INFO_ENDPOINT, { type: 'validatorSummaries' })
+    end
+
+    # Retrieve exchange system status information
+    # @return [Hash] Keys: time (Integer, ms since epoch), specialStatuses (Object or nil)
+    def exchange_status
+      @client.post(Constants::INFO_ENDPOINT, { type: 'exchangeStatus' })
+    end
+
+    # Retrieve maximum market order notionals per asset
+    # @return [Array<Array>] Array of [notional (Numeric), symbol (String)] tuples
+    def max_market_order_ntls
+      @client.post(Constants::INFO_ENDPOINT, { type: 'maxMarketOrderNtls' })
+    end
+
     # ============================
     # Info: Perpetuals
     # ============================
