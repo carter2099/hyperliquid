@@ -677,6 +677,62 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#pre_transfer_check' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+    let(:source_address) { '0x2222222222222222222222222222222222222222' }
+
+    it 'requests pre-transfer user existence check' do
+      expected_response = {
+        'fee' => '1.0',
+        'isSanctioned' => false,
+        'userExists' => true,
+        'userHasSentTx' => true
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'preTransferCheck', user: user_address, source: source_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.pre_transfer_check(user_address, source_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#vip?' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "returns a user's VIP status" do
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'isVip', user: user_address }.to_json)
+        .to_return(status: 200, body: 'true')
+
+      result = info.vip?(user_address)
+      expect(result).to be(true)
+    end
+
+    it 'returns nil for unknown users' do
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'isVip', user: user_address }.to_json)
+        .to_return(status: 200, body: 'null')
+
+      result = info.vip?(user_address)
+      expect(result).to be_nil
+    end
+  end
+
+  describe '#liquidatable' do
+    it 'requests the liquidatable users list' do
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'liquidatable' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.liquidatable
+      expect(result).to eq(expected_response)
+    end
+  end
+
   # ============================
   # Info: Perpetuals
   # ============================

@@ -274,6 +274,28 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'userAbstraction', user: user })
     end
 
+    # Check user existence, activation fee, and sanctions status before a transfer
+    # @param user [String] Destination user address
+    # @param source [String] Source (funding) address
+    # @return [Hash] Keys: fee (String), isSanctioned (Boolean), userExists (Boolean),
+    #   userHasSentTx (Boolean)
+    def pre_transfer_check(user, source)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'preTransferCheck', user: user, source: source })
+    end
+
+    # Check whether a user is a VIP
+    # @param user [String] Wallet address
+    # @return [Boolean, nil] True/false VIP status, or nil if the user is unknown
+    def vip?(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'isVip', user: user })
+    end
+
+    # Retrieve addresses of currently liquidatable users
+    # @return [Array] Array of liquidatable user entries
+    def liquidatable
+      @client.post(Constants::INFO_ENDPOINT, { type: 'liquidatable' })
+    end
+
     # ============================
     # Info: Perpetuals
     # ============================
