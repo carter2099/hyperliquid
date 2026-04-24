@@ -790,6 +790,65 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#validator_l1_votes' do
+    it 'requests L1 governance votes cast by validators' do
+      expected_response = [
+        {
+          'expireTime' => 1_700_000_000_000,
+          'action' => { 'D' => 'some-proposal-id' },
+          'votes' => %w[
+            0x1111111111111111111111111111111111111111
+            0x2222222222222222222222222222222222222222
+          ]
+        },
+        {
+          'expireTime' => 1_700_000_060_000,
+          'action' => { 'C' => %w[option-a option-b] },
+          'votes' => ['0x3333333333333333333333333333333333333333']
+        }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'validatorL1Votes' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.validator_l1_votes
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#gossip_root_ips' do
+    it 'requests gossip root IPs' do
+      expected_response = ['10.0.0.1', '192.168.1.100', '203.0.113.42']
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'gossipRootIps' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.gossip_root_ips
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#legal_check' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests a user's legal verification status" do
+      expected_response = {
+        'ipAllowed' => true,
+        'acceptedTerms' => true,
+        'userAllowed' => true
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'legalCheck', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.legal_check(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
   # ============================
   # Info: Perpetuals
   # ============================

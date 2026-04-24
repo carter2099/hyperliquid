@@ -316,6 +316,26 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'maxMarketOrderNtls' })
     end
 
+    # Retrieve L1 governance votes cast by validators
+    # @return [Array] Array of entries with expireTime (ms since epoch), action (hash with
+    #   either `D` string or `C` array of strings), and votes (array of validator addresses)
+    def validator_l1_votes
+      @client.post(Constants::INFO_ENDPOINT, { type: 'validatorL1Votes' })
+    end
+
+    # Retrieve gossip root IPs
+    # @return [Array<String>] Array of dotted-quad IPv4 addresses
+    def gossip_root_ips
+      @client.post(Constants::INFO_ENDPOINT, { type: 'gossipRootIps' })
+    end
+
+    # Retrieve a user's legal verification status
+    # @param user [String] Wallet address
+    # @return [Hash] Keys: ipAllowed (Boolean), acceptedTerms (Boolean), userAllowed (Boolean)
+    def legal_check(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'legalCheck', user: user })
+    end
+
     # ============================
     # Info: Perpetuals
     # ============================
