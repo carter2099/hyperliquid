@@ -94,6 +94,20 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'l2Book', coin: coin })
     end
 
+    # Get recent trades for a coin
+    # @param coin [String] Asset symbol (e.g., "BTC")
+    # @return [Array] Recent trades with coin, side, px, sz, time, hash, tid, users (maker, taker)
+    def recent_trades(coin)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'recentTrades', coin: coin })
+    end
+
+    # Get block details by block height
+    # @param height [Integer] Block height
+    # @return [Hash] Block details including blockTime, hash, height, numTxs, proposer, txs
+    def block_details(height)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'blockDetails', height: height })
+    end
+
     # Get candlestick data
     # @param coin [String] Coin symbol
     # @param interval [String] Time interval (e.g., "1m", "1h", "1d")

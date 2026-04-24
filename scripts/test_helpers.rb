@@ -49,7 +49,13 @@ end
 def dump_status(result)
   return unless result.is_a?(Hash)
 
-  status = result.dig('response', 'data', 'statuses', 0)
+  response = result['response']
+  return unless response.is_a?(Hash)
+
+  data = response['data']
+  return unless data.is_a?(Hash)
+
+  status = data.dig('statuses', 0)
   return unless status
 
   puts "  API status: #{status.inspect}"
@@ -60,7 +66,9 @@ def check_result(result, operation)
 
   return false if api_error?(result)
 
-  status = result.dig('response', 'data', 'statuses', 0)
+  response = result['response']
+  data = response.is_a?(Hash) ? response['data'] : nil
+  status = data.is_a?(Hash) ? data.dig('statuses', 0) : nil
 
   if status.is_a?(Hash) && status['error']
     $test_failed = true

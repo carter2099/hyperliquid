@@ -232,6 +232,60 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#recent_trades' do
+    let(:coin) { 'BTC' }
+
+    it 'requests recent trades for a coin' do
+      expected_response = [
+        {
+          'coin' => 'BTC',
+          'side' => 'B',
+          'px' => '50000',
+          'sz' => '0.5',
+          'time' => 1_700_000_000_000,
+          'hash' => '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+          'tid' => 12_345,
+          'users' => %w[
+            0x1111111111111111111111111111111111111111
+            0x2222222222222222222222222222222222222222
+          ]
+        }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'recentTrades', coin: coin }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.recent_trades(coin)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#block_details' do
+    let(:height) { 12_345 }
+
+    it 'requests block details by height' do
+      expected_response = {
+        'type' => 'blockDetails',
+        'blockDetails' => {
+          'blockTime' => 1_700_000_000_000,
+          'hash' => '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+          'height' => height,
+          'numTxs' => 2,
+          'proposer' => '0x3333333333333333333333333333333333333333',
+          'txs' => []
+        }
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'blockDetails', height: height }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.block_details(height)
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#candles_snapshot' do
     let(:coin) { 'BTC' }
     let(:interval) { '1h' }
