@@ -137,6 +137,30 @@ RSpec.describe Hyperliquid::Info do
       result = info.user_fills_by_time(user_address, start_time, end_time)
       expect(result).to eq(expected_response)
     end
+
+    it 'supports aggregate_by_time parameter' do
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userFillsByTime', user: user_address, startTime: start_time,
+                      aggregateByTime: true }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_fills_by_time(user_address, start_time, aggregate_by_time: true)
+      expect(result).to eq(expected_response)
+    end
+
+    it 'supports reversed parameter' do
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userFillsByTime', user: user_address, startTime: start_time,
+                      reversed: true }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_fills_by_time(user_address, start_time, reversed: true)
+      expect(result).to eq(expected_response)
+    end
   end
 
   describe '#user_rate_limit' do
@@ -204,6 +228,60 @@ RSpec.describe Hyperliquid::Info do
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.l2_book(coin)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#recent_trades' do
+    let(:coin) { 'BTC' }
+
+    it 'requests recent trades for a coin' do
+      expected_response = [
+        {
+          'coin' => 'BTC',
+          'side' => 'B',
+          'px' => '50000',
+          'sz' => '0.5',
+          'time' => 1_700_000_000_000,
+          'hash' => '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+          'tid' => 12_345,
+          'users' => %w[
+            0x1111111111111111111111111111111111111111
+            0x2222222222222222222222222222222222222222
+          ]
+        }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'recentTrades', coin: coin }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.recent_trades(coin)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#block_details' do
+    let(:height) { 12_345 }
+
+    it 'requests block details by height' do
+      expected_response = {
+        'type' => 'blockDetails',
+        'blockDetails' => {
+          'blockTime' => 1_700_000_000_000,
+          'hash' => '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+          'height' => height,
+          'numTxs' => 2,
+          'proposer' => '0x3333333333333333333333333333333333333333',
+          'txs' => []
+        }
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'blockDetails', height: height }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.block_details(height)
       expect(result).to eq(expected_response)
     end
   end
@@ -383,6 +461,29 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#vault_summaries' do
+    it 'requests vaults less than 2 hours old' do
+      expected_response = [
+        {
+          'name' => 'Test Vault',
+          'vaultAddress' => '0x2222222222222222222222222222222222222222',
+          'leader' => '0x3333333333333333333333333333333333333333',
+          'tvl' => '10000.00',
+          'isClosed' => false,
+          'relationship' => { 'type' => 'normal' },
+          'createTimeMillis' => 1_700_000_000_000
+        }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'vaultSummaries' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.vault_summaries
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#user_role' do
     let(:user_address) { '0x1234567890123456789012345678901234567890' }
 
@@ -557,6 +658,134 @@ RSpec.describe Hyperliquid::Info do
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.user_dex_abstraction(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#user_abstraction' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests user's abstraction state" do
+      expected_response = 'unifiedAccount'
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userAbstraction', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_abstraction(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#pre_transfer_check' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+    let(:source_address) { '0x2222222222222222222222222222222222222222' }
+
+    it 'requests pre-transfer user existence check' do
+      expected_response = {
+        'fee' => '1.0',
+        'isSanctioned' => false,
+        'userExists' => true,
+        'userHasSentTx' => true
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'preTransferCheck', user: user_address, source: source_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.pre_transfer_check(user_address, source_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#vip?' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "returns a user's VIP status" do
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'isVip', user: user_address }.to_json)
+        .to_return(status: 200, body: 'true')
+
+      result = info.vip?(user_address)
+      expect(result).to be(true)
+    end
+
+    it 'returns nil for unknown users' do
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'isVip', user: user_address }.to_json)
+        .to_return(status: 200, body: 'null')
+
+      result = info.vip?(user_address)
+      expect(result).to be_nil
+    end
+  end
+
+  describe '#liquidatable' do
+    it 'requests the liquidatable users list' do
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'liquidatable' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.liquidatable
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#validator_summaries' do
+    it 'requests validator performance summaries' do
+      expected_response = [
+        {
+          'validator' => '0x1111111111111111111111111111111111111111',
+          'signer' => '0x2222222222222222222222222222222222222222',
+          'name' => 'Test Validator',
+          'description' => 'A test validator',
+          'nRecentBlocks' => 100,
+          'stake' => 1_000_000,
+          'isJailed' => false,
+          'unjailableAfter' => nil,
+          'isActive' => true,
+          'commission' => '0.05',
+          'stats' => [
+            ['day', { 'uptimeFraction' => '0.99', 'predictedApr' => '0.08', 'nSamples' => 144 }],
+            ['week', { 'uptimeFraction' => '0.98', 'predictedApr' => '0.08', 'nSamples' => 1008 }],
+            ['month', { 'uptimeFraction' => '0.97', 'predictedApr' => '0.08', 'nSamples' => 4320 }]
+          ]
+        }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'validatorSummaries' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.validator_summaries
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#exchange_status' do
+    it 'requests exchange system status information' do
+      expected_response = { 'time' => 1_700_000_000_000, 'specialStatuses' => nil }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'exchangeStatus' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.exchange_status
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#max_market_order_ntls' do
+    it 'requests maximum market order notionals per asset' do
+      expected_response = [[1_000_000, 'BTC'], [500_000, 'ETH']]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'maxMarketOrderNtls' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.max_market_order_ntls
       expect(result).to eq(expected_response)
     end
   end

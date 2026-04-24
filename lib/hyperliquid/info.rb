@@ -52,10 +52,15 @@ module Hyperliquid
     # @param user [String] Wallet address
     # @param start_time [Integer] Start timestamp in milliseconds
     # @param end_time [Integer, nil] Optional end timestamp in milliseconds
+    # @param aggregate_by_time [Boolean, nil] If true, partial fills are aggregated when a
+    #   crossing order fills multiple resting orders
+    # @param reversed [Boolean, nil] If true, fills are returned in reverse chronological order (newest first)
     # @return [Array]
-    def user_fills_by_time(user, start_time, end_time = nil)
+    def user_fills_by_time(user, start_time, end_time = nil, aggregate_by_time: nil, reversed: nil)
       body = { type: 'userFillsByTime', user: user, startTime: start_time }
       body[:endTime] = end_time if end_time
+      body[:aggregateByTime] = aggregate_by_time unless aggregate_by_time.nil?
+      body[:reversed] = reversed unless reversed.nil?
       @client.post(Constants::INFO_ENDPOINT, body)
     end
 
@@ -87,6 +92,20 @@ module Hyperliquid
     # @return [Hash] L2 order book data with bids and asks
     def l2_book(coin)
       @client.post(Constants::INFO_ENDPOINT, { type: 'l2Book', coin: coin })
+    end
+
+    # Get recent trades for a coin
+    # @param coin [String] Asset symbol (e.g., "BTC")
+    # @return [Array] Recent trades with coin, side, px, sz, time, hash, tid, users (maker, taker)
+    def recent_trades(coin)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'recentTrades', coin: coin })
+    end
+
+    # Get block details by block height
+    # @param height [Integer] Block height
+    # @return [Hash] Block details including blockTime, hash, height, numTxs, proposer, txs
+    def block_details(height)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'blockDetails', height: height })
     end
 
     # Get candlestick data
@@ -161,6 +180,13 @@ module Hyperliquid
     # @return [Array]
     def user_vault_equities(user)
       @client.post(Constants::INFO_ENDPOINT, { type: 'userVaultEquities', user: user })
+    end
+
+    # Retrieve a list of vaults less than 2 hours old
+    # @return [Array] Recently created vaults with name, address, leader, tvl, isClosed,
+    #   relationship, createTimeMillis
+    def vault_summaries
+      @client.post(Constants::INFO_ENDPOINT, { type: 'vaultSummaries' })
     end
 
     # Query a user's role
@@ -238,6 +264,56 @@ module Hyperliquid
     # @return [Hash] Dex abstraction configuration
     def user_dex_abstraction(user)
       @client.post(Constants::INFO_ENDPOINT, { type: 'userDexAbstraction', user: user })
+    end
+
+    # Query a user's abstraction state
+    # @param user [String] Wallet address
+    # @return [String] Abstraction state (e.g., "unifiedAccount", "portfolioMargin", "disabled",
+    #   "default", "dexAbstraction")
+    def user_abstraction(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'userAbstraction', user: user })
+    end
+
+    # Check user existence, activation fee, and sanctions status before a transfer
+    # @param user [String] Destination user address
+    # @param source [String] Source (funding) address
+    # @return [Hash] Keys: fee (String), isSanctioned (Boolean), userExists (Boolean),
+    #   userHasSentTx (Boolean)
+    def pre_transfer_check(user, source)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'preTransferCheck', user: user, source: source })
+    end
+
+    # Check whether a user is a VIP
+    # @param user [String] Wallet address
+    # @return [Boolean, nil] True/false VIP status, or nil if the user is unknown
+    def vip?(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'isVip', user: user })
+    end
+
+    # Retrieve addresses of currently liquidatable users
+    # @return [Array] Array of liquidatable user entries
+    def liquidatable
+      @client.post(Constants::INFO_ENDPOINT, { type: 'liquidatable' })
+    end
+
+    # Retrieve validator performance summaries
+    # @return [Array] Array of validator entries with validator, signer, name, description,
+    #   nRecentBlocks, stake, isJailed, unjailableAfter, isActive, commission, and stats
+    #   (day/week/month uptime fraction, predicted APR, and sample count)
+    def validator_summaries
+      @client.post(Constants::INFO_ENDPOINT, { type: 'validatorSummaries' })
+    end
+
+    # Retrieve exchange system status information
+    # @return [Hash] Keys: time (Integer, ms since epoch), specialStatuses (Object or nil)
+    def exchange_status
+      @client.post(Constants::INFO_ENDPOINT, { type: 'exchangeStatus' })
+    end
+
+    # Retrieve maximum market order notionals per asset
+    # @return [Array<Array>] Array of [notional (Numeric), symbol (String)] tuples
+    def max_market_order_ntls
+      @client.post(Constants::INFO_ENDPOINT, { type: 'maxMarketOrderNtls' })
     end
 
     # ============================
