@@ -1,5 +1,25 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [1.1.0] - 2026-04-24
+
+### New Info endpoints
+
+- `Info#validator_summaries` — validator status/stake summaries
+- `Info#exchange_status` — exchange-wide status
+- `Info#max_market_order_ntls` — per-coin max market order notionals
+- `Info#pre_transfer_check` — pre-flight checks for transfers
+- `Info#vip?` — VIP status lookup
+- `Info#liquidatable` — open positions flagged liquidatable
+- `Info#recent_trades(coin)` — recent trades feed
+- `Info#block_details(height)` — block detail lookup by height
+- `Info#user_abstraction` — account abstraction state (unifiedAccount, portfolioMargin, dexAbstraction, etc.)
+- `Info#vault_summaries` — vaults less than 2 hours old
+- `Info#user_fills_by_time` now accepts `aggregate_by_time` and `reversed` kwargs (matches upstream Python/TS SDKs)
+
+### Fixes
+
+- Fix `TypeError` in `dump_status`/`check_result` when `response.data` is a String (e.g. `usdClassTransfer`, `approveBuilderFee` style actions)
+
 ## [1.0.2] - 2026-02-05
 
 - Lower minimum Ruby requirement to 3.3 and align RuboCop target
