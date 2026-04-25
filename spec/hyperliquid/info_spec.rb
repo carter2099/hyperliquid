@@ -341,6 +341,24 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#approved_builders' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it 'requests approved builder addresses for a user' do
+      expected_response = %w[
+        0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'approvedBuilders', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.approved_builders(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#historical_orders' do
     let(:user_address) { '0x1234567890123456789012345678901234567890' }
 
@@ -1094,6 +1112,22 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#all_perp_metas' do
+    it 'requests trading metadata for all perp dexs' do
+      expected_response = [
+        { 'universe' => [{ 'name' => 'BTC', 'szDecimals' => 4 }] },
+        { 'universe' => [{ 'name' => 'FOO', 'szDecimals' => 2 }] }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'allPerpMetas' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.all_perp_metas
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#user_state' do
     let(:user_address) { '0x1234567890123456789012345678901234567890' }
 
@@ -1189,6 +1223,30 @@ RSpec.describe Hyperliquid::Info do
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.perp_dex_limits('builder-dex')
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#perp_dex_status' do
+    it 'requests perp DEX status for a builder-deployed dex' do
+      expected_response = { 'totalNetDeposit' => '12345.67' }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpDexStatus', dex: 'builder-dex' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.perp_dex_status('builder-dex')
+      expect(result).to eq(expected_response)
+    end
+
+    it 'accepts an empty string for the first perp dex' do
+      expected_response = { 'totalNetDeposit' => '0.0' }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpDexStatus', dex: '' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.perp_dex_status('')
       expect(result).to eq(expected_response)
     end
   end

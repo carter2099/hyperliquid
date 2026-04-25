@@ -134,6 +134,13 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'maxBuilderFee', user: user, builder: builder })
     end
 
+    # Query approved builders for a user
+    # @param user [String] Wallet address
+    # @return [Array<String>] Array of approved builder addresses
+    def approved_builders(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'approvedBuilders', user: user })
+    end
+
     # Retrieve a user's historical orders
     # @param user [String] Wallet address
     # @param start_time [Integer, nil] Optional start timestamp in milliseconds
@@ -416,6 +423,12 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'metaAndAssetCtxs' })
     end
 
+    # Get trading metadata for all perpetual dexs
+    # @return [Array<Hash>] Array of meta payloads (one per dex), each with universe and other fields
+    def all_perp_metas
+      @client.post(Constants::INFO_ENDPOINT, { type: 'allPerpMetas' })
+    end
+
     # Get user's trading state
     # @param user [String] Wallet address
     # @param dex [String, nil] Optional perp dex name
@@ -457,6 +470,13 @@ module Hyperliquid
     # @return [Hash]
     def perp_dex_limits(dex)
       @client.post(Constants::INFO_ENDPOINT, { type: 'perpDexLimits', dex: dex })
+    end
+
+    # Retrieve perp DEX status (e.g. total net deposit) for a builder-deployed dex
+    # @param dex [String] Perp dex name; the empty string represents the first perp dex
+    # @return [Hash] Keys: totalNetDeposit (String)
+    def perp_dex_status(dex)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'perpDexStatus', dex: dex })
     end
 
     # Retrieve a user's funding history
