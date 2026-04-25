@@ -1251,6 +1251,55 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#perp_categories' do
+    it 'requests perpetual asset categories' do
+      expected_response = [
+        %w[BTC layer1],
+        %w[ETH layer1],
+        %w[ARB layer2]
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpCategories' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.perp_categories
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#outcome_meta' do
+    it 'requests prediction market outcome metadata' do
+      expected_response = {
+        'outcomes' => [
+          {
+            'outcome' => 1,
+            'name' => 'Yes',
+            'description' => 'Resolves YES',
+            'sideSpecs' => [{ 'name' => 'YES', 'token' => 42 }]
+          }
+        ],
+        'questions' => [
+          {
+            'question' => 1,
+            'name' => 'Will X happen?',
+            'description' => 'Resolution criteria...',
+            'fallbackOutcome' => 0,
+            'namedOutcomes' => [1, 2],
+            'settledNamedOutcomes' => []
+          }
+        ]
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'outcomeMeta' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.outcome_meta
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#user_funding' do
     let(:user_address) { '0x1234567890123456789012345678901234567890' }
     let(:start_time) { 1_681_222_254_710 }
@@ -1475,6 +1524,30 @@ RSpec.describe Hyperliquid::Info do
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.token_details(token_id)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#aligned_quote_token_info' do
+    let(:token) { 1328 }
+
+    it 'requests aligned quote token info for a token index' do
+      expected_response = {
+        'isAligned' => true,
+        'firstAlignedTime' => 1_700_000_000_000,
+        'evmMintedSupply' => '1000000.5',
+        'dailyAmountOwed' => [
+          ['2026-04-24', '12.34'],
+          ['2026-04-25', '15.67']
+        ],
+        'predictedRate' => '0.0125'
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'alignedQuoteTokenInfo', token: token }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.aligned_quote_token_info(token)
       expect(result).to eq(expected_response)
     end
   end

@@ -479,6 +479,20 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'perpDexStatus', dex: dex })
     end
 
+    # Retrieve perpetual asset categories
+    # @return [Array<Array(String, String)>] Array of [coin, category] tuples
+    def perp_categories
+      @client.post(Constants::INFO_ENDPOINT, { type: 'perpCategories' })
+    end
+
+    # Retrieve prediction market outcome metadata
+    # @return [Hash] Hash with outcomes (each with outcome, name, description, sideSpecs)
+    #   and questions (each with question, name, description, fallbackOutcome,
+    #   namedOutcomes, settledNamedOutcomes)
+    def outcome_meta
+      @client.post(Constants::INFO_ENDPOINT, { type: 'outcomeMeta' })
+    end
+
     # Retrieve a user's funding history
     # @param user [String]
     # @param start_time [Integer]
@@ -553,6 +567,14 @@ module Hyperliquid
     # @return [Hash] Token details
     def token_details(token_id)
       @client.post(Constants::INFO_ENDPOINT, { type: 'tokenDetails', tokenId: token_id })
+    end
+
+    # Get supply, rate, and pending payment information for an aligned quote token
+    # @param token [Integer] Token index
+    # @return [Hash] Hash with isAligned, firstAlignedTime, evmMintedSupply,
+    #   dailyAmountOwed (array of [date, amount] tuples), predictedRate
+    def aligned_quote_token_info(token)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'alignedQuoteTokenInfo', token: token })
     end
   end
   # rubocop:enable Metrics/ClassLength
