@@ -336,6 +336,28 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'legalCheck', user: user })
     end
 
+    # Retrieve the margin requirements table for a given id
+    # @param id [Integer] Margin table id
+    # @return [Hash] Keys: description (String), marginTiers (Array of { lowerBound, maxLeverage })
+    def margin_table(id)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'marginTable', id: id })
+    end
+
+    # Retrieve the vaults a user is leading
+    # @param user [String] Wallet address
+    # @return [Array<Hash>] Array of { address (String), name (String) } entries
+    def leading_vaults(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'leadingVaults', user: user })
+    end
+
+    # Retrieve a user's TWAP order history
+    # @param user [String] Wallet address
+    # @return [Array<Hash>] Array of entries with time (Integer, sec since epoch), state (Hash),
+    #   status (Hash with `status` and optional `description`), and optional twapId (Integer)
+    def twap_history(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'twapHistory', user: user })
+    end
+
     # ============================
     # Info: Perpetuals
     # ============================

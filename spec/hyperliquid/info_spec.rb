@@ -849,6 +849,92 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#margin_table' do
+    it 'requests the margin table for the given id' do
+      expected_response = {
+        'description' => 'Default',
+        'marginTiers' => [
+          { 'lowerBound' => '0', 'maxLeverage' => 50 },
+          { 'lowerBound' => '100000', 'maxLeverage' => 25 }
+        ]
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'marginTable', id: 1 }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.margin_table(1)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#leading_vaults' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it 'requests the vaults a user is leading' do
+      expected_response = [
+        { 'address' => '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'name' => 'Vault A' },
+        { 'address' => '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'name' => 'Vault B' }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'leadingVaults', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.leading_vaults(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#twap_history' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests a user's TWAP order history" do
+      expected_response = [
+        {
+          'time' => 1_700_000_000,
+          'state' => {
+            'coin' => 'BTC',
+            'user' => user_address,
+            'side' => 'B',
+            'sz' => '0.1',
+            'executedSz' => '0.1',
+            'executedNtl' => '5000',
+            'minutes' => 30,
+            'reduceOnly' => false,
+            'randomize' => false,
+            'timestamp' => 1_700_000_000_000
+          },
+          'status' => { 'status' => 'finished' },
+          'twapId' => 42
+        },
+        {
+          'time' => 1_700_000_100,
+          'state' => {
+            'coin' => 'ETH',
+            'user' => user_address,
+            'side' => 'A',
+            'sz' => '1.0',
+            'executedSz' => '0.2',
+            'executedNtl' => '400',
+            'minutes' => 15,
+            'reduceOnly' => true,
+            'randomize' => true,
+            'timestamp' => 1_700_000_100_000
+          },
+          'status' => { 'status' => 'error', 'description' => 'oracle bounce' }
+        }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'twapHistory', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.twap_history(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
   # ============================
   # Info: Perpetuals
   # ============================
