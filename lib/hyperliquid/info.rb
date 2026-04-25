@@ -158,11 +158,34 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, body)
     end
 
+    # Retrieve a user's TWAP slice fills within a time range
+    # @param user [String] Wallet address
+    # @param start_time [Integer] Start timestamp in milliseconds
+    # @param end_time [Integer, nil] Optional end timestamp in milliseconds
+    # @param aggregate_by_time [Boolean, nil] If true, partial fills are aggregated when a
+    #   crossing order fills multiple resting orders
+    # @return [Array]
+    def user_twap_slice_fills_by_time(user, start_time, end_time = nil, aggregate_by_time: nil)
+      body = { type: 'userTwapSliceFillsByTime', user: user, startTime: start_time }
+      body[:endTime] = end_time if end_time
+      body[:aggregateByTime] = aggregate_by_time unless aggregate_by_time.nil?
+      @client.post(Constants::INFO_ENDPOINT, body)
+    end
+
     # Retrieve a user's subaccounts
     # @param user [String]
     # @return [Array]
     def user_subaccounts(user)
       @client.post(Constants::INFO_ENDPOINT, { type: 'subaccounts', user: user })
+    end
+
+    # Retrieve a user's V2 subaccounts (per-dex clearinghouse + spot state)
+    # @param user [String] Wallet address
+    # @return [Array<Hash>, nil] Array of entries with name, subAccountUser, master,
+    #   dexToClearinghouseState (array of [dex, state] tuples), and spotState; nil if
+    #   the user has no subaccounts
+    def sub_accounts2(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'subAccounts2', user: user })
     end
 
     # Retrieve details for a vault
@@ -356,6 +379,16 @@ module Hyperliquid
     #   status (Hash with `status` and optional `description`), and optional twapId (Integer)
     def twap_history(user)
       @client.post(Constants::INFO_ENDPOINT, { type: 'twapHistory', user: user })
+    end
+
+    # Retrieve comprehensive user and market data in a single response
+    # @param user [String] Wallet address
+    # @return [Hash] Aggregated payload containing keys including clearinghouseState,
+    #   leadingVaults, totalVaultEquity, openOrders, agentAddress, agentValidUntil, cumLedger,
+    #   meta, assetCtxs, serverTime, isVault, user, twapStates, spotState, spotAssetCtxs,
+    #   optOutOfSpotDusting, perpsAtOpenInterestCap
+    def web_data2(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'webData2', user: user })
     end
 
     # ============================

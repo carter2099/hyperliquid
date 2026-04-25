@@ -402,6 +402,40 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#user_twap_slice_fills_by_time' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+    let(:start_time) { 1_700_000_000_000 }
+
+    it "requests user's TWAP slice fills with start_time only" do
+      expected_response = [
+        { 'sliceId' => 1, 'coin' => 'ETH', 'sz' => '1.0' }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userTwapSliceFillsByTime', user: user_address,
+                      startTime: start_time }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_twap_slice_fills_by_time(user_address, start_time)
+      expect(result).to eq(expected_response)
+    end
+
+    it 'supports end_time and aggregate_by_time kwarg' do
+      end_time = start_time + 86_400_000
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userTwapSliceFillsByTime', user: user_address,
+                      startTime: start_time, endTime: end_time,
+                      aggregateByTime: true }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_twap_slice_fills_by_time(user_address, start_time, end_time,
+                                                  aggregate_by_time: true)
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#user_subaccounts' do
     let(:user_address) { '0x1234567890123456789012345678901234567890' }
 
@@ -414,6 +448,40 @@ RSpec.describe Hyperliquid::Info do
 
       result = info.user_subaccounts(user_address)
       expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#sub_accounts2' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests a user's V2 sub-accounts" do
+      expected_response = [
+        {
+          'name' => 'sub1',
+          'subAccountUser' => '0x2222222222222222222222222222222222222222',
+          'master' => user_address,
+          'dexToClearinghouseState' => [
+            ['', { 'marginSummary' => { 'accountValue' => '100' } }]
+          ],
+          'spotState' => { 'balances' => [] }
+        }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'subAccounts2', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.sub_accounts2(user_address)
+      expect(result).to eq(expected_response)
+    end
+
+    it 'returns nil for users with no sub-accounts' do
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'subAccounts2', user: user_address }.to_json)
+        .to_return(status: 200, body: 'null')
+
+      result = info.sub_accounts2(user_address)
+      expect(result).to be_nil
     end
   end
 
@@ -931,6 +999,36 @@ RSpec.describe Hyperliquid::Info do
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.twap_history(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#web_data2' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it 'requests comprehensive user and market data' do
+      expected_response = {
+        'clearinghouseState' => { 'marginSummary' => { 'accountValue' => '100' } },
+        'leadingVaults' => [],
+        'totalVaultEquity' => '0',
+        'openOrders' => [],
+        'agentAddress' => nil,
+        'agentValidUntil' => nil,
+        'cumLedger' => '0',
+        'meta' => { 'universe' => [] },
+        'assetCtxs' => [],
+        'serverTime' => 1_700_000_000_000,
+        'isVault' => false,
+        'user' => user_address,
+        'twapStates' => [],
+        'spotAssetCtxs' => []
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'webData2', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.web_data2(user_address)
       expect(result).to eq(expected_response)
     end
   end
