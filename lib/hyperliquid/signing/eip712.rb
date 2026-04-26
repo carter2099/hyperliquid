@@ -104,6 +104,14 @@ module Hyperliquid
         ]
       }.freeze
 
+      CONVERT_TO_MULTI_SIG_USER_TYPES = {
+        'HyperliquidTransaction:ConvertToMultiSigUser': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :signers, type: 'string' },
+          { name: :nonce, type: 'uint64' }
+        ]
+      }.freeze
+
       class << self
         # Domain for L1 actions (orders, cancels, leverage, etc.)
         # @return [Hash] EIP-712 domain configuration

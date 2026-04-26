@@ -1990,4 +1990,139 @@ RSpec.describe Hyperliquid::Exchange do
       expect(exchange.send(:extract_dex_prefix, 'PURR/USDC')).to be_nil
     end
   end
+
+  describe '#agent_set_abstraction' do
+    let(:abstraction_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends agentSetAbstraction with the given mode' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'agentSetAbstraction' &&
+            action['abstraction'] == 'u' &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: abstraction_response.to_json)
+
+      result = exchange.agent_set_abstraction(abstraction: 'u')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'forwards different abstraction modes verbatim' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['abstraction'] == 'p'
+        end
+        .to_return(status: 200, body: abstraction_response.to_json)
+
+      result = exchange.agent_set_abstraction(abstraction: 'p')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes vaultAddress when provided' do
+      vault_addr = '0x1234567890123456789012345678901234567890'
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == vault_addr
+        end
+        .to_return(status: 200, body: abstraction_response.to_json)
+
+      result = exchange.agent_set_abstraction(abstraction: 'i', vault_address: vault_addr)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#gossip_priority_bid' do
+    let(:bid_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends gossipPriorityBid with the given fields' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'gossipPriorityBid' &&
+            action['slotId'] == 42 &&
+            action['ip'] == '198.51.100.7' &&
+            action['maxGas'] == 1_000 &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: bid_response.to_json)
+
+      result = exchange.gossip_priority_bid(slot_id: 42, ip: '198.51.100.7', max_gas: 1_000)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes vaultAddress when provided' do
+      vault_addr = '0x1234567890123456789012345678901234567890'
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == vault_addr
+        end
+        .to_return(status: 200, body: bid_response.to_json)
+
+      result = exchange.gossip_priority_bid(
+        slot_id: 1, ip: '203.0.113.1', max_gas: 500, vault_address: vault_addr
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#convert_to_multi_sig_user' do
+    let(:convert_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sorts authorized_users and JSON-encodes signers with threshold' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          signers = JSON.parse(action['signers'])
+          action['type'] == 'convertToMultiSigUser' &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet' &&
+            action['nonce'].is_a?(Integer) &&
+            signers['authorizedUsers'] == %w[
+              0x1111111111111111111111111111111111111111
+              0x2222222222222222222222222222222222222222
+              0x3333333333333333333333333333333333333333
+            ] &&
+            signers['threshold'] == 2 &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: convert_response.to_json)
+
+      result = exchange.convert_to_multi_sig_user(
+        authorized_users: %w[
+          0x3333333333333333333333333333333333333333
+          0x1111111111111111111111111111111111111111
+          0x2222222222222222222222222222222222222222
+        ],
+        threshold: 2
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes signature in request' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['signature'].is_a?(Hash) &&
+            body['signature']['r']&.start_with?('0x')
+        end
+        .to_return(status: 200, body: convert_response.to_json)
+
+      result = exchange.convert_to_multi_sig_user(
+        authorized_users: ['0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
+        threshold: 1
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
 end
