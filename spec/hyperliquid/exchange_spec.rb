@@ -2125,4 +2125,60 @@ RSpec.describe Hyperliquid::Exchange do
       expect(result['status']).to eq('ok')
     end
   end
+
+  describe '#user_set_abstraction' do
+    let(:abstraction_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends userSetAbstraction with lowercased user and correct envelope' do
+      mixed_case_user = '0xABCDEF1234567890ABCDEF1234567890ABCDEF12'
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'userSetAbstraction' &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet' &&
+            action['user'] == mixed_case_user.downcase &&
+            action['abstraction'] == 'u' &&
+            action['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: abstraction_response.to_json)
+
+      result = exchange.user_set_abstraction(user: mixed_case_user, abstraction: 'u')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'forwards the abstraction value verbatim' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['abstraction'] == 'p'
+        end
+        .to_return(status: 200, body: abstraction_response.to_json)
+
+      result = exchange.user_set_abstraction(
+        user: '0x1111111111111111111111111111111111111111',
+        abstraction: 'p'
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes signature in request' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['signature'].is_a?(Hash) &&
+            body['signature']['r']&.start_with?('0x')
+        end
+        .to_return(status: 200, body: abstraction_response.to_json)
+
+      result = exchange.user_set_abstraction(
+        user: '0x1111111111111111111111111111111111111111',
+        abstraction: 'i'
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
 end

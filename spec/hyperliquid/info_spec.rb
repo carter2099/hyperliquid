@@ -1268,6 +1268,50 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#perp_annotation' do
+    it 'requests perp annotation for a single coin' do
+      expected_response = {
+        'category' => 'layer1',
+        'description' => 'Bitcoin — original proof-of-work blockchain',
+        'displayName' => 'Bitcoin',
+        'keywords' => %w[btc bitcoin satoshi]
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpAnnotation', coin: 'BTC' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.perp_annotation('BTC')
+      expect(result).to eq(expected_response)
+    end
+
+    it 'returns nil for coins without an annotation' do
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpAnnotation', coin: 'UNKNOWN' }.to_json)
+        .to_return(status: 200, body: 'null')
+
+      result = info.perp_annotation('UNKNOWN')
+      expect(result).to be_nil
+    end
+  end
+
+  describe '#perp_concise_annotations' do
+    it 'requests concise annotations for all perpetual assets' do
+      expected_response = [
+        ['BTC', { 'category' => 'layer1', 'displayName' => 'Bitcoin', 'keywords' => %w[btc] }],
+        ['ETH', { 'category' => 'layer1', 'displayName' => 'Ethereum' }],
+        ['ARB', { 'category' => 'layer2' }]
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpConciseAnnotations' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.perp_concise_annotations
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#outcome_meta' do
     it 'requests prediction market outcome metadata' do
       expected_response = {

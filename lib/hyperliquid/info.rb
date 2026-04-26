@@ -485,6 +485,21 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'perpCategories' })
     end
 
+    # Retrieve perp annotation for a single perpetual asset
+    # @param coin [String] Coin symbol (e.g., "BTC")
+    # @return [Hash, nil] Hash with category, description, and optional displayName/keywords;
+    #   nil if no annotation exists for the coin
+    def perp_annotation(coin)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'perpAnnotation', coin: coin })
+    end
+
+    # Retrieve concise annotations for all perpetual assets
+    # @return [Array<Array>] Array of [coin (String), annotation (Hash)] tuples; each
+    #   annotation has category and optional displayName/keywords
+    def perp_concise_annotations
+      @client.post(Constants::INFO_ENDPOINT, { type: 'perpConciseAnnotations' })
+    end
+
     # Retrieve prediction market outcome metadata
     # @return [Hash] Hash with outcomes (each with outcome, name, description, sideSpecs)
     #   and questions (each with question, name, description, fallbackOutcome,

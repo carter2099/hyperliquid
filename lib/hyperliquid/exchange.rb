@@ -691,6 +691,30 @@ module Hyperliquid
       post_action(action, signature, nonce, vault_address)
     end
 
+    # Set the abstraction mode for a user (`userSetAbstraction` user-signed action).
+    # The `user` address is lowercased to match the Python SDK and protocol expectations.
+    # @param user [String] Wallet address whose abstraction is being set
+    # @param abstraction [String] One of 'u' (unified), 'p' (portfolio margin), 'i' (isolated/disabled)
+    # @return [Hash] Exchange response
+    def user_set_abstraction(user:, abstraction:)
+      nonce = timestamp_ms
+      user_lower = user.downcase
+      action = {
+        type: 'userSetAbstraction',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
+        user: user_lower,
+        abstraction: abstraction,
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { user: user_lower, abstraction: abstraction, nonce: nonce },
+        'HyperliquidTransaction:UserSetAbstraction',
+        Signing::EIP712::USER_SET_ABSTRACTION_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
     # Update the global expiration timestamp applied to subsequent L1 actions.
     # `expires_after` is not supported on user-signed actions (e.g. `usd_send`,
     # `withdraw_from_bridge`) and must be nil for those calls to succeed.
