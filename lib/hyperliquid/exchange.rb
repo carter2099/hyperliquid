@@ -675,6 +675,41 @@ module Hyperliquid
       post_action(action, signature, nonce, vault_address)
     end
 
+    # Update the global expiration timestamp applied to subsequent L1 actions.
+    # `expires_after` is not supported on user-signed actions (e.g. `usd_send`,
+    # `withdraw_from_bridge`) and must be nil for those calls to succeed.
+    # @param value [Integer, nil] Unix timestamp in milliseconds, or nil to clear
+    attr_writer :expires_after
+
+    # Toggle EVM big-blocks mode for this account (`evmUserModify` L1 action).
+    # When enabled, EVM transactions from this account are routed to big blocks.
+    # @param enable [Boolean] True to enable big blocks, false to disable
+    # @return [Hash] Exchange response
+    def use_big_blocks(enable:)
+      nonce = timestamp_ms
+      action = { type: 'evmUserModify', usingBigBlocks: enable }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # No-op L1 action — useful for burning a specific nonce slot without side effects.
+    # @param nonce [Integer, nil] Nonce to consume (defaults to current timestamp_ms)
+    # @param vault_address [String, nil] Vault address if acting on behalf of a vault
+    # @return [Hash] Exchange response
+    def noop(nonce: nil, vault_address: nil)
+      nonce ||= timestamp_ms
+      action = { type: 'noop' }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        vault_address: vault_address,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, vault_address)
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!

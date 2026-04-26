@@ -1653,6 +1653,133 @@ RSpec.describe Hyperliquid::Exchange do
     end
   end
 
+  describe '#expires_after=' do
+    it 'updates @expires_after for subsequent L1 actions' do
+      exchange.expires_after = 9_999_999_999_999
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['expiresAfter'] == 9_999_999_999_999
+        end
+        .to_return(status: 200, body: { 'status' => 'ok', 'response' => { 'type' => 'default' } }.to_json)
+
+      result = exchange.agent_enable_dex_abstraction
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'clears @expires_after when nil is passed' do
+      exchange.expires_after = 123_456_789
+      exchange.expires_after = nil
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          !body.key?('expiresAfter')
+        end
+        .to_return(status: 200, body: { 'status' => 'ok', 'response' => { 'type' => 'default' } }.to_json)
+
+      result = exchange.agent_enable_dex_abstraction
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'returns the assigned value' do
+      expect(exchange.expires_after = 42).to eq(42)
+      expect(exchange.expires_after = nil).to be_nil
+    end
+  end
+
+  describe '#use_big_blocks' do
+    let(:big_blocks_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends evmUserModify with usingBigBlocks: true' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'evmUserModify' &&
+            action['usingBigBlocks'] == true &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: big_blocks_response.to_json)
+
+      result = exchange.use_big_blocks(enable: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'sends evmUserModify with usingBigBlocks: false' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['usingBigBlocks'] == false
+        end
+        .to_return(status: 200, body: big_blocks_response.to_json)
+
+      result = exchange.use_big_blocks(enable: false)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'does not include vaultAddress in the payload' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          !body.key?('vaultAddress')
+        end
+        .to_return(status: 200, body: big_blocks_response.to_json)
+
+      result = exchange.use_big_blocks(enable: true)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#noop' do
+    let(:noop_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends a noop L1 action with a generated nonce' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action == { 'type' => 'noop' } &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: noop_response.to_json)
+
+      result = exchange.noop
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'uses the caller-provided nonce when given' do
+      explicit_nonce = 1_700_000_000_000
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['nonce'] == explicit_nonce
+        end
+        .to_return(status: 200, body: noop_response.to_json)
+
+      result = exchange.noop(nonce: explicit_nonce)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes vaultAddress when provided' do
+      vault_addr = '0x1234567890123456789012345678901234567890'
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == vault_addr
+        end
+        .to_return(status: 200, body: noop_response.to_json)
+
+      result = exchange.noop(vault_address: vault_addr)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
   describe 'builder parameter' do
     let(:order_response) do
       {
