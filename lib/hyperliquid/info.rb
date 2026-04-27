@@ -619,6 +619,18 @@ module Hyperliquid
     def all_borrow_lend_reserve_states
       @client.post(Constants::INFO_ENDPOINT, { type: 'allBorrowLendReserveStates' })
     end
+
+    # Retrieve a user's borrow/lend interest accrual history
+    # @param user [String] Wallet address
+    # @param start_time [Integer] Start timestamp in milliseconds
+    # @param end_time [Integer, nil] Optional end timestamp in milliseconds
+    # @return [Array<Hash>] Array of {time, token, borrow, supply} entries; borrow and
+    #   supply are decimal-string interest amounts
+    def user_borrow_lend_interest(user, start_time, end_time = nil)
+      body = { type: 'userBorrowLendInterest', user: user, startTime: start_time }
+      body[:endTime] = end_time if end_time
+      @client.post(Constants::INFO_ENDPOINT, body)
+    end
   end
   # rubocop:enable Metrics/ClassLength
 end

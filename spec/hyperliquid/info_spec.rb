@@ -1693,4 +1693,36 @@ RSpec.describe Hyperliquid::Info do
       expect(result).to eq(expected_response)
     end
   end
+
+  describe '#user_borrow_lend_interest' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+    let(:start_time) { 1_700_000_000_000 }
+    let(:end_time) { 1_700_086_400_000 }
+
+    it 'requests interest history with start_time only' do
+      expected_response = [
+        { 'time' => 1_700_003_600_000, 'token' => 'USDC', 'borrow' => '0.0', 'supply' => '0.012345' },
+        { 'time' => 1_700_007_200_000, 'token' => 'USDC', 'borrow' => '0.0', 'supply' => '0.012398' }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userBorrowLendInterest', user: user_address, startTime: start_time }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_borrow_lend_interest(user_address, start_time)
+      expect(result).to eq(expected_response)
+    end
+
+    it 'includes end_time when provided' do
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userBorrowLendInterest', user: user_address, startTime: start_time,
+                      endTime: end_time }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_borrow_lend_interest(user_address, start_time, end_time)
+      expect(result).to eq(expected_response)
+    end
+  end
 end
