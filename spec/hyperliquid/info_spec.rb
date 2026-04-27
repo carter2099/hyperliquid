@@ -1595,4 +1595,102 @@ RSpec.describe Hyperliquid::Info do
       expect(result).to eq(expected_response)
     end
   end
+
+  describe '#borrow_lend_user_state' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests a user's borrow/lend state" do
+      expected_response = {
+        'tokenToState' => [
+          [
+            0,
+            {
+              'borrow' => { 'basis' => '100.0', 'value' => '101.5' },
+              'supply' => { 'basis' => '500.0', 'value' => '505.25' }
+            }
+          ],
+          [
+            7,
+            {
+              'borrow' => { 'basis' => '0.0', 'value' => '0.0' },
+              'supply' => { 'basis' => '50.0', 'value' => '50.1' }
+            }
+          ]
+        ],
+        'health' => 'healthy',
+        'healthFactor' => nil
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'borrowLendUserState', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.borrow_lend_user_state(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#borrow_lend_reserve_state' do
+    let(:token) { 0 }
+
+    it 'requests reserve state for a single token' do
+      expected_response = {
+        'borrowYearlyRate' => '0.045',
+        'supplyYearlyRate' => '0.025',
+        'balance' => '10000.0',
+        'utilization' => '0.65',
+        'oraclePx' => '1.0',
+        'ltv' => '0.75',
+        'totalSupplied' => '50000.0',
+        'totalBorrowed' => '32500.0'
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'borrowLendReserveState', token: token }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.borrow_lend_reserve_state(token)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#all_borrow_lend_reserve_states' do
+    it 'requests reserve states for all tokens' do
+      expected_response = [
+        [
+          0,
+          {
+            'borrowYearlyRate' => '0.045',
+            'supplyYearlyRate' => '0.025',
+            'balance' => '10000.0',
+            'utilization' => '0.65',
+            'oraclePx' => '1.0',
+            'ltv' => '0.75',
+            'totalSupplied' => '50000.0',
+            'totalBorrowed' => '32500.0'
+          }
+        ],
+        [
+          7,
+          {
+            'borrowYearlyRate' => '0.06',
+            'supplyYearlyRate' => '0.04',
+            'balance' => '500.0',
+            'utilization' => '0.8',
+            'oraclePx' => '2500.0',
+            'ltv' => '0.7',
+            'totalSupplied' => '2500.0',
+            'totalBorrowed' => '2000.0'
+          }
+        ]
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'allBorrowLendReserveStates' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.all_borrow_lend_reserve_states
+      expect(result).to eq(expected_response)
+    end
+  end
 end

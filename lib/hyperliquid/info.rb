@@ -591,6 +591,34 @@ module Hyperliquid
     def aligned_quote_token_info(token)
       @client.post(Constants::INFO_ENDPOINT, { type: 'alignedQuoteTokenInfo', token: token })
     end
+
+    # ============================
+    # Info: Borrow/Lend (HIP-2)
+    # ============================
+
+    # Retrieve a user's borrow/lend state across tokens
+    # @param user [String] Wallet address
+    # @return [Hash] Hash with tokenToState (array of [tokenId, state] tuples; state has
+    #   borrow {basis, value} and supply {basis, value}), health, healthFactor
+    def borrow_lend_user_state(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'borrowLendUserState', user: user })
+    end
+
+    # Retrieve borrow/lend reserve state for a single token
+    # @param token [Integer] Token index
+    # @return [Hash] Hash with borrowYearlyRate, supplyYearlyRate, balance, utilization,
+    #   oraclePx, ltv, totalSupplied, totalBorrowed
+    def borrow_lend_reserve_state(token)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'borrowLendReserveState', token: token })
+    end
+
+    # Retrieve borrow/lend reserve states for all tokens
+    # @return [Array<Array>] Array of [reserveId (Integer), state (Hash)] tuples; each
+    #   state has borrowYearlyRate, supplyYearlyRate, balance, utilization, oraclePx,
+    #   ltv, totalSupplied, totalBorrowed
+    def all_borrow_lend_reserve_states
+      @client.post(Constants::INFO_ENDPOINT, { type: 'allBorrowLendReserveStates' })
+    end
   end
   # rubocop:enable Metrics/ClassLength
 end
