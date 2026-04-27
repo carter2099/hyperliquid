@@ -341,6 +341,24 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#approved_builders' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it 'requests approved builder addresses for a user' do
+      expected_response = %w[
+        0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'approvedBuilders', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.approved_builders(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#historical_orders' do
     let(:user_address) { '0x1234567890123456789012345678901234567890' }
 
@@ -402,6 +420,40 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#user_twap_slice_fills_by_time' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+    let(:start_time) { 1_700_000_000_000 }
+
+    it "requests user's TWAP slice fills with start_time only" do
+      expected_response = [
+        { 'sliceId' => 1, 'coin' => 'ETH', 'sz' => '1.0' }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userTwapSliceFillsByTime', user: user_address,
+                      startTime: start_time }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_twap_slice_fills_by_time(user_address, start_time)
+      expect(result).to eq(expected_response)
+    end
+
+    it 'supports end_time and aggregate_by_time kwarg' do
+      end_time = start_time + 86_400_000
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userTwapSliceFillsByTime', user: user_address,
+                      startTime: start_time, endTime: end_time,
+                      aggregateByTime: true }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_twap_slice_fills_by_time(user_address, start_time, end_time,
+                                                  aggregate_by_time: true)
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#user_subaccounts' do
     let(:user_address) { '0x1234567890123456789012345678901234567890' }
 
@@ -414,6 +466,40 @@ RSpec.describe Hyperliquid::Info do
 
       result = info.user_subaccounts(user_address)
       expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#sub_accounts2' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests a user's V2 sub-accounts" do
+      expected_response = [
+        {
+          'name' => 'sub1',
+          'subAccountUser' => '0x2222222222222222222222222222222222222222',
+          'master' => user_address,
+          'dexToClearinghouseState' => [
+            ['', { 'marginSummary' => { 'accountValue' => '100' } }]
+          ],
+          'spotState' => { 'balances' => [] }
+        }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'subAccounts2', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.sub_accounts2(user_address)
+      expect(result).to eq(expected_response)
+    end
+
+    it 'returns nil for users with no sub-accounts' do
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'subAccounts2', user: user_address }.to_json)
+        .to_return(status: 200, body: 'null')
+
+      result = info.sub_accounts2(user_address)
+      expect(result).to be_nil
     end
   end
 
@@ -790,6 +876,181 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#validator_l1_votes' do
+    it 'requests L1 governance votes cast by validators' do
+      expected_response = [
+        {
+          'expireTime' => 1_700_000_000_000,
+          'action' => { 'D' => 'some-proposal-id' },
+          'votes' => %w[
+            0x1111111111111111111111111111111111111111
+            0x2222222222222222222222222222222222222222
+          ]
+        },
+        {
+          'expireTime' => 1_700_000_060_000,
+          'action' => { 'C' => %w[option-a option-b] },
+          'votes' => ['0x3333333333333333333333333333333333333333']
+        }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'validatorL1Votes' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.validator_l1_votes
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#gossip_root_ips' do
+    it 'requests gossip root IPs' do
+      expected_response = ['10.0.0.1', '192.168.1.100', '203.0.113.42']
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'gossipRootIps' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.gossip_root_ips
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#legal_check' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests a user's legal verification status" do
+      expected_response = {
+        'ipAllowed' => true,
+        'acceptedTerms' => true,
+        'userAllowed' => true
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'legalCheck', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.legal_check(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#margin_table' do
+    it 'requests the margin table for the given id' do
+      expected_response = {
+        'description' => 'Default',
+        'marginTiers' => [
+          { 'lowerBound' => '0', 'maxLeverage' => 50 },
+          { 'lowerBound' => '100000', 'maxLeverage' => 25 }
+        ]
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'marginTable', id: 1 }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.margin_table(1)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#leading_vaults' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it 'requests the vaults a user is leading' do
+      expected_response = [
+        { 'address' => '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'name' => 'Vault A' },
+        { 'address' => '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'name' => 'Vault B' }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'leadingVaults', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.leading_vaults(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#twap_history' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests a user's TWAP order history" do
+      expected_response = [
+        {
+          'time' => 1_700_000_000,
+          'state' => {
+            'coin' => 'BTC',
+            'user' => user_address,
+            'side' => 'B',
+            'sz' => '0.1',
+            'executedSz' => '0.1',
+            'executedNtl' => '5000',
+            'minutes' => 30,
+            'reduceOnly' => false,
+            'randomize' => false,
+            'timestamp' => 1_700_000_000_000
+          },
+          'status' => { 'status' => 'finished' },
+          'twapId' => 42
+        },
+        {
+          'time' => 1_700_000_100,
+          'state' => {
+            'coin' => 'ETH',
+            'user' => user_address,
+            'side' => 'A',
+            'sz' => '1.0',
+            'executedSz' => '0.2',
+            'executedNtl' => '400',
+            'minutes' => 15,
+            'reduceOnly' => true,
+            'randomize' => true,
+            'timestamp' => 1_700_000_100_000
+          },
+          'status' => { 'status' => 'error', 'description' => 'oracle bounce' }
+        }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'twapHistory', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.twap_history(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#web_data2' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it 'requests comprehensive user and market data' do
+      expected_response = {
+        'clearinghouseState' => { 'marginSummary' => { 'accountValue' => '100' } },
+        'leadingVaults' => [],
+        'totalVaultEquity' => '0',
+        'openOrders' => [],
+        'agentAddress' => nil,
+        'agentValidUntil' => nil,
+        'cumLedger' => '0',
+        'meta' => { 'universe' => [] },
+        'assetCtxs' => [],
+        'serverTime' => 1_700_000_000_000,
+        'isVault' => false,
+        'user' => user_address,
+        'twapStates' => [],
+        'spotAssetCtxs' => []
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'webData2', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.web_data2(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
   # ============================
   # Info: Perpetuals
   # ============================
@@ -847,6 +1108,22 @@ RSpec.describe Hyperliquid::Info do
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.meta_and_asset_ctxs
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#all_perp_metas' do
+    it 'requests trading metadata for all perp dexs' do
+      expected_response = [
+        { 'universe' => [{ 'name' => 'BTC', 'szDecimals' => 4 }] },
+        { 'universe' => [{ 'name' => 'FOO', 'szDecimals' => 2 }] }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'allPerpMetas' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.all_perp_metas
       expect(result).to eq(expected_response)
     end
   end
@@ -946,6 +1223,123 @@ RSpec.describe Hyperliquid::Info do
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.perp_dex_limits('builder-dex')
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#perp_dex_status' do
+    it 'requests perp DEX status for a builder-deployed dex' do
+      expected_response = { 'totalNetDeposit' => '12345.67' }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpDexStatus', dex: 'builder-dex' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.perp_dex_status('builder-dex')
+      expect(result).to eq(expected_response)
+    end
+
+    it 'accepts an empty string for the first perp dex' do
+      expected_response = { 'totalNetDeposit' => '0.0' }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpDexStatus', dex: '' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.perp_dex_status('')
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#perp_categories' do
+    it 'requests perpetual asset categories' do
+      expected_response = [
+        %w[BTC layer1],
+        %w[ETH layer1],
+        %w[ARB layer2]
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpCategories' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.perp_categories
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#perp_annotation' do
+    it 'requests perp annotation for a single coin' do
+      expected_response = {
+        'category' => 'layer1',
+        'description' => 'Bitcoin — original proof-of-work blockchain',
+        'displayName' => 'Bitcoin',
+        'keywords' => %w[btc bitcoin satoshi]
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpAnnotation', coin: 'BTC' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.perp_annotation('BTC')
+      expect(result).to eq(expected_response)
+    end
+
+    it 'returns nil for coins without an annotation' do
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpAnnotation', coin: 'UNKNOWN' }.to_json)
+        .to_return(status: 200, body: 'null')
+
+      result = info.perp_annotation('UNKNOWN')
+      expect(result).to be_nil
+    end
+  end
+
+  describe '#perp_concise_annotations' do
+    it 'requests concise annotations for all perpetual assets' do
+      expected_response = [
+        ['BTC', { 'category' => 'layer1', 'displayName' => 'Bitcoin', 'keywords' => %w[btc] }],
+        ['ETH', { 'category' => 'layer1', 'displayName' => 'Ethereum' }],
+        ['ARB', { 'category' => 'layer2' }]
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpConciseAnnotations' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.perp_concise_annotations
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#outcome_meta' do
+    it 'requests prediction market outcome metadata' do
+      expected_response = {
+        'outcomes' => [
+          {
+            'outcome' => 1,
+            'name' => 'Yes',
+            'description' => 'Resolves YES',
+            'sideSpecs' => [{ 'name' => 'YES', 'token' => 42 }]
+          }
+        ],
+        'questions' => [
+          {
+            'question' => 1,
+            'name' => 'Will X happen?',
+            'description' => 'Resolution criteria...',
+            'fallbackOutcome' => 0,
+            'namedOutcomes' => [1, 2],
+            'settledNamedOutcomes' => []
+          }
+        ]
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'outcomeMeta' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.outcome_meta
       expect(result).to eq(expected_response)
     end
   end
@@ -1174,6 +1568,160 @@ RSpec.describe Hyperliquid::Info do
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.token_details(token_id)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#aligned_quote_token_info' do
+    let(:token) { 1328 }
+
+    it 'requests aligned quote token info for a token index' do
+      expected_response = {
+        'isAligned' => true,
+        'firstAlignedTime' => 1_700_000_000_000,
+        'evmMintedSupply' => '1000000.5',
+        'dailyAmountOwed' => [
+          ['2026-04-24', '12.34'],
+          ['2026-04-25', '15.67']
+        ],
+        'predictedRate' => '0.0125'
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'alignedQuoteTokenInfo', token: token }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.aligned_quote_token_info(token)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#borrow_lend_user_state' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it "requests a user's borrow/lend state" do
+      expected_response = {
+        'tokenToState' => [
+          [
+            0,
+            {
+              'borrow' => { 'basis' => '100.0', 'value' => '101.5' },
+              'supply' => { 'basis' => '500.0', 'value' => '505.25' }
+            }
+          ],
+          [
+            7,
+            {
+              'borrow' => { 'basis' => '0.0', 'value' => '0.0' },
+              'supply' => { 'basis' => '50.0', 'value' => '50.1' }
+            }
+          ]
+        ],
+        'health' => 'healthy',
+        'healthFactor' => nil
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'borrowLendUserState', user: user_address }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.borrow_lend_user_state(user_address)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#borrow_lend_reserve_state' do
+    let(:token) { 0 }
+
+    it 'requests reserve state for a single token' do
+      expected_response = {
+        'borrowYearlyRate' => '0.045',
+        'supplyYearlyRate' => '0.025',
+        'balance' => '10000.0',
+        'utilization' => '0.65',
+        'oraclePx' => '1.0',
+        'ltv' => '0.75',
+        'totalSupplied' => '50000.0',
+        'totalBorrowed' => '32500.0'
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'borrowLendReserveState', token: token }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.borrow_lend_reserve_state(token)
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#all_borrow_lend_reserve_states' do
+    it 'requests reserve states for all tokens' do
+      expected_response = [
+        [
+          0,
+          {
+            'borrowYearlyRate' => '0.045',
+            'supplyYearlyRate' => '0.025',
+            'balance' => '10000.0',
+            'utilization' => '0.65',
+            'oraclePx' => '1.0',
+            'ltv' => '0.75',
+            'totalSupplied' => '50000.0',
+            'totalBorrowed' => '32500.0'
+          }
+        ],
+        [
+          7,
+          {
+            'borrowYearlyRate' => '0.06',
+            'supplyYearlyRate' => '0.04',
+            'balance' => '500.0',
+            'utilization' => '0.8',
+            'oraclePx' => '2500.0',
+            'ltv' => '0.7',
+            'totalSupplied' => '2500.0',
+            'totalBorrowed' => '2000.0'
+          }
+        ]
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'allBorrowLendReserveStates' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.all_borrow_lend_reserve_states
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#user_borrow_lend_interest' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+    let(:start_time) { 1_700_000_000_000 }
+    let(:end_time) { 1_700_086_400_000 }
+
+    it 'requests interest history with start_time only' do
+      expected_response = [
+        { 'time' => 1_700_003_600_000, 'token' => 'USDC', 'borrow' => '0.0', 'supply' => '0.012345' },
+        { 'time' => 1_700_007_200_000, 'token' => 'USDC', 'borrow' => '0.0', 'supply' => '0.012398' }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userBorrowLendInterest', user: user_address, startTime: start_time }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_borrow_lend_interest(user_address, start_time)
+      expect(result).to eq(expected_response)
+    end
+
+    it 'includes end_time when provided' do
+      expected_response = []
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userBorrowLendInterest', user: user_address, startTime: start_time,
+                      endTime: end_time }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.user_borrow_lend_interest(user_address, start_time, end_time)
       expect(result).to eq(expected_response)
     end
   end

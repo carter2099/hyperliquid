@@ -14,10 +14,20 @@ max_fee_rate = '0.01%'
 perp_coin = 'BTC'
 
 # Step 1: Approve builder fee
+# On testnet, the builder may not meet the exchange's minimum balance for approval.
+# That precondition failure is not an SDK bug — we downgrade it to a warning and
+# continue, since the order-with-builder-fee flow (the thing we actually ship)
+# can still be exercised if a prior approval is in place.
 puts "Approving builder fee for #{builder_address} (max #{max_fee_rate})..."
 result = sdk.exchange.approve_builder_fee(builder: builder_address, max_fee_rate: max_fee_rate)
-dump_status(result)
-api_error?(result) || puts(green('Builder fee approved'))
+if result.is_a?(Hash) && result['status'] == 'err' &&
+   result['response'].to_s.include?('insufficient balance')
+  puts red("WARNING: #{result['response']}")
+  puts '  Continuing — this is a testnet precondition, not an SDK failure.'
+else
+  dump_status(result)
+  api_error?(result) || puts(green('Builder fee approved'))
+end
 puts
 
 wait_with_countdown(WAIT_SECONDS, 'Waiting before placing order with builder...')

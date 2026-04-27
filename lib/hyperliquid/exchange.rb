@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'bigdecimal'
+require 'json'
 
 module Hyperliquid
   # Exchange API client for write operations (orders, cancels, etc.)
@@ -673,6 +674,123 @@ module Hyperliquid
         expires_after: @expires_after
       )
       post_action(action, signature, nonce, vault_address)
+    end
+
+    # Set the agent abstraction mode (L1 action `agentSetAbstraction`).
+    # @param abstraction [String] One of 'u' (unified), 'p' (portfolio margin), 'i' (isolated/disabled)
+    # @param vault_address [String, nil] Vault address if acting on behalf of a vault
+    # @return [Hash] Exchange response
+    def agent_set_abstraction(abstraction:, vault_address: nil)
+      nonce = timestamp_ms
+      action = { type: 'agentSetAbstraction', abstraction: abstraction }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        vault_address: vault_address,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, vault_address)
+    end
+
+    # Set the abstraction mode for a user (`userSetAbstraction` user-signed action).
+    # The `user` address is lowercased to match the Python SDK and protocol expectations.
+    # @param user [String] Wallet address whose abstraction is being set
+    # @param abstraction [String] One of 'u' (unified), 'p' (portfolio margin), 'i' (isolated/disabled)
+    # @return [Hash] Exchange response
+    def user_set_abstraction(user:, abstraction:)
+      nonce = timestamp_ms
+      user_lower = user.downcase
+      action = {
+        type: 'userSetAbstraction',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
+        user: user_lower,
+        abstraction: abstraction,
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { user: user_lower, abstraction: abstraction, nonce: nonce },
+        'HyperliquidTransaction:UserSetAbstraction',
+        Signing::EIP712::USER_SET_ABSTRACTION_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Update the global expiration timestamp applied to subsequent L1 actions.
+    # `expires_after` is not supported on user-signed actions (e.g. `usd_send`,
+    # `withdraw_from_bridge`) and must be nil for those calls to succeed.
+    # @param value [Integer, nil] Unix timestamp in milliseconds, or nil to clear
+    attr_writer :expires_after
+
+    # Toggle EVM big-blocks mode for this account (`evmUserModify` L1 action).
+    # When enabled, EVM transactions from this account are routed to big blocks.
+    # @param enable [Boolean] True to enable big blocks, false to disable
+    # @return [Hash] Exchange response
+    def use_big_blocks(enable:)
+      nonce = timestamp_ms
+      action = { type: 'evmUserModify', usingBigBlocks: enable }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # No-op L1 action — useful for burning a specific nonce slot without side effects.
+    # @param nonce [Integer, nil] Nonce to consume (defaults to current timestamp_ms)
+    # @param vault_address [String, nil] Vault address if acting on behalf of a vault
+    # @return [Hash] Exchange response
+    def noop(nonce: nil, vault_address: nil)
+      nonce ||= timestamp_ms
+      action = { type: 'noop' }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        vault_address: vault_address,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, vault_address)
+    end
+
+    # Submit a priority-bid gossip message (L1 action `gossipPriorityBid`).
+    # Used by validators / priority bidders to gossip a bid for a given slot.
+    # @param slot_id [Integer] Slot identifier the bid applies to
+    # @param ip [String] Bidder IP address (string form expected by the protocol)
+    # @param max_gas [Integer] Maximum gas the bidder is willing to pay
+    # @param vault_address [String, nil] Vault address if acting on behalf of a vault
+    # @return [Hash] Exchange response
+    def gossip_priority_bid(slot_id:, ip:, max_gas:, vault_address: nil)
+      nonce = timestamp_ms
+      action = { type: 'gossipPriorityBid', slotId: slot_id, ip: ip, maxGas: max_gas }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        vault_address: vault_address,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, vault_address)
+    end
+
+    # Convert this account into a multi-sig user (`convertToMultiSigUser` user-signed action).
+    # The set of authorized signers and the threshold are JSON-encoded into the action's
+    # `signers` field as required by the Hyperliquid protocol.
+    # @param authorized_users [Array<String>] Authorized signer addresses; sorted before signing
+    # @param threshold [Integer] Number of signatures required to authorize an action
+    # @return [Hash] Exchange response
+    def convert_to_multi_sig_user(authorized_users:, threshold:)
+      nonce = timestamp_ms
+      sorted_users = authorized_users.sort
+      signers_json = JSON.generate({ authorizedUsers: sorted_users, threshold: threshold })
+      action = {
+        type: 'convertToMultiSigUser',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
+        signers: signers_json,
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { signers: signers_json, nonce: nonce },
+        'HyperliquidTransaction:ConvertToMultiSigUser',
+        Signing::EIP712::CONVERT_TO_MULTI_SIG_USER_TYPES
+      )
+      post_action(action, signature, nonce, nil)
     end
 
     # Clear the asset metadata cache

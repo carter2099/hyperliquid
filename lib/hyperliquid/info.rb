@@ -134,6 +134,13 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'maxBuilderFee', user: user, builder: builder })
     end
 
+    # Query approved builders for a user
+    # @param user [String] Wallet address
+    # @return [Array<String>] Array of approved builder addresses
+    def approved_builders(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'approvedBuilders', user: user })
+    end
+
     # Retrieve a user's historical orders
     # @param user [String] Wallet address
     # @param start_time [Integer, nil] Optional start timestamp in milliseconds
@@ -158,11 +165,34 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, body)
     end
 
+    # Retrieve a user's TWAP slice fills within a time range
+    # @param user [String] Wallet address
+    # @param start_time [Integer] Start timestamp in milliseconds
+    # @param end_time [Integer, nil] Optional end timestamp in milliseconds
+    # @param aggregate_by_time [Boolean, nil] If true, partial fills are aggregated when a
+    #   crossing order fills multiple resting orders
+    # @return [Array]
+    def user_twap_slice_fills_by_time(user, start_time, end_time = nil, aggregate_by_time: nil)
+      body = { type: 'userTwapSliceFillsByTime', user: user, startTime: start_time }
+      body[:endTime] = end_time if end_time
+      body[:aggregateByTime] = aggregate_by_time unless aggregate_by_time.nil?
+      @client.post(Constants::INFO_ENDPOINT, body)
+    end
+
     # Retrieve a user's subaccounts
     # @param user [String]
     # @return [Array]
     def user_subaccounts(user)
       @client.post(Constants::INFO_ENDPOINT, { type: 'subaccounts', user: user })
+    end
+
+    # Retrieve a user's V2 subaccounts (per-dex clearinghouse + spot state)
+    # @param user [String] Wallet address
+    # @return [Array<Hash>, nil] Array of entries with name, subAccountUser, master,
+    #   dexToClearinghouseState (array of [dex, state] tuples), and spotState; nil if
+    #   the user has no subaccounts
+    def sub_accounts2(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'subAccounts2', user: user })
     end
 
     # Retrieve details for a vault
@@ -316,6 +346,58 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'maxMarketOrderNtls' })
     end
 
+    # Retrieve L1 governance votes cast by validators
+    # @return [Array] Array of entries with expireTime (ms since epoch), action (hash with
+    #   either `D` string or `C` array of strings), and votes (array of validator addresses)
+    def validator_l1_votes
+      @client.post(Constants::INFO_ENDPOINT, { type: 'validatorL1Votes' })
+    end
+
+    # Retrieve gossip root IPs
+    # @return [Array<String>] Array of dotted-quad IPv4 addresses
+    def gossip_root_ips
+      @client.post(Constants::INFO_ENDPOINT, { type: 'gossipRootIps' })
+    end
+
+    # Retrieve a user's legal verification status
+    # @param user [String] Wallet address
+    # @return [Hash] Keys: ipAllowed (Boolean), acceptedTerms (Boolean), userAllowed (Boolean)
+    def legal_check(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'legalCheck', user: user })
+    end
+
+    # Retrieve the margin requirements table for a given id
+    # @param id [Integer] Margin table id
+    # @return [Hash] Keys: description (String), marginTiers (Array of { lowerBound, maxLeverage })
+    def margin_table(id)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'marginTable', id: id })
+    end
+
+    # Retrieve the vaults a user is leading
+    # @param user [String] Wallet address
+    # @return [Array<Hash>] Array of { address (String), name (String) } entries
+    def leading_vaults(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'leadingVaults', user: user })
+    end
+
+    # Retrieve a user's TWAP order history
+    # @param user [String] Wallet address
+    # @return [Array<Hash>] Array of entries with time (Integer, sec since epoch), state (Hash),
+    #   status (Hash with `status` and optional `description`), and optional twapId (Integer)
+    def twap_history(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'twapHistory', user: user })
+    end
+
+    # Retrieve comprehensive user and market data in a single response
+    # @param user [String] Wallet address
+    # @return [Hash] Aggregated payload containing keys including clearinghouseState,
+    #   leadingVaults, totalVaultEquity, openOrders, agentAddress, agentValidUntil, cumLedger,
+    #   meta, assetCtxs, serverTime, isVault, user, twapStates, spotState, spotAssetCtxs,
+    #   optOutOfSpotDusting, perpsAtOpenInterestCap
+    def web_data2(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'webData2', user: user })
+    end
+
     # ============================
     # Info: Perpetuals
     # ============================
@@ -339,6 +421,12 @@ module Hyperliquid
     # @return [Hash] Extended metadata for all assets with universe information
     def meta_and_asset_ctxs
       @client.post(Constants::INFO_ENDPOINT, { type: 'metaAndAssetCtxs' })
+    end
+
+    # Get trading metadata for all perpetual dexs
+    # @return [Array<Hash>] Array of meta payloads (one per dex), each with universe and other fields
+    def all_perp_metas
+      @client.post(Constants::INFO_ENDPOINT, { type: 'allPerpMetas' })
     end
 
     # Get user's trading state
@@ -382,6 +470,42 @@ module Hyperliquid
     # @return [Hash]
     def perp_dex_limits(dex)
       @client.post(Constants::INFO_ENDPOINT, { type: 'perpDexLimits', dex: dex })
+    end
+
+    # Retrieve perp DEX status (e.g. total net deposit) for a builder-deployed dex
+    # @param dex [String] Perp dex name; the empty string represents the first perp dex
+    # @return [Hash] Keys: totalNetDeposit (String)
+    def perp_dex_status(dex)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'perpDexStatus', dex: dex })
+    end
+
+    # Retrieve perpetual asset categories
+    # @return [Array<Array(String, String)>] Array of [coin, category] tuples
+    def perp_categories
+      @client.post(Constants::INFO_ENDPOINT, { type: 'perpCategories' })
+    end
+
+    # Retrieve perp annotation for a single perpetual asset
+    # @param coin [String] Coin symbol (e.g., "BTC")
+    # @return [Hash, nil] Hash with category, description, and optional displayName/keywords;
+    #   nil if no annotation exists for the coin
+    def perp_annotation(coin)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'perpAnnotation', coin: coin })
+    end
+
+    # Retrieve concise annotations for all perpetual assets
+    # @return [Array<Array>] Array of [coin (String), annotation (Hash)] tuples; each
+    #   annotation has category and optional displayName/keywords
+    def perp_concise_annotations
+      @client.post(Constants::INFO_ENDPOINT, { type: 'perpConciseAnnotations' })
+    end
+
+    # Retrieve prediction market outcome metadata
+    # @return [Hash] Hash with outcomes (each with outcome, name, description, sideSpecs)
+    #   and questions (each with question, name, description, fallbackOutcome,
+    #   namedOutcomes, settledNamedOutcomes)
+    def outcome_meta
+      @client.post(Constants::INFO_ENDPOINT, { type: 'outcomeMeta' })
     end
 
     # Retrieve a user's funding history
@@ -458,6 +582,54 @@ module Hyperliquid
     # @return [Hash] Token details
     def token_details(token_id)
       @client.post(Constants::INFO_ENDPOINT, { type: 'tokenDetails', tokenId: token_id })
+    end
+
+    # Get supply, rate, and pending payment information for an aligned quote token
+    # @param token [Integer] Token index
+    # @return [Hash] Hash with isAligned, firstAlignedTime, evmMintedSupply,
+    #   dailyAmountOwed (array of [date, amount] tuples), predictedRate
+    def aligned_quote_token_info(token)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'alignedQuoteTokenInfo', token: token })
+    end
+
+    # ============================
+    # Info: Borrow/Lend (HIP-2)
+    # ============================
+
+    # Retrieve a user's borrow/lend state across tokens
+    # @param user [String] Wallet address
+    # @return [Hash] Hash with tokenToState (array of [tokenId, state] tuples; state has
+    #   borrow {basis, value} and supply {basis, value}), health, healthFactor
+    def borrow_lend_user_state(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'borrowLendUserState', user: user })
+    end
+
+    # Retrieve borrow/lend reserve state for a single token
+    # @param token [Integer] Token index
+    # @return [Hash] Hash with borrowYearlyRate, supplyYearlyRate, balance, utilization,
+    #   oraclePx, ltv, totalSupplied, totalBorrowed
+    def borrow_lend_reserve_state(token)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'borrowLendReserveState', token: token })
+    end
+
+    # Retrieve borrow/lend reserve states for all tokens
+    # @return [Array<Array>] Array of [reserveId (Integer), state (Hash)] tuples; each
+    #   state has borrowYearlyRate, supplyYearlyRate, balance, utilization, oraclePx,
+    #   ltv, totalSupplied, totalBorrowed
+    def all_borrow_lend_reserve_states
+      @client.post(Constants::INFO_ENDPOINT, { type: 'allBorrowLendReserveStates' })
+    end
+
+    # Retrieve a user's borrow/lend interest accrual history
+    # @param user [String] Wallet address
+    # @param start_time [Integer] Start timestamp in milliseconds
+    # @param end_time [Integer, nil] Optional end timestamp in milliseconds
+    # @return [Array<Hash>] Array of {time, token, borrow, supply} entries; borrow and
+    #   supply are decimal-string interest amounts
+    def user_borrow_lend_interest(user, start_time, end_time = nil)
+      body = { type: 'userBorrowLendInterest', user: user, startTime: start_time }
+      body[:endTime] = end_time if end_time
+      @client.post(Constants::INFO_ENDPOINT, body)
     end
   end
   # rubocop:enable Metrics/ClassLength

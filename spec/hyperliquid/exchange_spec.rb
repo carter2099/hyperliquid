@@ -1653,6 +1653,133 @@ RSpec.describe Hyperliquid::Exchange do
     end
   end
 
+  describe '#expires_after=' do
+    it 'updates @expires_after for subsequent L1 actions' do
+      exchange.expires_after = 9_999_999_999_999
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['expiresAfter'] == 9_999_999_999_999
+        end
+        .to_return(status: 200, body: { 'status' => 'ok', 'response' => { 'type' => 'default' } }.to_json)
+
+      result = exchange.agent_enable_dex_abstraction
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'clears @expires_after when nil is passed' do
+      exchange.expires_after = 123_456_789
+      exchange.expires_after = nil
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          !body.key?('expiresAfter')
+        end
+        .to_return(status: 200, body: { 'status' => 'ok', 'response' => { 'type' => 'default' } }.to_json)
+
+      result = exchange.agent_enable_dex_abstraction
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'returns the assigned value' do
+      expect(exchange.expires_after = 42).to eq(42)
+      expect(exchange.expires_after = nil).to be_nil
+    end
+  end
+
+  describe '#use_big_blocks' do
+    let(:big_blocks_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends evmUserModify with usingBigBlocks: true' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'evmUserModify' &&
+            action['usingBigBlocks'] == true &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: big_blocks_response.to_json)
+
+      result = exchange.use_big_blocks(enable: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'sends evmUserModify with usingBigBlocks: false' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['usingBigBlocks'] == false
+        end
+        .to_return(status: 200, body: big_blocks_response.to_json)
+
+      result = exchange.use_big_blocks(enable: false)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'does not include vaultAddress in the payload' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          !body.key?('vaultAddress')
+        end
+        .to_return(status: 200, body: big_blocks_response.to_json)
+
+      result = exchange.use_big_blocks(enable: true)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#noop' do
+    let(:noop_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends a noop L1 action with a generated nonce' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action == { 'type' => 'noop' } &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: noop_response.to_json)
+
+      result = exchange.noop
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'uses the caller-provided nonce when given' do
+      explicit_nonce = 1_700_000_000_000
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['nonce'] == explicit_nonce
+        end
+        .to_return(status: 200, body: noop_response.to_json)
+
+      result = exchange.noop(nonce: explicit_nonce)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes vaultAddress when provided' do
+      vault_addr = '0x1234567890123456789012345678901234567890'
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == vault_addr
+        end
+        .to_return(status: 200, body: noop_response.to_json)
+
+      result = exchange.noop(vault_address: vault_addr)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
   describe 'builder parameter' do
     let(:order_response) do
       {
@@ -1861,6 +1988,197 @@ RSpec.describe Hyperliquid::Exchange do
       expect(exchange.send(:extract_dex_prefix, 'xyz:GOLD')).to eq('xyz')
       expect(exchange.send(:extract_dex_prefix, 'BTC')).to be_nil
       expect(exchange.send(:extract_dex_prefix, 'PURR/USDC')).to be_nil
+    end
+  end
+
+  describe '#agent_set_abstraction' do
+    let(:abstraction_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends agentSetAbstraction with the given mode' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'agentSetAbstraction' &&
+            action['abstraction'] == 'u' &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: abstraction_response.to_json)
+
+      result = exchange.agent_set_abstraction(abstraction: 'u')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'forwards different abstraction modes verbatim' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['abstraction'] == 'p'
+        end
+        .to_return(status: 200, body: abstraction_response.to_json)
+
+      result = exchange.agent_set_abstraction(abstraction: 'p')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes vaultAddress when provided' do
+      vault_addr = '0x1234567890123456789012345678901234567890'
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == vault_addr
+        end
+        .to_return(status: 200, body: abstraction_response.to_json)
+
+      result = exchange.agent_set_abstraction(abstraction: 'i', vault_address: vault_addr)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#gossip_priority_bid' do
+    let(:bid_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends gossipPriorityBid with the given fields' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'gossipPriorityBid' &&
+            action['slotId'] == 42 &&
+            action['ip'] == '198.51.100.7' &&
+            action['maxGas'] == 1_000 &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: bid_response.to_json)
+
+      result = exchange.gossip_priority_bid(slot_id: 42, ip: '198.51.100.7', max_gas: 1_000)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes vaultAddress when provided' do
+      vault_addr = '0x1234567890123456789012345678901234567890'
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == vault_addr
+        end
+        .to_return(status: 200, body: bid_response.to_json)
+
+      result = exchange.gossip_priority_bid(
+        slot_id: 1, ip: '203.0.113.1', max_gas: 500, vault_address: vault_addr
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#convert_to_multi_sig_user' do
+    let(:convert_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sorts authorized_users and JSON-encodes signers with threshold' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          signers = JSON.parse(action['signers'])
+          action['type'] == 'convertToMultiSigUser' &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet' &&
+            action['nonce'].is_a?(Integer) &&
+            signers['authorizedUsers'] == %w[
+              0x1111111111111111111111111111111111111111
+              0x2222222222222222222222222222222222222222
+              0x3333333333333333333333333333333333333333
+            ] &&
+            signers['threshold'] == 2 &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: convert_response.to_json)
+
+      result = exchange.convert_to_multi_sig_user(
+        authorized_users: %w[
+          0x3333333333333333333333333333333333333333
+          0x1111111111111111111111111111111111111111
+          0x2222222222222222222222222222222222222222
+        ],
+        threshold: 2
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes signature in request' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['signature'].is_a?(Hash) &&
+            body['signature']['r']&.start_with?('0x')
+        end
+        .to_return(status: 200, body: convert_response.to_json)
+
+      result = exchange.convert_to_multi_sig_user(
+        authorized_users: ['0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
+        threshold: 1
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#user_set_abstraction' do
+    let(:abstraction_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends userSetAbstraction with lowercased user and correct envelope' do
+      mixed_case_user = '0xABCDEF1234567890ABCDEF1234567890ABCDEF12'
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'userSetAbstraction' &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet' &&
+            action['user'] == mixed_case_user.downcase &&
+            action['abstraction'] == 'u' &&
+            action['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: abstraction_response.to_json)
+
+      result = exchange.user_set_abstraction(user: mixed_case_user, abstraction: 'u')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'forwards the abstraction value verbatim' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['abstraction'] == 'p'
+        end
+        .to_return(status: 200, body: abstraction_response.to_json)
+
+      result = exchange.user_set_abstraction(
+        user: '0x1111111111111111111111111111111111111111',
+        abstraction: 'p'
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes signature in request' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['signature'].is_a?(Hash) &&
+            body['signature']['r']&.start_with?('0x')
+        end
+        .to_return(status: 200, body: abstraction_response.to_json)
+
+      result = exchange.user_set_abstraction(
+        user: '0x1111111111111111111111111111111111111111',
+        abstraction: 'i'
+      )
+      expect(result['status']).to eq('ok')
     end
   end
 end
