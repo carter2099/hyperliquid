@@ -1,5 +1,26 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [1.2.0] - 2026-04-27
+
+### New Info endpoints
+
+- HIP-2 borrow/lend: `Info#borrow_lend_user_state`, `Info#borrow_lend_reserve_state`, `Info#all_borrow_lend_reserve_states`, `Info#user_borrow_lend_interest`
+- Perp metadata: `Info#perp_annotation`, `Info#perp_concise_annotations`, `Info#perp_categories`, `Info#outcome_meta`, `Info#aligned_quote_token_info`
+- Builders / perp dexs: `Info#approved_builders`, `Info#all_perp_metas`, `Info#perp_dex_status`
+- TWAP / web / sub-accounts: `Info#user_twap_slice_fills_by_time`, `Info#web_data2`, `Info#sub_accounts2`, `Info#twap_history`
+- Margin / vaults: `Info#margin_table`, `Info#leading_vaults`
+- Validator / network: `Info#validator_l1_votes`, `Info#gossip_root_ips`, `Info#legal_check`
+
+### New Exchange actions
+
+- `Exchange#user_set_abstraction(user:, abstraction:)` — user-signed `userSetAbstraction` (new `USER_SET_ABSTRACTION_TYPES` EIP-712 schema)
+- `Exchange#agent_set_abstraction(abstraction:, vault_address:)` — L1 `agentSetAbstraction`
+- `Exchange#gossip_priority_bid(slot_id:, ip:, max_gas:, vault_address:)` — L1 `gossipPriorityBid`
+- `Exchange#convert_to_multi_sig_user(authorized_users:, threshold:)` — user-signed action (new `CONVERT_TO_MULTI_SIG_USER_TYPES` EIP-712 schema)
+- `Exchange#expires_after=` — writer to set the global L1 expiration timestamp for subsequent actions
+- `Exchange#use_big_blocks(enable:)` — `evmUserModify` action
+- `Exchange#noop(nonce: nil, vault_address: nil)` — L1 noop, useful for burning a specific nonce slot
+
 ## [1.1.0] - 2026-04-24
 
 ### New Info endpoints
