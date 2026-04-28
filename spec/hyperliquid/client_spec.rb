@@ -251,4 +251,76 @@ RSpec.describe Hyperliquid::Client do
       expect(middleware_names).to include('Faraday::Retry::Middleware')
     end
   end
+
+  describe 'explorer target routing' do
+    let(:explorer_base_url) { 'https://rpc.example.com' }
+    let(:explorer_endpoint) { '/explorer' }
+    let(:explorer_url) { "#{explorer_base_url}#{explorer_endpoint}" }
+    let(:explorer_client) do
+      described_class.new(base_url: base_url, explorer_base_url: explorer_base_url)
+    end
+
+    it 'routes target: :explorer to the explorer base URL' do
+      stub_request(:post, explorer_url)
+        .with(body: { type: 'txDetails', hash: '0xabc' }.to_json)
+        .to_return(status: 200, body: { 'type' => 'txDetails', 'tx' => {} }.to_json)
+
+      result = explorer_client.post(explorer_endpoint, { type: 'txDetails', hash: '0xabc' }, target: :explorer)
+      expect(result).to eq('type' => 'txDetails', 'tx' => {})
+      expect(a_request(:post, explorer_url)).to have_been_made.once
+    end
+
+    it 'routes target: :default to the default base URL' do
+      stub_request(:post, full_url).to_return(status: 200, body: '{}')
+      explorer_client.post(endpoint)
+      expect(a_request(:post, full_url)).to have_been_made.once
+    end
+
+    it 'lazily builds the explorer connection (not allocated until first explorer call)' do
+      expect(explorer_client.instance_variable_get(:@explorer_connection)).to be_nil
+
+      stub_request(:post, explorer_url).to_return(status: 200, body: '{}')
+      explorer_client.post(explorer_endpoint, { type: 'txDetails', hash: '0x' }, target: :explorer)
+
+      expect(explorer_client.instance_variable_get(:@explorer_connection)).not_to be_nil
+    end
+
+    it 'reuses the same explorer connection across calls' do
+      stub_request(:post, explorer_url).to_return(status: 200, body: '{}')
+      explorer_client.post(explorer_endpoint, { type: 'a' }, target: :explorer)
+      first = explorer_client.instance_variable_get(:@explorer_connection)
+      explorer_client.post(explorer_endpoint, { type: 'b' }, target: :explorer)
+      expect(explorer_client.instance_variable_get(:@explorer_connection)).to be(first)
+    end
+
+    it 'raises ConfigurationError when explorer URL is not configured' do
+      no_explorer_client = described_class.new(base_url: base_url)
+      expect do
+        no_explorer_client.post(explorer_endpoint, { type: 'txDetails' }, target: :explorer)
+      end.to raise_error(Hyperliquid::ConfigurationError, /Explorer RPC URL not configured/)
+    end
+
+    it 'raises ArgumentError on unknown target' do
+      expect { explorer_client.post(endpoint, {}, target: :other) }
+        .to raise_error(ArgumentError, /Unknown post target/)
+    end
+
+    it 'shares retry configuration with the default connection' do
+      retry_explorer_client = described_class.new(
+        base_url: base_url, explorer_base_url: explorer_base_url, retry_enabled: true
+      )
+      stub_request(:post, explorer_url).to_return(status: 200, body: '{}')
+      retry_explorer_client.post(explorer_endpoint, { type: 'a' }, target: :explorer)
+      explorer_conn = retry_explorer_client.instance_variable_get(:@explorer_connection)
+      middleware_names = explorer_conn.builder.handlers.map(&:name)
+      expect(middleware_names).to include('Faraday::Retry::Middleware')
+    end
+
+    it 'translates Faraday::ConnectionFailed on explorer to NetworkError' do
+      stub_request(:post, explorer_url).to_raise(Faraday::ConnectionFailed.new('boom'))
+      expect do
+        explorer_client.post(explorer_endpoint, { type: 'a' }, target: :explorer)
+      end.to raise_error(Hyperliquid::NetworkError, /Connection failed/)
+    end
+  end
 end

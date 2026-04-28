@@ -46,7 +46,13 @@ module Hyperliquid
     def initialize(testnet: false, timeout: Constants::DEFAULT_TIMEOUT, retry_enabled: false,
                    private_key: nil, expires_after: nil)
       base_url = testnet ? Constants::TESTNET_API_URL : Constants::MAINNET_API_URL
-      client = Client.new(base_url: base_url, timeout: timeout, retry_enabled: retry_enabled)
+      explorer_base_url = testnet ? Constants::TESTNET_RPC_URL : Constants::MAINNET_RPC_URL
+      client = Client.new(
+        base_url: base_url,
+        timeout: timeout,
+        retry_enabled: retry_enabled,
+        explorer_base_url: explorer_base_url
+      )
 
       @info = Info.new(client)
       @testnet = testnet

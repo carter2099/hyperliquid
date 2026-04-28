@@ -38,4 +38,8 @@ module Hyperliquid
 
   # Error for WebSocket issues
   class WebSocketError < Error; end
+
+  # Error for SDK configuration issues (e.g. calling an explorer-only method
+  # on a Client that wasn't configured with an explorer_base_url)
+  class ConfigurationError < Error; end
 end

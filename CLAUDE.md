@@ -50,6 +50,7 @@ Hyperliquid.new(...)
 
 - **Info path**: method builds `{ type: 'someType', ... }` body → `Client` POSTs to `/info` → parsed JSON returned.
 - **Exchange path**: method builds action payload → `Signer` generates EIP-712 signature over msgpack-encoded action → `Client` POSTs signed payload to `/exchange` → parsed JSON returned.
+- **Explorer RPC path** (`tx_details`, `user_details`): a separate base URL (`rpc.hyperliquid.xyz` / `rpc.hyperliquid-testnet.xyz`) with endpoint `/explorer`. `Client` holds a second Faraday connection for this, built lazily on first use; methods opt in via `client.post(EXPLORER_ENDPOINT, body, target: :explorer)`. The SDK wires this up automatically based on `testnet:`. Calling `target: :explorer` on a `Client` constructed without `explorer_base_url:` raises `ConfigurationError`. Don't add a public connection accessor — `target:` is the contract.
 - **WebSocket path**: `WS::Client` manages a persistent WSS connection with subscription tracking, automatic reconnection (exp backoff, 30s cap), 50s ping keepalive, and a bounded message queue (1024, drops oldest on overflow). Subscriptions are identified by a canonical key and dispatched via callbacks on a dedicated thread.
 
 ### Signing (Python SDK Parity)

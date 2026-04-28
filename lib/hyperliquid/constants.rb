@@ -7,9 +7,14 @@ module Hyperliquid
     MAINNET_API_URL = 'https://api.hyperliquid.xyz'
     TESTNET_API_URL = 'https://api.hyperliquid-testnet.xyz'
 
+    # Explorer RPC URLs (used by Info#tx_details and Info#user_details)
+    MAINNET_RPC_URL = 'https://rpc.hyperliquid.xyz'
+    TESTNET_RPC_URL = 'https://rpc.hyperliquid-testnet.xyz'
+
     # API endpoints
     INFO_ENDPOINT = '/info'
     EXCHANGE_ENDPOINT = '/exchange'
+    EXPLORER_ENDPOINT = '/explorer'
 
     # WebSocket
     WS_ENDPOINT = '/ws'
