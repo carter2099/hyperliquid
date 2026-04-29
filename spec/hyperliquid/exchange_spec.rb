@@ -2181,4 +2181,75 @@ RSpec.describe Hyperliquid::Exchange do
       expect(result['status']).to eq('ok')
     end
   end
+
+  describe '#claim_rewards' do
+    let(:claim_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends claimRewards with no extra fields' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action == { 'type' => 'claimRewards' } &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: claim_response.to_json)
+
+      result = exchange.claim_rewards
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#set_display_name' do
+    let(:display_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends setDisplayName with the provided display name' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'setDisplayName' &&
+            action['displayName'] == 'Carter' &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: display_response.to_json)
+
+      result = exchange.set_display_name(display_name: 'Carter')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'allows clearing the display name with an empty string' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['displayName'] == ''
+        end
+        .to_return(status: 200, body: display_response.to_json)
+
+      result = exchange.set_display_name(display_name: '')
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#register_referrer' do
+    let(:register_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends registerReferrer with the provided code' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'registerReferrer' &&
+            action['code'] == 'CARTER2099' &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: register_response.to_json)
+
+      result = exchange.register_referrer(code: 'CARTER2099')
+      expect(result['status']).to eq('ok')
+    end
+  end
 end

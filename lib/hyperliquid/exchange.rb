@@ -793,6 +793,46 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Claim accrued referral-program rewards (`claimRewards` L1 action).
+    # @return [Hash] Exchange response
+    def claim_rewards
+      nonce = timestamp_ms
+      action = { type: 'claimRewards' }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Set the leaderboard display name (`setDisplayName` L1 action).
+    # Pass an empty string to remove the existing display name.
+    # @param display_name [String] Display name (max 20 characters)
+    # @return [Hash] Exchange response
+    def set_display_name(display_name:)
+      nonce = timestamp_ms
+      action = { type: 'setDisplayName', displayName: display_name }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Register a new referral code for this account (`registerReferrer` L1 action).
+    # Distinct from `set_referrer`, which records a referrer the account was referred *by*.
+    # @param code [String] Referral code to create (1–20 characters)
+    # @return [Hash] Exchange response
+    def register_referrer(code:)
+      nonce = timestamp_ms
+      action = { type: 'registerReferrer', code: code }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!
