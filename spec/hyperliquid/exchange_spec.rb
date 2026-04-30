@@ -2252,4 +2252,139 @@ RSpec.describe Hyperliquid::Exchange do
       expect(result['status']).to eq('ok')
     end
   end
+
+  describe '#top_up_isolated_only_margin' do
+    let(:top_up_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends topUpIsolatedOnlyMargin with asset index and leverage as a string' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'topUpIsolatedOnlyMargin' &&
+            action['asset'] == 0 &&
+            action['leverage'] == '5' &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: top_up_response.to_json)
+
+      result = exchange.top_up_isolated_only_margin(coin: 'BTC', leverage: 5)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'preserves fractional leverage when passed as a string' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['leverage'] == '0.5'
+        end
+        .to_return(status: 200, body: top_up_response.to_json)
+
+      result = exchange.top_up_isolated_only_margin(coin: 'BTC', leverage: '0.5')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes vaultAddress at payload level when provided' do
+      vault = '0x1111111111111111111111111111111111111111'
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == vault
+        end
+        .to_return(status: 200, body: top_up_response.to_json)
+
+      result = exchange.top_up_isolated_only_margin(coin: 'BTC', leverage: 3, vault_address: vault)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'raises ArgumentError for unknown asset' do
+      expect do
+        exchange.top_up_isolated_only_margin(coin: 'UNKNOWN', leverage: 5)
+      end.to raise_error(ArgumentError, /Unknown asset/)
+    end
+  end
+
+  describe '#vault_modify' do
+    let(:vault_modify_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+    let(:vault) { '0x2222222222222222222222222222222222222222' }
+
+    it 'sends vaultModify with both flags set' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'vaultModify' &&
+            action['vaultAddress'] == vault &&
+            action['allowDeposits'] == true &&
+            action['alwaysCloseOnWithdraw'] == false &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: vault_modify_response.to_json)
+
+      result = exchange.vault_modify(
+        vault_address: vault,
+        allow_deposits: true,
+        always_close_on_withdraw: false
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'sends null for unspecified flags' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action.key?('allowDeposits') &&
+            action['allowDeposits'].nil? &&
+            action.key?('alwaysCloseOnWithdraw') &&
+            action['alwaysCloseOnWithdraw'].nil?
+        end
+        .to_return(status: 200, body: vault_modify_response.to_json)
+
+      result = exchange.vault_modify(vault_address: vault)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#vault_distribute' do
+    let(:vault_distribute_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+    let(:vault) { '0x3333333333333333333333333333333333333333' }
+
+    it 'sends vaultDistribute with usd scaled to 1e6 integer' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'vaultDistribute' &&
+            action['vaultAddress'] == vault &&
+            action['usd'] == 10_000_000 &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: vault_distribute_response.to_json)
+
+      result = exchange.vault_distribute(vault_address: vault, usd: 10)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'allows usd: 0 (close vault)' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['usd'] == 0
+        end
+        .to_return(status: 200, body: vault_distribute_response.to_json)
+
+      result = exchange.vault_distribute(vault_address: vault, usd: 0)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'raises ArgumentError for usd that causes rounding' do
+      expect do
+        exchange.vault_distribute(vault_address: vault, usd: 100.0000019)
+      end.to raise_error(ArgumentError, /float_to_usd_int causes rounding/)
+    end
+  end
 end
