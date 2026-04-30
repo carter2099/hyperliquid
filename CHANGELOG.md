@@ -1,5 +1,26 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [1.3.0] - 2026-04-30
+
+### New transport
+
+- Explorer RPC connection (`rpc.hyperliquid.xyz` / `rpc.hyperliquid-testnet.xyz`, endpoint `/explorer`). `Client` gains optional `explorer_base_url:` and `target: :explorer` routing, with a lazily-built second Faraday connection sharing the default retry/timeout config. The SDK wires this up automatically based on `testnet:`.
+- New `Hyperliquid::ConfigurationError` raised when `target: :explorer` is used on a client constructed without an explorer URL.
+
+### New Info endpoints
+
+- `Info#tx_details(hash)` — explorer `txDetails` lookup
+- `Info#user_details(user)` — explorer `userDetails` lookup
+
+### New Exchange actions
+
+- `Exchange#claim_rewards` — L1 `claimRewards`
+- `Exchange#set_display_name(display_name:)` — L1 `setDisplayName` (max 20 chars; `""` clears)
+- `Exchange#register_referrer(code:)` — L1 `registerReferrer`
+- `Exchange#top_up_isolated_only_margin(coin:, leverage:, vault_address:)` — L1 `topUpIsolatedOnlyMargin`
+- `Exchange#vault_modify(vault_address:, allow_deposits:, always_close_on_withdraw:)` — L1 `vaultModify`
+- `Exchange#vault_distribute(vault_address:, usd:)` — L1 `vaultDistribute`
+
 ## [1.2.0] - 2026-04-27
 
 ### New Info endpoints
