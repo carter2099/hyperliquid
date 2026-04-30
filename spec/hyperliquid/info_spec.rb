@@ -1725,4 +1725,61 @@ RSpec.describe Hyperliquid::Info do
       expect(result).to eq(expected_response)
     end
   end
+
+  # ============================
+  # Info: Explorer RPC
+  # ============================
+
+  describe 'explorer RPC methods' do
+    let(:explorer_base_url) { Hyperliquid::Constants::TESTNET_RPC_URL }
+    let(:explorer_endpoint) { "#{explorer_base_url}/explorer" }
+    let(:explorer_client) do
+      Hyperliquid::Client.new(base_url: base_url, explorer_base_url: explorer_base_url)
+    end
+    let(:explorer_info) { described_class.new(explorer_client) }
+
+    describe '#tx_details' do
+      let(:tx_hash) { "0x#{'a' * 64}" }
+
+      it 'POSTs txDetails to the explorer endpoint' do
+        expected_response = {
+          'type' => 'txDetails',
+          'tx' => { 'time' => 1_700_000_000_000, 'hash' => tx_hash, 'action' => { 'type' => 'order' } }
+        }
+
+        stub_request(:post, explorer_endpoint)
+          .with(body: { type: 'txDetails', hash: tx_hash }.to_json)
+          .to_return(status: 200, body: expected_response.to_json)
+
+        result = explorer_info.tx_details(tx_hash)
+        expect(result).to eq(expected_response)
+      end
+
+      it 'raises ConfigurationError when client lacks an explorer URL' do
+        expect { info.tx_details(tx_hash) }.to raise_error(Hyperliquid::ConfigurationError)
+      end
+    end
+
+    describe '#user_details' do
+      let(:user_address) { '0xABCDEF1234567890123456789012345678901234' }
+
+      it 'POSTs userDetails to the explorer endpoint with lowercased user' do
+        expected_response = {
+          'type' => 'userDetails',
+          'txs' => [{ 'time' => 1_700_000_000_000, 'hash' => '0xdead' }]
+        }
+
+        stub_request(:post, explorer_endpoint)
+          .with(body: { type: 'userDetails', user: user_address.downcase }.to_json)
+          .to_return(status: 200, body: expected_response.to_json)
+
+        result = explorer_info.user_details(user_address)
+        expect(result).to eq(expected_response)
+      end
+
+      it 'raises ConfigurationError when client lacks an explorer URL' do
+        expect { info.user_details(user_address) }.to raise_error(Hyperliquid::ConfigurationError)
+      end
+    end
+  end
 end

@@ -793,6 +793,106 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Claim accrued referral-program rewards (`claimRewards` L1 action).
+    # @return [Hash] Exchange response
+    def claim_rewards
+      nonce = timestamp_ms
+      action = { type: 'claimRewards' }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Set the leaderboard display name (`setDisplayName` L1 action).
+    # Pass an empty string to remove the existing display name.
+    # @param display_name [String] Display name (max 20 characters)
+    # @return [Hash] Exchange response
+    def set_display_name(display_name:)
+      nonce = timestamp_ms
+      action = { type: 'setDisplayName', displayName: display_name }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Register a new referral code for this account (`registerReferrer` L1 action).
+    # Distinct from `set_referrer`, which records a referrer the account was referred *by*.
+    # @param code [String] Referral code to create (1–20 characters)
+    # @return [Hash] Exchange response
+    def register_referrer(code:)
+      nonce = timestamp_ms
+      action = { type: 'registerReferrer', code: code }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Top up isolated margin to target a specific leverage (`topUpIsolatedOnlyMargin` L1 action).
+    # @param coin [String] Asset symbol (perps only)
+    # @param leverage [String, Numeric] Target leverage (sent as float string per protocol)
+    # @param vault_address [String, nil] Vault address if acting on behalf of a vault
+    # @return [Hash] Exchange response
+    def top_up_isolated_only_margin(coin:, leverage:, vault_address: nil)
+      nonce = timestamp_ms
+      action = {
+        type: 'topUpIsolatedOnlyMargin',
+        asset: asset_index(coin),
+        leverage: leverage.to_s
+      }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        vault_address: vault_address,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, vault_address)
+    end
+
+    # Modify a vault's configuration (`vaultModify` L1 action).
+    # Only the vault leader may submit this. Either flag may be omitted (sent as null).
+    # @param vault_address [String] Vault address being modified
+    # @param allow_deposits [Boolean, nil] Allow follower deposits (nil = unchanged)
+    # @param always_close_on_withdraw [Boolean, nil] Always close positions on withdrawal (nil = unchanged)
+    # @return [Hash] Exchange response
+    def vault_modify(vault_address:, allow_deposits: nil, always_close_on_withdraw: nil)
+      nonce = timestamp_ms
+      action = {
+        type: 'vaultModify',
+        vaultAddress: vault_address,
+        allowDeposits: allow_deposits,
+        alwaysCloseOnWithdraw: always_close_on_withdraw
+      }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Distribute funds from a vault to followers (`vaultDistribute` L1 action).
+    # Only the vault leader may submit this. Pass `usd: 0` to close the vault.
+    # @param vault_address [String] Vault address
+    # @param usd [Numeric] USD amount to distribute (scaled to integer cents-of-cents internally)
+    # @return [Hash] Exchange response
+    def vault_distribute(vault_address:, usd:)
+      nonce = timestamp_ms
+      action = {
+        type: 'vaultDistribute',
+        vaultAddress: vault_address,
+        usd: float_to_usd_int(usd)
+      }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!

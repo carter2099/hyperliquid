@@ -631,6 +631,32 @@ module Hyperliquid
       body[:endTime] = end_time if end_time
       @client.post(Constants::INFO_ENDPOINT, body)
     end
+
+    # ============================
+    # Info: Explorer RPC
+    # ============================
+    # The methods below are routed via a separate base URL (the explorer RPC) rather
+    # than the canonical /info endpoint. They require the Client to have been
+    # constructed with explorer_base_url:; the SDK does this automatically based on
+    # the testnet: flag.
+
+    # Retrieve transaction details by transaction hash
+    # @param hash [String] Transaction hash (66-char 0x-prefixed hex)
+    # @return [Hash] Hash with type ('txDetails') and tx (transaction details)
+    def tx_details(hash)
+      @client.post(Constants::EXPLORER_ENDPOINT, { type: 'txDetails', hash: hash }, target: :explorer)
+    end
+
+    # Retrieve a user's transaction history from the explorer
+    # @param user [String] Wallet address
+    # @return [Hash] Hash with type ('userDetails') and txs (Array of transaction details)
+    def user_details(user)
+      @client.post(
+        Constants::EXPLORER_ENDPOINT,
+        { type: 'userDetails', user: user.downcase },
+        target: :explorer
+      )
+    end
   end
   # rubocop:enable Metrics/ClassLength
 end

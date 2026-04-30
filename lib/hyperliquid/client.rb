@@ -21,17 +21,24 @@ module Hyperliquid
     }.freeze
 
     # Initialize a new HTTP client
-    # @param base_url [String] The base URL for the API
+    # @param base_url [String] The base URL for the default API (info/exchange)
     # @param timeout [Integer] Request timeout in seconds (default: Constants::DEFAULT_TIMEOUT)
     # @param retry_enabled [Boolean] Whether to enable retry logic (default: false)
-    def initialize(base_url:, timeout: Constants::DEFAULT_TIMEOUT, retry_enabled: false)
+    # @param explorer_base_url [String, nil] Optional base URL for the explorer RPC (used by
+    #   tx_details / user_details). When nil, calls with target: :explorer raise ConfigurationError.
+    def initialize(base_url:, timeout: Constants::DEFAULT_TIMEOUT, retry_enabled: false,
+                   explorer_base_url: nil)
       @retry_enabled = retry_enabled
-      @connection = build_connection(base_url, timeout)
+      @timeout = timeout
+      @explorer_base_url = explorer_base_url
+      @connection = build_connection(base_url)
+      @explorer_connection = nil
     end
 
     # Make a POST request to the API
     # @param endpoint [String] The API endpoint to make the request to
     # @param body [Hash] The request body as a hash (default: {})
+    # @param target [Symbol] Which connection to use; :default (info/exchange) or :explorer (RPC)
     # @return [Hash, String] The parsed JSON response or raw response body
     # @raise [NetworkError] When connection fails
     # @raise [TimeoutError] When request times out
@@ -41,8 +48,10 @@ module Hyperliquid
     # @raise [RateLimitError] When API returns 429 status
     # @raise [ServerError] When API returns 5xx status
     # @raise [ClientError] When API returns unexpected status
-    def post(endpoint, body = {})
-      response = @connection.post(endpoint) do |req|
+    # @raise [ConfigurationError] When target: :explorer is requested but no explorer_base_url was configured
+    def post(endpoint, body = {}, target: :default)
+      connection = connection_for(target)
+      response = connection.post(endpoint) do |req|
         req.headers['Content-Type'] = 'application/json'
         req.body = body.to_json unless body.empty?
       end
@@ -60,9 +69,24 @@ module Hyperliquid
 
     private
 
-    def build_connection(base_url, timeout)
+    def connection_for(target)
+      case target
+      when :default
+        @connection
+      when :explorer
+        unless @explorer_base_url
+          raise ConfigurationError,
+                'Explorer RPC URL not configured; pass explorer_base_url: when constructing the Client'
+        end
+        @explorer_connection ||= build_connection(@explorer_base_url)
+      else
+        raise ArgumentError, "Unknown post target: #{target.inspect} (expected :default or :explorer)"
+      end
+    end
+
+    def build_connection(base_url)
       Faraday.new(url: base_url) do |conn|
-        conn.options.timeout = timeout
+        conn.options.timeout = @timeout
         conn.options.read_timeout = Constants::DEFAULT_READ_TIMEOUT
         conn.request :retry, DEFAULT_RETRY_OPTIONS if @retry_enabled
       end
