@@ -121,6 +121,15 @@ module Hyperliquid
         ]
       }.freeze
 
+      LINK_STAKING_USER_TYPES = {
+        'HyperliquidTransaction:LinkStakingUser': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :user, type: 'address' },
+          { name: :isFinalize, type: 'bool' },
+          { name: :nonce, type: 'uint64' }
+        ]
+      }.freeze
+
       class << self
         # Domain for L1 actions (orders, cancels, leverage, etc.)
         # @return [Hash] EIP-712 domain configuration

@@ -2387,4 +2387,126 @@ RSpec.describe Hyperliquid::Exchange do
       end.to raise_error(ArgumentError, /float_to_usd_int causes rounding/)
     end
   end
+
+  describe '#borrow_lend' do
+    let(:borrow_lend_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends borrowLend with operation, token, and amount as a string' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'borrowLend' &&
+            action['operation'] == 'supply' &&
+            action['token'] == 0 &&
+            action['amount'] == '20' &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: borrow_lend_response.to_json)
+
+      result = exchange.borrow_lend(operation: 'supply', token: 0, amount: 20)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'sends amount: null when amount is nil (full position)' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action.key?('amount') && action['amount'].nil? &&
+            action['operation'] == 'withdraw'
+        end
+        .to_return(status: 200, body: borrow_lend_response.to_json)
+
+      result = exchange.borrow_lend(operation: 'withdraw', token: 0)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes vaultAddress at payload level when provided' do
+      vault = '0x4444444444444444444444444444444444444444'
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == vault
+        end
+        .to_return(status: 200, body: borrow_lend_response.to_json)
+
+      result = exchange.borrow_lend(
+        operation: 'borrow', token: 0, amount: '5', vault_address: vault
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#sub_account_modify' do
+    let(:sub_modify_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+    let(:sub_user) { '0x5555555555555555555555555555555555555555' }
+
+    it 'sends subAccountModify with subAccountUser and name' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'subAccountModify' &&
+            action['subAccountUser'] == sub_user &&
+            action['name'] == 'trading-bot' &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: sub_modify_response.to_json)
+
+      result = exchange.sub_account_modify(sub_account_user: sub_user, name: 'trading-bot')
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#link_staking_user' do
+    let(:link_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+    let(:counterpart) { '0x6666666666666666666666666666666666666666' }
+
+    it 'sends linkStakingUser with user-signed envelope when initiating' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'linkStakingUser' &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet' &&
+            action['user'] == counterpart &&
+            action['isFinalize'] == false &&
+            action['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: link_response.to_json)
+
+      result = exchange.link_staking_user(user: counterpart, is_finalize: false)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'forwards isFinalize: true when staking user finalizes' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['isFinalize'] == true
+        end
+        .to_return(status: 200, body: link_response.to_json)
+
+      result = exchange.link_staking_user(user: counterpart, is_finalize: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes signature in request' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['signature'].is_a?(Hash) &&
+            body['signature']['r']&.start_with?('0x')
+        end
+        .to_return(status: 200, body: link_response.to_json)
+
+      result = exchange.link_staking_user(user: counterpart, is_finalize: false)
+      expect(result['status']).to eq('ok')
+    end
+  end
 end

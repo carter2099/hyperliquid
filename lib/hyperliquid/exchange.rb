@@ -893,6 +893,73 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Borrow, lend, supply, or withdraw HIP-2 borrow/lend assets (`borrowLend` L1 action).
+    # Companion to the four HIP-2 info methods (`borrow_lend_user_state` etc.).
+    # @param operation [String] One of 'supply', 'withdraw', 'repay', 'borrow'
+    # @param token [Integer] HIP-2 token ID (e.g. 0 for USDC)
+    # @param amount [String, Numeric, nil] Amount to operate on; pass nil to use the full position
+    # @param vault_address [String, nil] Vault address if acting on behalf of a vault
+    # @return [Hash] Exchange response
+    def borrow_lend(operation:, token:, amount: nil, vault_address: nil)
+      nonce = timestamp_ms
+      action = {
+        type: 'borrowLend',
+        operation: operation,
+        token: token,
+        amount: amount&.to_s
+      }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        vault_address: vault_address,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, vault_address)
+    end
+
+    # Rename a sub-account (`subAccountModify` L1 action).
+    # @param sub_account_user [String] Sub-account wallet address to rename
+    # @param name [String] New sub-account name (1–16 characters)
+    # @return [Hash] Exchange response
+    def sub_account_modify(sub_account_user:, name:)
+      nonce = timestamp_ms
+      action = {
+        type: 'subAccountModify',
+        subAccountUser: sub_account_user,
+        name: name
+      }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Link a staking account to a trading account for fee-discount attribution
+    # (`linkStakingUser` user-signed action).
+    # The trading user initiates with `is_finalize: false`; the staking user finalizes
+    # the permanent link with `is_finalize: true`. The `user` field is the *other*
+    # account address in each direction.
+    # @param user [String] The counterpart account address (staking address when initiating, trading when finalizing)
+    # @param is_finalize [Boolean] False = trading user initiates, true = staking user finalizes
+    # @return [Hash] Exchange response
+    def link_staking_user(user:, is_finalize:)
+      nonce = timestamp_ms
+      action = {
+        type: 'linkStakingUser',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
+        user: user,
+        isFinalize: is_finalize,
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { user: user, isFinalize: is_finalize, nonce: nonce },
+        'HyperliquidTransaction:LinkStakingUser',
+        Signing::EIP712::LINK_STAKING_USER_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!
