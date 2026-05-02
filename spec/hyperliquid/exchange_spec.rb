@@ -2509,4 +2509,111 @@ RSpec.describe Hyperliquid::Exchange do
       expect(result['status']).to eq('ok')
     end
   end
+
+  describe '#agent_send_asset' do
+    let(:agent_send_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+    let(:principal) { '0x1111111111111111111111111111111111111111' }
+
+    it 'sends agentSendAsset as an L1 action with inner nonce matching outer nonce' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'agentSendAsset' &&
+            action['destination'] == principal &&
+            action['sourceDex'] == '' &&
+            action['destinationDex'] == 'xyz' &&
+            action['token'] == 'USDC:0x6d1e7cde53ba9467b783cb7c530ce054' &&
+            action['amount'] == '0.01' &&
+            action['fromSubAccount'] == '' &&
+            action['nonce'].is_a?(Integer) &&
+            action['nonce'] == body['nonce'] &&
+            action.keys.none? { |k| %w[signatureChainId hyperliquidChain].include?(k) } &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: agent_send_response.to_json)
+
+      result = exchange.agent_send_asset(
+        destination: principal,
+        source_dex: '',
+        destination_dex: 'xyz',
+        token: 'USDC:0x6d1e7cde53ba9467b783cb7c530ce054',
+        amount: 0.01
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'forwards a non-empty fromSubAccount when provided' do
+      sub = '0x9999999999999999999999999999999999999999'
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['fromSubAccount'] == sub
+        end
+        .to_return(status: 200, body: agent_send_response.to_json)
+
+      result = exchange.agent_send_asset(
+        destination: principal,
+        source_dex: 'spot',
+        destination_dex: '',
+        token: 'USDC:0xabc',
+        amount: '5',
+        from_sub_account: sub
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'coerces numeric amount to string' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['amount'] == '1.5'
+        end
+        .to_return(status: 200, body: agent_send_response.to_json)
+
+      result = exchange.agent_send_asset(
+        destination: principal,
+        source_dex: '',
+        destination_dex: 'xyz',
+        token: 'USDC:0xabc',
+        amount: 1.5
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#hip3_liquidator_transfer' do
+    let(:liq_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends hip3LiquidatorTransfer with the given fields' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'hip3LiquidatorTransfer' &&
+            action['dex'] == 'xyz' &&
+            action['ntl'] == 1_000_000_000 &&
+            action['isDeposit'] == true &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: liq_response.to_json)
+
+      result = exchange.hip3_liquidator_transfer(dex: 'xyz', ntl: 1_000_000_000, is_deposit: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'forwards isDeposit: false for withdrawals' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['isDeposit'] == false
+        end
+        .to_return(status: 200, body: liq_response.to_json)
+
+      result = exchange.hip3_liquidator_transfer(dex: 'xyz', ntl: 2_000_000_000, is_deposit: false)
+      expect(result['status']).to eq('ok')
+    end
+  end
 end

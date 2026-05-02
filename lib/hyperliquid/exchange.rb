@@ -960,6 +960,56 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Move assets between DEX instances on behalf of an agent's principal
+    # (`agentSendAsset` L1 action). Unlike `send_asset` (which is user-signed),
+    # this is signed by an agent and the destination must equal the agent's
+    # principal address. `source_dex`/`destination_dex` accept "" (default USDC
+    # perp DEX) and "spot" (spot trading) per protocol convention.
+    # @param destination [String] Destination wallet address (must match the agent's principal)
+    # @param source_dex [String] Source DEX identifier
+    # @param destination_dex [String] Destination DEX identifier
+    # @param token [String] Token in "tokenName:tokenId" format
+    # @param amount [String, Numeric] Amount to send
+    # @param from_sub_account [String] Source sub-account address, or empty string for the principal
+    # @return [Hash] Exchange response
+    def agent_send_asset(destination:, source_dex:, destination_dex:, token:, amount:,
+                         from_sub_account: '')
+      nonce = timestamp_ms
+      action = {
+        type: 'agentSendAsset',
+        destination: destination,
+        sourceDex: source_dex,
+        destinationDex: destination_dex,
+        token: token,
+        amount: amount.to_s,
+        fromSubAccount: from_sub_account,
+        nonce: nonce
+      }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Deposit to or withdraw from an HIP-3 DEX's backstop liquidator
+    # (`hip3LiquidatorTransfer` L1 action). `ntl` is denominated in 1e-6 quote
+    # tokens and the protocol requires it to be a multiple of 1_000_000_000
+    # (i.e. $1,000 increments).
+    # @param dex [String] HIP-3 DEX identifier
+    # @param ntl [Integer] Notional amount in 1e-6 quote tokens (multiple of 1_000_000_000)
+    # @param is_deposit [Boolean] True to deposit into the backstop, false to withdraw
+    # @return [Hash] Exchange response
+    def hip3_liquidator_transfer(dex:, ntl:, is_deposit:)
+      nonce = timestamp_ms
+      action = { type: 'hip3LiquidatorTransfer', dex: dex, ntl: ntl, isDeposit: is_deposit }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!
