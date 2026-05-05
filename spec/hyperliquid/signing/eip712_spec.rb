@@ -137,5 +137,17 @@ RSpec.describe Hyperliquid::Signing::EIP712 do
         %i[hyperliquidChain destination sourceDex destinationDex token amount fromSubAccount nonce]
       )
     end
+
+    it 'defines SEND_TO_EVM_WITH_DATA_TYPES with correct fields and types' do
+      types = described_class::SEND_TO_EVM_WITH_DATA_TYPES
+      fields = types[:'HyperliquidTransaction:SendToEvmWithData']
+      expect(fields.map { |f| f[:name] }).to eq(
+        %i[hyperliquidChain token amount sourceDex destinationRecipient addressEncoding
+           destinationChainId gasLimit data nonce]
+      )
+      expect(fields.map { |f| f[:type] }).to eq(
+        %w[string string string string string string uint32 uint64 bytes uint64]
+      )
+    end
   end
 end

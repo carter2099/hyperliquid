@@ -2387,4 +2387,395 @@ RSpec.describe Hyperliquid::Exchange do
       end.to raise_error(ArgumentError, /float_to_usd_int causes rounding/)
     end
   end
+
+  describe '#borrow_lend' do
+    let(:borrow_lend_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends borrowLend with operation, token, and amount as a string' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'borrowLend' &&
+            action['operation'] == 'supply' &&
+            action['token'] == 0 &&
+            action['amount'] == '20' &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: borrow_lend_response.to_json)
+
+      result = exchange.borrow_lend(operation: 'supply', token: 0, amount: 20)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'sends amount: null when amount is nil (full position)' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action.key?('amount') && action['amount'].nil? &&
+            action['operation'] == 'withdraw'
+        end
+        .to_return(status: 200, body: borrow_lend_response.to_json)
+
+      result = exchange.borrow_lend(operation: 'withdraw', token: 0)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes vaultAddress at payload level when provided' do
+      vault = '0x4444444444444444444444444444444444444444'
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == vault
+        end
+        .to_return(status: 200, body: borrow_lend_response.to_json)
+
+      result = exchange.borrow_lend(
+        operation: 'borrow', token: 0, amount: '5', vault_address: vault
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#sub_account_modify' do
+    let(:sub_modify_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+    let(:sub_user) { '0x5555555555555555555555555555555555555555' }
+
+    it 'sends subAccountModify with subAccountUser and name' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'subAccountModify' &&
+            action['subAccountUser'] == sub_user &&
+            action['name'] == 'trading-bot' &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: sub_modify_response.to_json)
+
+      result = exchange.sub_account_modify(sub_account_user: sub_user, name: 'trading-bot')
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#link_staking_user' do
+    let(:link_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+    let(:counterpart) { '0x6666666666666666666666666666666666666666' }
+
+    it 'sends linkStakingUser with user-signed envelope when initiating' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'linkStakingUser' &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet' &&
+            action['user'] == counterpart &&
+            action['isFinalize'] == false &&
+            action['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: link_response.to_json)
+
+      result = exchange.link_staking_user(user: counterpart, is_finalize: false)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'forwards isFinalize: true when staking user finalizes' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['isFinalize'] == true
+        end
+        .to_return(status: 200, body: link_response.to_json)
+
+      result = exchange.link_staking_user(user: counterpart, is_finalize: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes signature in request' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['signature'].is_a?(Hash) &&
+            body['signature']['r']&.start_with?('0x')
+        end
+        .to_return(status: 200, body: link_response.to_json)
+
+      result = exchange.link_staking_user(user: counterpart, is_finalize: false)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#agent_send_asset' do
+    let(:agent_send_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+    let(:principal) { '0x1111111111111111111111111111111111111111' }
+
+    it 'sends agentSendAsset as an L1 action with inner nonce matching outer nonce' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'agentSendAsset' &&
+            action['destination'] == principal &&
+            action['sourceDex'] == '' &&
+            action['destinationDex'] == 'xyz' &&
+            action['token'] == 'USDC:0x6d1e7cde53ba9467b783cb7c530ce054' &&
+            action['amount'] == '0.01' &&
+            action['fromSubAccount'] == '' &&
+            action['nonce'].is_a?(Integer) &&
+            action['nonce'] == body['nonce'] &&
+            action.keys.none? { |k| %w[signatureChainId hyperliquidChain].include?(k) } &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: agent_send_response.to_json)
+
+      result = exchange.agent_send_asset(
+        destination: principal,
+        source_dex: '',
+        destination_dex: 'xyz',
+        token: 'USDC:0x6d1e7cde53ba9467b783cb7c530ce054',
+        amount: 0.01
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'forwards a non-empty fromSubAccount when provided' do
+      sub = '0x9999999999999999999999999999999999999999'
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['fromSubAccount'] == sub
+        end
+        .to_return(status: 200, body: agent_send_response.to_json)
+
+      result = exchange.agent_send_asset(
+        destination: principal,
+        source_dex: 'spot',
+        destination_dex: '',
+        token: 'USDC:0xabc',
+        amount: '5',
+        from_sub_account: sub
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'coerces numeric amount to string' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['amount'] == '1.5'
+        end
+        .to_return(status: 200, body: agent_send_response.to_json)
+
+      result = exchange.agent_send_asset(
+        destination: principal,
+        source_dex: '',
+        destination_dex: 'xyz',
+        token: 'USDC:0xabc',
+        amount: 1.5
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#hip3_liquidator_transfer' do
+    let(:liq_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends hip3LiquidatorTransfer with the given fields' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'hip3LiquidatorTransfer' &&
+            action['dex'] == 'xyz' &&
+            action['ntl'] == 1_000_000_000 &&
+            action['isDeposit'] == true &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: liq_response.to_json)
+
+      result = exchange.hip3_liquidator_transfer(dex: 'xyz', ntl: 1_000_000_000, is_deposit: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'forwards isDeposit: false for withdrawals' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['isDeposit'] == false
+        end
+        .to_return(status: 200, body: liq_response.to_json)
+
+      result = exchange.hip3_liquidator_transfer(dex: 'xyz', ntl: 2_000_000_000, is_deposit: false)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#send_to_evm_with_data' do
+    let(:send_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+    let(:default_args) do
+      {
+        token: 'USDC',
+        amount: '1',
+        source_dex: 'spot',
+        destination_recipient: '0xABCDEF1234567890ABCDEF1234567890ABCDEF12',
+        address_encoding: 'hex',
+        destination_chain_id: 998,
+        gas_limit: 200_000
+      }
+    end
+
+    it 'sends sendToEvmWithData with full user-signed envelope and default empty data' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'sendToEvmWithData' &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet' &&
+            action['token'] == 'USDC' &&
+            action['amount'] == '1' &&
+            action['sourceDex'] == 'spot' &&
+            action['destinationRecipient'] == default_args[:destination_recipient] &&
+            action['addressEncoding'] == 'hex' &&
+            action['destinationChainId'] == 998 &&
+            action['gasLimit'] == 200_000 &&
+            action['data'] == '0x' &&
+            action['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: send_response.to_json)
+
+      result = exchange.send_to_evm_with_data(**default_args)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'forwards a non-empty data payload verbatim' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['data'] == '0xdeadbeef'
+        end
+        .to_return(status: 200, body: send_response.to_json)
+
+      result = exchange.send_to_evm_with_data(**default_args, data: '0xdeadbeef')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'does NOT lowercase destinationRecipient (base58 safety)' do
+      mixed_recipient = '5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty' # base58 example
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['destinationRecipient'] == mixed_recipient &&
+            body['action']['addressEncoding'] == 'base58'
+        end
+        .to_return(status: 200, body: send_response.to_json)
+
+      result = exchange.send_to_evm_with_data(
+        **default_args, destination_recipient: mixed_recipient, address_encoding: 'base58'
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'coerces numeric amount to string' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['amount'] == '1.5'
+        end
+        .to_return(status: 200, body: send_response.to_json)
+
+      result = exchange.send_to_evm_with_data(**default_args, amount: 1.5)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'coerces destination_chain_id and gas_limit to Integer' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['destinationChainId'] == 998 && action['destinationChainId'].is_a?(Integer) &&
+            action['gasLimit'] == 200_000 && action['gasLimit'].is_a?(Integer)
+        end
+        .to_return(status: 200, body: send_response.to_json)
+
+      # Pass floats — defensively coerced to int by the SDK
+      result = exchange.send_to_evm_with_data(
+        **default_args, destination_chain_id: 998.0, gas_limit: 200_000.0
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'invokes sign_user_signed_action with the new primary type and constant' do
+      stub_request(:post, exchange_endpoint)
+        .to_return(status: 200, body: send_response.to_json)
+
+      expect(signer).to receive(:sign_user_signed_action).with(
+        hash_including(
+          token: 'USDC', amount: '1', sourceDex: 'spot',
+          destinationRecipient: default_args[:destination_recipient],
+          addressEncoding: 'hex', destinationChainId: 998, gasLimit: 200_000,
+          data: '0x'
+        ),
+        'HyperliquidTransaction:SendToEvmWithData',
+        Hyperliquid::Signing::EIP712::SEND_TO_EVM_WITH_DATA_TYPES
+      ).and_call_original
+
+      exchange.send_to_evm_with_data(**default_args)
+    end
+
+    # Signature parity regression: catches future eth gem regressions on `bytes` handling.
+    # Fixtures captured 2026-05-04 against Python's eth_account 0.13.7. Do not modify
+    # without re-capturing via ~/agent-state/hyperliquid-sdk-fixtures/capture_send_to_evm_with_data_signatures.py
+    describe 'EIP-712 signature parity (regression guard for bytes type)' do
+      let(:fixture_private_key) { '0x1111111111111111111111111111111111111111111111111111111111111111' }
+      let(:fixture_signer) { Hyperliquid::Signing::Signer.new(private_key: fixture_private_key, testnet: false) }
+      let(:fixture_nonce) { 1_700_000_000_000 }
+      let(:base_message) do
+        {
+          token: 'USDC',
+          amount: '1',
+          sourceDex: 'spot',
+          destinationRecipient: '0x0000000000000000000000000000000000000001',
+          addressEncoding: 'hex',
+          destinationChainId: 998,
+          gasLimit: 200_000,
+          nonce: fixture_nonce
+        }
+      end
+
+      it 'fixture signer address sanity check' do
+        expect(fixture_signer.address).to eq('0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A')
+      end
+
+      it 'Fixture A: signs empty data (data: "0x") matching reference eth_account output' do
+        sig = fixture_signer.sign_user_signed_action(
+          base_message.merge(data: '0x'),
+          'HyperliquidTransaction:SendToEvmWithData',
+          Hyperliquid::Signing::EIP712::SEND_TO_EVM_WITH_DATA_TYPES
+        )
+        expect(sig[:r]).to eq('0x74d708bb7b212d2449c5dc82aff2565d9813a2e1d47ad486c8bde843618d1fdb')
+        expect(sig[:s]).to eq('0x30f760fccdaacd3bfa1cb877fdbeb25468c9576128f0b38cfbc6059f05d3a179')
+        expect(sig[:v]).to eq(28)
+      end
+
+      it 'Fixture B: signs non-empty data ("0xdeadbeef") matching reference eth_account output' do
+        sig = fixture_signer.sign_user_signed_action(
+          base_message.merge(data: '0xdeadbeef'),
+          'HyperliquidTransaction:SendToEvmWithData',
+          Hyperliquid::Signing::EIP712::SEND_TO_EVM_WITH_DATA_TYPES
+        )
+        expect(sig[:r]).to eq('0xc628edcdf24aa7a5916314418f738eb1f1fdad468ef499dd706d7cf164e58a02')
+        expect(sig[:s]).to eq('0x11542fd00026ce84da9cd3004a31ddff18a1e70ce00f1a6dce6fbf16d618cf67')
+        expect(sig[:v]).to eq(27)
+      end
+    end
+  end
 end
