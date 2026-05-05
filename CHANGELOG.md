@@ -1,5 +1,16 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [1.4.0] - 2026-05-05
+
+### New Exchange actions
+
+- `Exchange#send_to_evm_with_data(destination:, token:, amount:, data:, ...)` — user-signed; transfers Core assets to HyperEVM with arbitrary calldata for `ICoreReceiveWithData` contracts. Adds `SEND_TO_EVM_WITH_DATA_TYPES` (first user-signed action using `bytes`). Includes signature-parity regression specs against captured `eth_account` fixtures to lock down eth gem's `bytes` handling.
+- `Exchange#agent_send_asset(...)` — agent-signed counterpart to `send_asset` (destination must equal the agent's principal).
+- `Exchange#hip3_liquidator_transfer(dex:, usdc:, to_dex:)` — deposit/withdraw to an HIP-3 DEX backstop in 1e-6 quote-token units.
+- `Exchange#borrow_lend(token:, action:, amount:, is_isolated:)` — HIP-2 supply/withdraw/repay/borrow (L1 action). Companion to the four HIP-2 info methods. `amount` is nullable for full-position ops.
+- `Exchange#sub_account_modify(sub_account_user:, name:)` — rename a sub-account (L1 action).
+- `Exchange#link_staking_user(staking_user:, ...)` — link staking + trading accounts for fee discount (user-signed EIP-712). Adds `LINK_STAKING_USER_TYPES`.
+
 ## [1.3.0] - 2026-04-30
 
 ### New transport
