@@ -1010,6 +1010,49 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Transfer an asset from Core to HyperEVM with an arbitrary calldata payload
+    # (`sendToEvmWithData` user-signed action). Intended for `ICoreReceiveWithData`
+    # contracts that react atomically to the deposit. `data` accepts a hex string
+    # ('0x' or '0x...'); the EIP-712 signer hashes it as `bytes`.
+    # `destination_recipient` is NOT lowercased — `address_encoding` may be
+    # 'base58' for non-EVM target chains, where lowercasing would corrupt the value.
+    # @param token [String] Token symbol (e.g. "USDC")
+    # @param amount [String, Numeric] Amount as UnsignedDecimal (NOT wei); coerced via to_s
+    # @param source_dex [String] Source DEX identifier (e.g. "spot")
+    # @param destination_recipient [String] Recipient address on the destination chain (hex or base58)
+    # @param address_encoding [String] One of 'hex' or 'base58'
+    # @param destination_chain_id [Integer] Target EVM chain id (e.g. 998 for HyperEVM testnet)
+    # @param gas_limit [Integer] Gas limit for the destination EVM call
+    # @param data [String] ABI calldata hex string ('0x' for empty payload)
+    # @return [Hash] Exchange response
+    def send_to_evm_with_data(token:, amount:, source_dex:, destination_recipient:,
+                              address_encoding:, destination_chain_id:, gas_limit:, data: '0x')
+      nonce = timestamp_ms
+      action = {
+        type: 'sendToEvmWithData',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
+        token: token,
+        amount: amount.to_s,
+        sourceDex: source_dex,
+        destinationRecipient: destination_recipient,
+        addressEncoding: address_encoding,
+        destinationChainId: destination_chain_id.to_i,
+        gasLimit: gas_limit.to_i,
+        data: data,
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { token: token, amount: amount.to_s, sourceDex: source_dex,
+          destinationRecipient: destination_recipient, addressEncoding: address_encoding,
+          destinationChainId: destination_chain_id.to_i, gasLimit: gas_limit.to_i,
+          data: data, nonce: nonce },
+        'HyperliquidTransaction:SendToEvmWithData',
+        Signing::EIP712::SEND_TO_EVM_WITH_DATA_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!

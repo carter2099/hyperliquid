@@ -130,6 +130,21 @@ module Hyperliquid
         ]
       }.freeze
 
+      SEND_TO_EVM_WITH_DATA_TYPES = {
+        'HyperliquidTransaction:SendToEvmWithData': [
+          { name: :hyperliquidChain,     type: 'string' },
+          { name: :token,                type: 'string' },
+          { name: :amount,               type: 'string' },
+          { name: :sourceDex,            type: 'string' },
+          { name: :destinationRecipient, type: 'string' },
+          { name: :addressEncoding,      type: 'string' },
+          { name: :destinationChainId,   type: 'uint32' },
+          { name: :gasLimit,             type: 'uint64' },
+          { name: :data,                 type: 'bytes'  },
+          { name: :nonce,                type: 'uint64' }
+        ]
+      }.freeze
+
       class << self
         # Domain for L1 actions (orders, cancels, leverage, etc.)
         # @return [Hash] EIP-712 domain configuration

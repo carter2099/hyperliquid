@@ -63,6 +63,8 @@ The signing chain in `lib/hyperliquid/signing/` must exactly match the official 
 
 Any change to signing must maintain parity with the Python SDK or transactions will be rejected by the exchange.
 
+User-signed actions (`usd_send`, `withdraw_from_bridge`, `send_to_evm_with_data`, etc.) use direct EIP-712 typed-data signing with the `HyperliquidSignTransaction` domain (chain ID 421614) — not the phantom-agent flow. Each has a typed-data spec in `Signing::EIP712`. The `eth` gem's typed-data signer handles primitive types (`string`, `uint*`, `address`, `bool`) and dynamic `bytes` correctly — `send_to_evm_with_data` was the first to use `bytes`, and its spec includes a fixture-based signature parity test against `eth_account` to lock that in. When adding new user-signed actions with non-string types, add a similar fixture to catch eth-gem regressions.
+
 ### Numeric Conversion
 
 - **`float_to_wire`** (in Exchange): converts to string with 8-decimal precision, validates rounding tolerance (`1e-12`), normalizes trailing zeros. No scientific notation.

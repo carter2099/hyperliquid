@@ -33,7 +33,8 @@ SCRIPTS = [
   'test_12_staking.rb',
   'test_13_ws_l2_book.rb',
   'test_14_ws_candle.rb',
-  'test_15_explorer.rb'
+  'test_15_explorer.rb',
+  'test_16_send_to_evm_with_data.rb'
 ].freeze
 
 def green(text)
