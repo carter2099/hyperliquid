@@ -2388,6 +2388,69 @@ RSpec.describe Hyperliquid::Exchange do
     end
   end
 
+  describe '#create_vault' do
+    let(:create_vault_response) do
+      { 'status' => 'ok',
+        'response' => { 'type' => 'createVault',
+                        'data' => '0x4444444444444444444444444444444444444444' } }
+    end
+
+    it 'sends createVault with name, description, initialUsd scaled to 1e6, and inner nonce matching outer nonce' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'createVault' &&
+            action['name'] == 'TestVault' &&
+            action['description'] == 'Test description' &&
+            action['initialUsd'] == 100_000_000 &&
+            action['nonce'] == body['nonce'] &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: create_vault_response.to_json)
+
+      result = exchange.create_vault(
+        name: 'TestVault',
+        description: 'Test description',
+        initial_usd: 100
+      )
+      expect(result['status']).to eq('ok')
+      expect(result.dig('response', 'data')).to eq('0x4444444444444444444444444444444444444444')
+    end
+
+    it 'scales fractional usd values via float_to_usd_int (100.5 -> 100_500_000)' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          JSON.parse(req.body).dig('action', 'initialUsd') == 100_500_000
+        end
+        .to_return(status: 200, body: create_vault_response.to_json)
+
+      result = exchange.create_vault(name: 'V', description: 'd' * 10, initial_usd: 100.5)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'raises ArgumentError for initial_usd that causes rounding' do
+      expect do
+        exchange.create_vault(name: 'V', description: 'd' * 10, initial_usd: 100.0000019)
+      end.to raise_error(ArgumentError, /float_to_usd_int causes rounding/)
+    end
+
+    it 'propagates expires_after when set on the exchange' do
+      exchange.expires_after = 9_999_999_999_999
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['expiresAfter'] == 9_999_999_999_999 &&
+            body.dig('action', 'type') == 'createVault'
+        end
+        .to_return(status: 200, body: create_vault_response.to_json)
+
+      result = exchange.create_vault(name: 'V', description: 'd' * 10, initial_usd: 100)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
   describe '#borrow_lend' do
     let(:borrow_lend_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
 

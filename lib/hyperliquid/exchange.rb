@@ -893,6 +893,29 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Create a new vault with the calling wallet as leader (`createVault` L1 action).
+    # @param name [String] Vault name (server-enforced 3–50 characters)
+    # @param description [String] Vault description (server-enforced 10–250 characters)
+    # @param initial_usd [Numeric] Initial USD seed (server-enforced $100 minimum);
+    #   scaled internally to integer 1e6 micro-USD
+
+    # @return [Hash] Exchange response — on success `response.data` is the new vault address
+    def create_vault(name:, description:, initial_usd:)
+      nonce = timestamp_ms
+      action = {
+        type: 'createVault',
+        name: name,
+        description: description,
+        initialUsd: float_to_usd_int(initial_usd),
+        nonce: nonce
+      }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
     # Borrow, lend, supply, or withdraw HIP-2 borrow/lend assets (`borrowLend` L1 action).
     # Companion to the four HIP-2 info methods (`borrow_lend_user_state` etc.).
     # @param operation [String] One of 'supply', 'withdraw', 'repay', 'borrow'
