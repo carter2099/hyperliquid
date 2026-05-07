@@ -793,6 +793,40 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Submit a multi-signature action wrapping any inner exchange action with N pre-collected
+    # co-signer signatures (`multiSig` user-signed envelope). The submitter's outer signature
+    # authorises execution; co-signer signatures must be collected externally via
+    # `Signing::MultiSig.sign_as_co_signer_l1` (for L1 inner actions) or
+    # `Signing::MultiSig.sign_as_co_signer_user_signed` (for user-signed inner actions).
+    # @param multi_sig_user [String] Address of the multi-sig user being acted on
+    # @param inner_action [Hash] The wrapped action body
+    # @param signatures [Array<Hash>] Co-signer signatures (each :r, :s, :v)
+    # @param nonce [Integer, nil] Nonce timestamp; defaults to `timestamp_ms`. Must match the
+    #   nonce used by every co-signer when they signed.
+    # @param vault_address [String, nil] Optional vault address (must match co-signer hashes)
+    # @return [Hash] Exchange response
+    def multi_sig(multi_sig_user:, inner_action:, signatures:, nonce: nil, vault_address: nil)
+      nonce ||= timestamp_ms
+      envelope = Signing::MultiSig.build_envelope(
+        inner_action: inner_action,
+        multi_sig_user: multi_sig_user,
+        outer_signer: @signer.address,
+        signatures: signatures
+      )
+      multi_sig_action_hash = Signing::MultiSig.envelope_action_hash(
+        envelope: envelope,
+        nonce: nonce,
+        vault_address: vault_address,
+        expires_after: @expires_after
+      )
+      signature = @signer.sign_user_signed_action(
+        { multiSigActionHash: multi_sig_action_hash, nonce: nonce },
+        Signing::MultiSig::OUTER_PRIMARY_TYPE,
+        Signing::EIP712::MULTI_SIG_TYPES
+      )
+      post_action(envelope, signature, nonce, vault_address)
+    end
+
     # Claim accrued referral-program rewards (`claimRewards` L1 action).
     # @return [Hash] Exchange response
     def claim_rewards

@@ -26,10 +26,11 @@ Metrics/BlockLength:
     - 'spec/**/*'
     - '*.gemspec'
 
-# Exchange API methods require many parameters
+# Exchange API methods (and multi-sig co-signer helpers that pass through to them) require many parameters
 Metrics/ParameterLists:
   Exclude:
     - 'lib/hyperliquid/exchange.rb'
+    - 'lib/hyperliquid/signing/multi_sig.rb'
 
 # Allow higher complexity for order type conversion logic and WS message handling
 Metrics/CyclomaticComplexity:

@@ -138,6 +138,13 @@ RSpec.describe Hyperliquid::Signing::EIP712 do
       )
     end
 
+    it 'defines MULTI_SIG_TYPES with correct fields and types' do
+      types = described_class::MULTI_SIG_TYPES
+      fields = types[:'HyperliquidTransaction:SendMultiSig']
+      expect(fields.map { |f| f[:name] }).to eq(%i[hyperliquidChain multiSigActionHash nonce])
+      expect(fields.map { |f| f[:type] }).to eq(%w[string bytes32 uint64])
+    end
+
     it 'defines SEND_TO_EVM_WITH_DATA_TYPES with correct fields and types' do
       types = described_class::SEND_TO_EVM_WITH_DATA_TYPES
       fields = types[:'HyperliquidTransaction:SendToEvmWithData']

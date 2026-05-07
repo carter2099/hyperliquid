@@ -8,6 +8,7 @@ require_relative 'hyperliquid/info'
 require_relative 'hyperliquid/cloid'
 require_relative 'hyperliquid/signing/eip712'
 require_relative 'hyperliquid/signing/signer'
+require_relative 'hyperliquid/signing/multi_sig'
 require_relative 'hyperliquid/exchange'
 require_relative 'hyperliquid/ws/client'
 
