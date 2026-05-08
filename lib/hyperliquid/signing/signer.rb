@@ -50,6 +50,33 @@ module Hyperliquid
         sign_typed_data(typed_data)
       end
 
+      # Compute the action hash used by the L1 phantom-agent flow and by the multi-sig
+      # outer-envelope flow. Mirrors the official Python SDK's `action_hash` byte layout:
+      # keccak256(msgpack(action) + nonce(8B BE) + vault_flag + [vault_addr] + [expires_flag + expires_after])
+      # @param action [Hash, Array] The action payload (or list-shaped envelope for multi-sig L1)
+      # @param nonce [Integer] Nonce timestamp (ms)
+      # @param vault_address [String, nil] Optional vault address (lowercased before hashing)
+      # @param expires_after [Integer, nil] Optional expiration timestamp (ms)
+      # @return [String] 0x-prefixed hex of the 32-byte keccak256 hash
+      def self.compute_action_hash(action, nonce, vault_address: nil, expires_after: nil)
+        data = action.to_msgpack
+        data += [nonce].pack('Q>')
+
+        if vault_address.nil?
+          data += "\x00"
+        else
+          data += "\x01"
+          data += [vault_address.sub(/\A0x/i, '').downcase].pack('H*')
+        end
+
+        unless expires_after.nil?
+          data += "\x00"
+          data += [expires_after].pack('Q>')
+        end
+
+        "0x#{Eth::Util.keccak256(data).unpack1('H*')}"
+      end
+
       # Sign a user-signed action (transfers, withdrawals, etc.)
       # Uses direct EIP-712 typed data signing with HyperliquidSignTransaction domain
       # @param action [Hash] The action message to sign (will have chain fields injected)
@@ -92,39 +119,12 @@ module Hyperliquid
       # @param expires_after [Integer, nil] Optional expiration timestamp
       # @return [Hash] Phantom agent with source and connectionId
       def construct_phantom_agent(action, nonce, vault_address, expires_after)
-        # Compute action hash
-        # Maintains parity with official Python SDK
-        # data = msgpack(action) + nonce(8 bytes BE) + vault_flag + [vault_addr] + [expires_flag + expires_after]
-        # - Note: expires_flag is only included if expires_after exists. A bit odd but that's what the
-        #     Python SDK does.
-        data = action.to_msgpack
-        data += [nonce].pack('Q>') # 8-byte big-endian uint64
-
-        if vault_address.nil?
-          data += "\x00" # no vault flag
-        else
-          data += "\x01" # has vault flag
-          data += address_to_bytes(vault_address.downcase)
-        end
-
-        unless expires_after.nil?
-          data += "\x00" # expiration flag
-          data += [expires_after].pack('Q>') # 8-byte big-endian uint64
-        end
-
-        connection_id = Eth::Util.keccak256(data)
-
         {
           source: EIP712.source(testnet: @testnet),
-          connectionId: bin_to_hex(connection_id)
+          connectionId: self.class.compute_action_hash(action, nonce,
+                                                       vault_address: vault_address,
+                                                       expires_after: expires_after)
         }
-      end
-
-      # Convert hex address to 20-byte binary
-      # @param address [String] Ethereum address with 0x prefix
-      # @return [String] 20-byte binary representation
-      def address_to_bytes(address)
-        [address.sub(/\A0x/i, '')].pack('H*')
       end
 
       # Sign EIP-712 typed data using eth gem's built-in method
@@ -140,13 +140,6 @@ module Hyperliquid
           s: "0x#{signature[64, 64]}",
           v: signature[128, 2].to_i(16)
         }
-      end
-
-      # Convert binary data to hex string with 0x prefix
-      # @param bin [String] Binary data
-      # @return [String] Hex string with 0x prefix
-      def bin_to_hex(bin)
-        "0x#{bin.unpack1('H*')}"
       end
     end
   end

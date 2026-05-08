@@ -2182,6 +2182,147 @@ RSpec.describe Hyperliquid::Exchange do
     end
   end
 
+  describe '#multi_sig' do
+    let(:multi_sig_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+    let(:multi_sig_user) { '0x0000000000000000000000000000000000000005' }
+    let(:inner_action) { { type: 'noop' } }
+
+    it 'posts a multiSig envelope with lowercased addresses and the outer user signature' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'multiSig' &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['signatures'] == [] &&
+            action['payload']['multiSigUser'] == multi_sig_user.downcase &&
+            action['payload']['outerSigner'] == signer.address.downcase &&
+            action['payload']['action'] == { 'type' => 'noop' } &&
+            body['signature'].is_a?(Hash) &&
+            body['nonce'].is_a?(Integer)
+        end
+        .to_return(status: 200, body: multi_sig_response.to_json)
+
+      result = exchange.multi_sig(
+        multi_sig_user: multi_sig_user,
+        inner_action: inner_action,
+        signatures: []
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'forwards a caller-provided nonce verbatim and includes pre-collected signatures' do
+      pre_sigs = [{ r: '0x1', s: '0x2', v: 27 }]
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          body['nonce'] == 1_700_000_000_000 &&
+            action['signatures'] == [{ 'r' => '0x1', 's' => '0x2', 'v' => 27 }]
+        end
+        .to_return(status: 200, body: multi_sig_response.to_json)
+
+      result = exchange.multi_sig(
+        multi_sig_user: multi_sig_user,
+        inner_action: inner_action,
+        signatures: pre_sigs,
+        nonce: 1_700_000_000_000
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'invokes sign_user_signed_action with SendMultiSig primary type and MULTI_SIG_TYPES' do
+      stub_request(:post, exchange_endpoint).to_return(status: 200, body: multi_sig_response.to_json)
+
+      expect(signer).to receive(:sign_user_signed_action).with(
+        hash_including(:multiSigActionHash, :nonce),
+        'HyperliquidTransaction:SendMultiSig',
+        Hyperliquid::Signing::EIP712::MULTI_SIG_TYPES
+      ).and_call_original
+
+      exchange.multi_sig(
+        multi_sig_user: multi_sig_user,
+        inner_action: inner_action,
+        signatures: []
+      )
+    end
+
+    it 'propagates vault_address into the wire payload' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == '0xabcdef1234567890abcdef1234567890abcdef12'
+        end
+        .to_return(status: 200, body: multi_sig_response.to_json)
+
+      result = exchange.multi_sig(
+        multi_sig_user: multi_sig_user,
+        inner_action: inner_action,
+        signatures: [],
+        vault_address: '0xabcdef1234567890abcdef1234567890abcdef12'
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    # Signature parity regression: catches future eth gem regressions on `bytes32` handling
+    # in the outer envelope. Fixtures captured 2026-05-07 against Python's eth_account 0.13.7.
+    # See: ~/agent-state/hyperliquid-sdk-fixtures/capture_multi_sig_signatures.py
+    describe 'EIP-712 outer-signature parity (regression guard for bytes32 type)' do
+      let(:fixture_private_key) { '0x1111111111111111111111111111111111111111111111111111111111111111' }
+      let(:fixture_signer) { Hyperliquid::Signing::Signer.new(private_key: fixture_private_key, testnet: false) }
+      let(:fixture_nonce) { 1_700_000_000_000 }
+
+      it 'Fixture A: signs envelope (noop inner action, no co-signers) matching reference output' do
+        envelope = Hyperliquid::Signing::MultiSig.build_envelope(
+          inner_action: { type: 'noop' },
+          multi_sig_user: '0x0000000000000000000000000000000000000005',
+          outer_signer: fixture_signer.address,
+          signatures: []
+        )
+        hash = Hyperliquid::Signing::MultiSig.envelope_action_hash(envelope: envelope, nonce: fixture_nonce)
+        expect(hash).to eq('0x897feed4f5053a54739850d8af2354f592b667b27cab36a917afe8333fec2156')
+
+        sig = fixture_signer.sign_user_signed_action(
+          { multiSigActionHash: hash, nonce: fixture_nonce },
+          'HyperliquidTransaction:SendMultiSig',
+          Hyperliquid::Signing::EIP712::MULTI_SIG_TYPES
+        )
+        expect(sig[:r]).to eq('0x673bd8bb32fd0d3faa1fc7282ad6af724ddd069b3a36441d879fa0a2a40abc31')
+        expect(sig[:s]).to eq('0x303b2f9c475130962e6b34f82eac3a91c52a2c860f57eabd1d7c99fffb10f0eb')
+        expect(sig[:v]).to eq(27)
+      end
+
+      it 'Fixture B: signs envelope (order inner action + populated co-signer sig) matching reference output' do
+        co_signer_sig = {
+          r: '0x9635450d1274007c5b83f819654b4994af3e76d732f99c677ed82058eae640d4',
+          s: '0x7b8beeb8dc6e70adde2df6defe73fea946d061ae1255482c1e2d0a54e6c9f3ec',
+          v: 27
+        }
+        envelope = Hyperliquid::Signing::MultiSig.build_envelope(
+          inner_action: {
+            type: 'order',
+            orders: [{ a: 4, b: true, p: '1100', s: '0.2', r: false, t: { limit: { tif: 'Gtc' } } }],
+            grouping: 'na'
+          },
+          multi_sig_user: '0x0000000000000000000000000000000000000005',
+          outer_signer: fixture_signer.address,
+          signatures: [co_signer_sig]
+        )
+        hash = Hyperliquid::Signing::MultiSig.envelope_action_hash(envelope: envelope, nonce: fixture_nonce)
+        expect(hash).to eq('0x7bc3a36d385f1decbe4983d98deb4c272e83ed1bb9d7d9736b225960cf5c32c5')
+
+        sig = fixture_signer.sign_user_signed_action(
+          { multiSigActionHash: hash, nonce: fixture_nonce },
+          'HyperliquidTransaction:SendMultiSig',
+          Hyperliquid::Signing::EIP712::MULTI_SIG_TYPES
+        )
+        expect(sig[:r]).to eq('0xe8c710d9ff10597a6960f5a69f02f63351845e7cd31733eb03e6799f085ca60a')
+        expect(sig[:s]).to eq('0x5895b4b2fb542667d858e8de39e2adf948916182a52e44cf6dfaa44528beeded')
+        expect(sig[:v]).to eq(28)
+      end
+    end
+  end
+
   describe '#claim_rewards' do
     let(:claim_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
 
@@ -2385,6 +2526,69 @@ RSpec.describe Hyperliquid::Exchange do
       expect do
         exchange.vault_distribute(vault_address: vault, usd: 100.0000019)
       end.to raise_error(ArgumentError, /float_to_usd_int causes rounding/)
+    end
+  end
+
+  describe '#create_vault' do
+    let(:create_vault_response) do
+      { 'status' => 'ok',
+        'response' => { 'type' => 'createVault',
+                        'data' => '0x4444444444444444444444444444444444444444' } }
+    end
+
+    it 'sends createVault with name, description, initialUsd scaled to 1e6, and inner nonce matching outer nonce' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'createVault' &&
+            action['name'] == 'TestVault' &&
+            action['description'] == 'Test description' &&
+            action['initialUsd'] == 100_000_000 &&
+            action['nonce'] == body['nonce'] &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: create_vault_response.to_json)
+
+      result = exchange.create_vault(
+        name: 'TestVault',
+        description: 'Test description',
+        initial_usd: 100
+      )
+      expect(result['status']).to eq('ok')
+      expect(result.dig('response', 'data')).to eq('0x4444444444444444444444444444444444444444')
+    end
+
+    it 'scales fractional usd values via float_to_usd_int (100.5 -> 100_500_000)' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          JSON.parse(req.body).dig('action', 'initialUsd') == 100_500_000
+        end
+        .to_return(status: 200, body: create_vault_response.to_json)
+
+      result = exchange.create_vault(name: 'V', description: 'd' * 10, initial_usd: 100.5)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'raises ArgumentError for initial_usd that causes rounding' do
+      expect do
+        exchange.create_vault(name: 'V', description: 'd' * 10, initial_usd: 100.0000019)
+      end.to raise_error(ArgumentError, /float_to_usd_int causes rounding/)
+    end
+
+    it 'propagates expires_after when set on the exchange' do
+      exchange.expires_after = 9_999_999_999_999
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['expiresAfter'] == 9_999_999_999_999 &&
+            body.dig('action', 'type') == 'createVault'
+        end
+        .to_return(status: 200, body: create_vault_response.to_json)
+
+      result = exchange.create_vault(name: 'V', description: 'd' * 10, initial_usd: 100)
+      expect(result['status']).to eq('ok')
     end
   end
 

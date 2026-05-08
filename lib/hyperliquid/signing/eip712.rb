@@ -130,6 +130,14 @@ module Hyperliquid
         ]
       }.freeze
 
+      MULTI_SIG_TYPES = {
+        'HyperliquidTransaction:SendMultiSig': [
+          { name: :hyperliquidChain,   type: 'string'  },
+          { name: :multiSigActionHash, type: 'bytes32' },
+          { name: :nonce,              type: 'uint64'  }
+        ]
+      }.freeze
+
       SEND_TO_EVM_WITH_DATA_TYPES = {
         'HyperliquidTransaction:SendToEvmWithData': [
           { name: :hyperliquidChain,     type: 'string' },
