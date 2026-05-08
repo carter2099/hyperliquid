@@ -1,5 +1,21 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [1.5.0] - 2026-05-08
+
+### New Exchange actions
+
+- `Exchange#multi_sig(multi_sig_user:, inner_action:, signatures:, nonce:, vault_address:)` — wraps any inner action with N pre-collected co-signer signatures and submits via the user-signed multi-sig envelope. Adds `MULTI_SIG_TYPES` (first EIP-712 type using `bytes32`).
+- `Exchange#create_vault(name:, description:, initial_usd:, ...)` — L1 action that creates a new vault with the calling wallet as leader. Float-USD scaled to integer micro-USD via `float_to_usd_int`.
+
+### New signing primitives
+
+- `Signing::MultiSig` module with `build_envelope`, `envelope_action_hash`, `sign_as_co_signer_l1` (for L1 inner actions, phantom-agent flow), and `sign_as_co_signer_user_signed` (enriches the inner action's typed-data spec with `payloadMultiSigUser` + `outerSigner` fields). Co-signature collection remains the caller's responsibility.
+- `Signer.compute_action_hash` exposed as a public class method (refactored out of `construct_phantom_agent` for reuse from multi-sig).
+
+### Tests
+
+- Fixture-based byte-parity specs against Python `eth_account` 0.13.7 + `msgpack` 1.1.2 covering: outer multi-sig signature with no co-signers, outer + L1 co-signer signatures over an order action, and a user-signed co-signer signature over a sendAsset action.
+
 ## [1.4.0] - 2026-05-05
 
 ### New Exchange actions
