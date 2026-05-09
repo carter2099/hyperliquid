@@ -1110,6 +1110,45 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Toggle cross-portfolio-margin mode for a user (`userPortfolioMargin` user-signed action).
+    # The `user` address is lowercased to match the Python SDK and protocol expectations.
+    # @param user [String] Wallet address whose portfolio-margin mode is being toggled
+    # @param enabled [Boolean] True to enable cross-portfolio margin, false to disable
+    # @return [Hash] Exchange response
+    def user_portfolio_margin(user:, enabled:)
+      nonce = timestamp_ms
+      user_lower = user.downcase
+      action = {
+        type: 'userPortfolioMargin',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
+        user: user_lower,
+        enabled: enabled,
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { user: user_lower, enabled: enabled, nonce: nonce },
+        'HyperliquidTransaction:UserPortfolioMargin',
+        Signing::EIP712::USER_PORTFOLIO_MARGIN_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Opt in or out of spot dusting (`spotUser` L1 action).
+    # Spot dusting is the protocol's automatic conversion of small spot balances.
+    # Despite the generic action name, this method exclusively toggles that opt-out flag.
+    # @param opt_out [Boolean] True to opt out of spot dusting, false to opt in
+    # @return [Hash] Exchange response
+    def spot_user(opt_out:)
+      nonce = timestamp_ms
+      action = { type: 'spotUser', toggleSpotDusting: { optOut: opt_out } }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!

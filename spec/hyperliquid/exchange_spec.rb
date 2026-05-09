@@ -2982,4 +2982,121 @@ RSpec.describe Hyperliquid::Exchange do
       end
     end
   end
+
+  describe '#user_portfolio_margin' do
+    let(:portfolio_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends userPortfolioMargin with lowercased user and full user-signed envelope' do
+      mixed_case_user = '0xABCDEF1234567890ABCDEF1234567890ABCDEF12'
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'userPortfolioMargin' &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet' &&
+            action['user'] == mixed_case_user.downcase &&
+            action['enabled'] == true &&
+            action['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: portfolio_response.to_json)
+
+      result = exchange.user_portfolio_margin(user: mixed_case_user, enabled: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'forwards enabled: false verbatim' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['enabled'] == false
+        end
+        .to_return(status: 200, body: portfolio_response.to_json)
+
+      result = exchange.user_portfolio_margin(
+        user: '0x1111111111111111111111111111111111111111',
+        enabled: false
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'invokes sign_user_signed_action with the new primary type and constant' do
+      stub_request(:post, exchange_endpoint)
+        .to_return(status: 200, body: portfolio_response.to_json)
+
+      expect(signer).to receive(:sign_user_signed_action).with(
+        hash_including(
+          user: '0x1111111111111111111111111111111111111111',
+          enabled: true
+        ),
+        'HyperliquidTransaction:UserPortfolioMargin',
+        Hyperliquid::Signing::EIP712::USER_PORTFOLIO_MARGIN_TYPES
+      ).and_call_original
+
+      exchange.user_portfolio_margin(
+        user: '0x1111111111111111111111111111111111111111',
+        enabled: true
+      )
+    end
+  end
+
+  describe '#spot_user' do
+    let(:spot_user_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends spotUser with toggleSpotDusting wrapping when opt_out: true' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'spotUser' &&
+            action['toggleSpotDusting'] == { 'optOut' => true } &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: spot_user_response.to_json)
+
+      result = exchange.spot_user(opt_out: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'sends spotUser with optOut: false when opt_out: false' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['toggleSpotDusting'] == { 'optOut' => false }
+        end
+        .to_return(status: 200, body: spot_user_response.to_json)
+
+      result = exchange.spot_user(opt_out: false)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'propagates expires_after when set on the exchange' do
+      exchange.expires_after = 9_999_999_999_999
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['expiresAfter'] == 9_999_999_999_999 &&
+            body.dig('action', 'type') == 'spotUser'
+        end
+        .to_return(status: 200, body: spot_user_response.to_json)
+
+      result = exchange.spot_user(opt_out: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'does not include vaultAddress in the payload' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          !body.key?('vaultAddress')
+        end
+        .to_return(status: 200, body: spot_user_response.to_json)
+
+      result = exchange.spot_user(opt_out: true)
+      expect(result['status']).to eq('ok')
+    end
+  end
 end
