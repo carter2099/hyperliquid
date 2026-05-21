@@ -1134,6 +1134,48 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Deposit native HYPE from the user's spot account into staking (`cDeposit` user-signed action).
+    # @param wei [Integer] Amount of wei to deposit into staking (float * 1e8)
+    # @return [Hash] Exchange response
+    def c_deposit(wei:)
+      nonce = timestamp_ms
+      wei_int = wei.to_i
+      action = {
+        type: 'cDeposit',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
+        wei: wei_int,
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { wei: wei_int, nonce: nonce },
+        'HyperliquidTransaction:CDeposit',
+        Signing::EIP712::C_DEPOSIT_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Withdraw native HYPE from staking back into the user's spot account (`cWithdraw` user-signed action).
+    # @param wei [Integer] Amount of wei to withdraw from staking (float * 1e8)
+    # @return [Hash] Exchange response
+    def c_withdraw(wei:)
+      nonce = timestamp_ms
+      wei_int = wei.to_i
+      action = {
+        type: 'cWithdraw',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
+        wei: wei_int,
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { wei: wei_int, nonce: nonce },
+        'HyperliquidTransaction:CWithdraw',
+        Signing::EIP712::C_WITHDRAW_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
     # Opt in or out of spot dusting (`spotUser` L1 action).
     # Spot dusting is the protocol's automatic conversion of small spot balances.
     # Despite the generic action name, this method exclusively toggles that opt-out flag.

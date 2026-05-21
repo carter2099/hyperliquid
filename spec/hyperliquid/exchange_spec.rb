@@ -3099,4 +3099,98 @@ RSpec.describe Hyperliquid::Exchange do
       expect(result['status']).to eq('ok')
     end
   end
+
+  describe '#c_deposit' do
+    let(:c_deposit_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends cDeposit with wei as Integer and full user-signed envelope' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'cDeposit' &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet' &&
+            action['wei'] == 100_000_000 &&
+            action['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: c_deposit_response.to_json)
+
+      result = exchange.c_deposit(wei: 100_000_000)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'coerces wei to Integer defensively' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['wei'] == 500_000_000
+        end
+        .to_return(status: 200, body: c_deposit_response.to_json)
+
+      result = exchange.c_deposit(wei: 500_000_000.0)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'invokes sign_user_signed_action with the new primary type and constant' do
+      stub_request(:post, exchange_endpoint)
+        .to_return(status: 200, body: c_deposit_response.to_json)
+
+      expect(signer).to receive(:sign_user_signed_action).with(
+        hash_including(wei: 100_000_000),
+        'HyperliquidTransaction:CDeposit',
+        Hyperliquid::Signing::EIP712::C_DEPOSIT_TYPES
+      ).and_call_original
+
+      exchange.c_deposit(wei: 100_000_000)
+    end
+  end
+
+  describe '#c_withdraw' do
+    let(:c_withdraw_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends cWithdraw with wei as Integer and full user-signed envelope' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'cWithdraw' &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet' &&
+            action['wei'] == 100_000_000 &&
+            action['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: c_withdraw_response.to_json)
+
+      result = exchange.c_withdraw(wei: 100_000_000)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'coerces wei to Integer defensively' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['wei'] == 500_000_000
+        end
+        .to_return(status: 200, body: c_withdraw_response.to_json)
+
+      result = exchange.c_withdraw(wei: 500_000_000.0)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'invokes sign_user_signed_action with the new primary type and constant' do
+      stub_request(:post, exchange_endpoint)
+        .to_return(status: 200, body: c_withdraw_response.to_json)
+
+      expect(signer).to receive(:sign_user_signed_action).with(
+        hash_including(wei: 100_000_000),
+        'HyperliquidTransaction:CWithdraw',
+        Hyperliquid::Signing::EIP712::C_WITHDRAW_TYPES
+      ).and_call_original
+
+      exchange.c_withdraw(wei: 100_000_000)
+    end
+  end
 end

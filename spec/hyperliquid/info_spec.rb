@@ -916,6 +916,27 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#gossip_priority_auction_status' do
+    it 'requests gossip priority auction status' do
+      expected_response = [
+        ['10.0.0.1', nil, '192.168.1.100'],
+        [
+          { 'startTimeSeconds' => 1_700_000_000, 'durationSeconds' => 3600,
+            'startGas' => '1000', 'currentGas' => '500', 'endGas' => '100' },
+          { 'startTimeSeconds' => 1_700_010_000, 'durationSeconds' => 3600,
+            'startGas' => '2000', 'currentGas' => '1500', 'endGas' => '200' }
+        ]
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'gossipPriorityAuctionStatus' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.gossip_priority_auction_status
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#legal_check' do
     let(:user_address) { '0x1234567890123456789012345678901234567890' }
 

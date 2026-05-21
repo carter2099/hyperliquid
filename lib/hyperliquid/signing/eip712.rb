@@ -147,6 +147,22 @@ module Hyperliquid
         ]
       }.freeze
 
+      C_DEPOSIT_TYPES = {
+        'HyperliquidTransaction:CDeposit': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :wei, type: 'uint64' },
+          { name: :nonce, type: 'uint64' }
+        ]
+      }.freeze
+
+      C_WITHDRAW_TYPES = {
+        'HyperliquidTransaction:CWithdraw': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :wei, type: 'uint64' },
+          { name: :nonce, type: 'uint64' }
+        ]
+      }.freeze
+
       SEND_TO_EVM_WITH_DATA_TYPES = {
         'HyperliquidTransaction:SendToEvmWithData': [
           { name: :hyperliquidChain,     type: 'string' },
