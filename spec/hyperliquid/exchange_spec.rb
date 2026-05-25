@@ -3193,4 +3193,130 @@ RSpec.describe Hyperliquid::Exchange do
       exchange.c_withdraw(wei: 100_000_000)
     end
   end
+
+  describe '#twap_order' do
+    let(:twap_order_response) do
+      { 'status' => 'ok',
+        'response' => { 'type' => 'twapOrder',
+                        'data' => { 'status' => { 'running' => { 'twapId' => 42 } } } } }
+    end
+
+    it 'sends twapOrder with the nested twap shape and correct field order' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'twapOrder' &&
+            action['twap'] == { 'a' => 1, 'b' => true, 's' => '1.5', 'r' => false, 'm' => 30, 't' => true } &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: twap_order_response.to_json)
+
+      result = exchange.twap_order(
+        coin: 'ETH', is_buy: true, size: '1.5', reduce_only: false, minutes: 30, randomize: true
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'normalizes size via float_to_wire' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['twap']['s'] == '0.5'
+        end
+        .to_return(status: 200, body: twap_order_response.to_json)
+
+      result = exchange.twap_order(
+        coin: 'BTC', is_buy: false, size: 0.5, reduce_only: true, minutes: 5, randomize: false
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'propagates vault_address into the payload' do
+      vault = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == vault
+        end
+        .to_return(status: 200, body: twap_order_response.to_json)
+
+      result = exchange.twap_order(
+        coin: 'ETH', is_buy: true, size: '1', reduce_only: false, minutes: 10, randomize: false,
+        vault_address: vault
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#twap_cancel' do
+    let(:twap_cancel_response) do
+      { 'status' => 'ok',
+        'response' => { 'type' => 'twapCancel', 'data' => { 'status' => 'success' } } }
+    end
+
+    it 'sends twapCancel with asset index and twap id' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'twapCancel' &&
+            action['a'] == 0 &&
+            action['t'] == 42 &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: twap_cancel_response.to_json)
+
+      result = exchange.twap_cancel(coin: 'BTC', twap_id: 42)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'propagates vault_address into the payload' do
+      vault = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == vault
+        end
+        .to_return(status: 200, body: twap_cancel_response.to_json)
+
+      result = exchange.twap_cancel(coin: 'BTC', twap_id: 7, vault_address: vault)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#reserve_request_weight' do
+    let(:reserve_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends reserveRequestWeight with the requested weight' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'reserveRequestWeight' &&
+            action['weight'] == 10 &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash) &&
+            !body.key?('vaultAddress')
+        end
+        .to_return(status: 200, body: reserve_response.to_json)
+
+      result = exchange.reserve_request_weight(weight: 10)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'propagates expires_after when set on the exchange' do
+      exchange.expires_after = 1_700_000_000_000
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['expiresAfter'] == 1_700_000_000_000
+        end
+        .to_return(status: 200, body: reserve_response.to_json)
+
+      result = exchange.reserve_request_weight(weight: 5)
+      expect(result['status']).to eq('ok')
+    end
+  end
 end
