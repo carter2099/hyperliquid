@@ -138,6 +138,31 @@ module Hyperliquid
         ]
       }.freeze
 
+      USER_PORTFOLIO_MARGIN_TYPES = {
+        'HyperliquidTransaction:UserPortfolioMargin': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :user, type: 'address' },
+          { name: :enabled, type: 'bool' },
+          { name: :nonce, type: 'uint64' }
+        ]
+      }.freeze
+
+      C_DEPOSIT_TYPES = {
+        'HyperliquidTransaction:CDeposit': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :wei, type: 'uint64' },
+          { name: :nonce, type: 'uint64' }
+        ]
+      }.freeze
+
+      C_WITHDRAW_TYPES = {
+        'HyperliquidTransaction:CWithdraw': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :wei, type: 'uint64' },
+          { name: :nonce, type: 'uint64' }
+        ]
+      }.freeze
+
       SEND_TO_EVM_WITH_DATA_TYPES = {
         'HyperliquidTransaction:SendToEvmWithData': [
           { name: :hyperliquidChain,     type: 'string' },

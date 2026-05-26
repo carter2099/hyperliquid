@@ -2982,4 +2982,341 @@ RSpec.describe Hyperliquid::Exchange do
       end
     end
   end
+
+  describe '#user_portfolio_margin' do
+    let(:portfolio_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends userPortfolioMargin with lowercased user and full user-signed envelope' do
+      mixed_case_user = '0xABCDEF1234567890ABCDEF1234567890ABCDEF12'
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'userPortfolioMargin' &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet' &&
+            action['user'] == mixed_case_user.downcase &&
+            action['enabled'] == true &&
+            action['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: portfolio_response.to_json)
+
+      result = exchange.user_portfolio_margin(user: mixed_case_user, enabled: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'forwards enabled: false verbatim' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['enabled'] == false
+        end
+        .to_return(status: 200, body: portfolio_response.to_json)
+
+      result = exchange.user_portfolio_margin(
+        user: '0x1111111111111111111111111111111111111111',
+        enabled: false
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'invokes sign_user_signed_action with the new primary type and constant' do
+      stub_request(:post, exchange_endpoint)
+        .to_return(status: 200, body: portfolio_response.to_json)
+
+      expect(signer).to receive(:sign_user_signed_action).with(
+        hash_including(
+          user: '0x1111111111111111111111111111111111111111',
+          enabled: true
+        ),
+        'HyperliquidTransaction:UserPortfolioMargin',
+        Hyperliquid::Signing::EIP712::USER_PORTFOLIO_MARGIN_TYPES
+      ).and_call_original
+
+      exchange.user_portfolio_margin(
+        user: '0x1111111111111111111111111111111111111111',
+        enabled: true
+      )
+    end
+  end
+
+  describe '#spot_user' do
+    let(:spot_user_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends spotUser with toggleSpotDusting wrapping when opt_out: true' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'spotUser' &&
+            action['toggleSpotDusting'] == { 'optOut' => true } &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: spot_user_response.to_json)
+
+      result = exchange.spot_user(opt_out: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'sends spotUser with optOut: false when opt_out: false' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['toggleSpotDusting'] == { 'optOut' => false }
+        end
+        .to_return(status: 200, body: spot_user_response.to_json)
+
+      result = exchange.spot_user(opt_out: false)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'propagates expires_after when set on the exchange' do
+      exchange.expires_after = 9_999_999_999_999
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['expiresAfter'] == 9_999_999_999_999 &&
+            body.dig('action', 'type') == 'spotUser'
+        end
+        .to_return(status: 200, body: spot_user_response.to_json)
+
+      result = exchange.spot_user(opt_out: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'does not include vaultAddress in the payload' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          !body.key?('vaultAddress')
+        end
+        .to_return(status: 200, body: spot_user_response.to_json)
+
+      result = exchange.spot_user(opt_out: true)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#c_deposit' do
+    let(:c_deposit_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends cDeposit with wei as Integer and full user-signed envelope' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'cDeposit' &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet' &&
+            action['wei'] == 100_000_000 &&
+            action['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: c_deposit_response.to_json)
+
+      result = exchange.c_deposit(wei: 100_000_000)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'coerces wei to Integer defensively' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['wei'] == 500_000_000
+        end
+        .to_return(status: 200, body: c_deposit_response.to_json)
+
+      result = exchange.c_deposit(wei: 500_000_000.0)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'invokes sign_user_signed_action with the new primary type and constant' do
+      stub_request(:post, exchange_endpoint)
+        .to_return(status: 200, body: c_deposit_response.to_json)
+
+      expect(signer).to receive(:sign_user_signed_action).with(
+        hash_including(wei: 100_000_000),
+        'HyperliquidTransaction:CDeposit',
+        Hyperliquid::Signing::EIP712::C_DEPOSIT_TYPES
+      ).and_call_original
+
+      exchange.c_deposit(wei: 100_000_000)
+    end
+  end
+
+  describe '#c_withdraw' do
+    let(:c_withdraw_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends cWithdraw with wei as Integer and full user-signed envelope' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'cWithdraw' &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet' &&
+            action['wei'] == 100_000_000 &&
+            action['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: c_withdraw_response.to_json)
+
+      result = exchange.c_withdraw(wei: 100_000_000)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'coerces wei to Integer defensively' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['wei'] == 500_000_000
+        end
+        .to_return(status: 200, body: c_withdraw_response.to_json)
+
+      result = exchange.c_withdraw(wei: 500_000_000.0)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'invokes sign_user_signed_action with the new primary type and constant' do
+      stub_request(:post, exchange_endpoint)
+        .to_return(status: 200, body: c_withdraw_response.to_json)
+
+      expect(signer).to receive(:sign_user_signed_action).with(
+        hash_including(wei: 100_000_000),
+        'HyperliquidTransaction:CWithdraw',
+        Hyperliquid::Signing::EIP712::C_WITHDRAW_TYPES
+      ).and_call_original
+
+      exchange.c_withdraw(wei: 100_000_000)
+    end
+  end
+
+  describe '#twap_order' do
+    let(:twap_order_response) do
+      { 'status' => 'ok',
+        'response' => { 'type' => 'twapOrder',
+                        'data' => { 'status' => { 'running' => { 'twapId' => 42 } } } } }
+    end
+
+    it 'sends twapOrder with the nested twap shape and correct field order' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'twapOrder' &&
+            action['twap'] == { 'a' => 1, 'b' => true, 's' => '1.5', 'r' => false, 'm' => 30, 't' => true } &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: twap_order_response.to_json)
+
+      result = exchange.twap_order(
+        coin: 'ETH', is_buy: true, size: '1.5', reduce_only: false, minutes: 30, randomize: true
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'normalizes size via float_to_wire' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['twap']['s'] == '0.5'
+        end
+        .to_return(status: 200, body: twap_order_response.to_json)
+
+      result = exchange.twap_order(
+        coin: 'BTC', is_buy: false, size: 0.5, reduce_only: true, minutes: 5, randomize: false
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'propagates vault_address into the payload' do
+      vault = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == vault
+        end
+        .to_return(status: 200, body: twap_order_response.to_json)
+
+      result = exchange.twap_order(
+        coin: 'ETH', is_buy: true, size: '1', reduce_only: false, minutes: 10, randomize: false,
+        vault_address: vault
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#twap_cancel' do
+    let(:twap_cancel_response) do
+      { 'status' => 'ok',
+        'response' => { 'type' => 'twapCancel', 'data' => { 'status' => 'success' } } }
+    end
+
+    it 'sends twapCancel with asset index and twap id' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'twapCancel' &&
+            action['a'] == 0 &&
+            action['t'] == 42 &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: twap_cancel_response.to_json)
+
+      result = exchange.twap_cancel(coin: 'BTC', twap_id: 42)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'propagates vault_address into the payload' do
+      vault = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == vault
+        end
+        .to_return(status: 200, body: twap_cancel_response.to_json)
+
+      result = exchange.twap_cancel(coin: 'BTC', twap_id: 7, vault_address: vault)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#reserve_request_weight' do
+    let(:reserve_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends reserveRequestWeight with the requested weight' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'reserveRequestWeight' &&
+            action['weight'] == 10 &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash) &&
+            !body.key?('vaultAddress')
+        end
+        .to_return(status: 200, body: reserve_response.to_json)
+
+      result = exchange.reserve_request_weight(weight: 10)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'propagates expires_after when set on the exchange' do
+      exchange.expires_after = 1_700_000_000_000
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['expiresAfter'] == 1_700_000_000_000
+        end
+        .to_return(status: 200, body: reserve_response.to_json)
+
+      result = exchange.reserve_request_weight(weight: 5)
+      expect(result['status']).to eq('ok')
+    end
+  end
 end

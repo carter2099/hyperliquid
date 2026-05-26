@@ -145,6 +145,27 @@ RSpec.describe Hyperliquid::Signing::EIP712 do
       expect(fields.map { |f| f[:type] }).to eq(%w[string bytes32 uint64])
     end
 
+    it 'defines USER_PORTFOLIO_MARGIN_TYPES with correct fields and types' do
+      types = described_class::USER_PORTFOLIO_MARGIN_TYPES
+      fields = types[:'HyperliquidTransaction:UserPortfolioMargin']
+      expect(fields.map { |f| f[:name] }).to eq(%i[hyperliquidChain user enabled nonce])
+      expect(fields.map { |f| f[:type] }).to eq(%w[string address bool uint64])
+    end
+
+    it 'defines C_DEPOSIT_TYPES with correct fields and types' do
+      types = described_class::C_DEPOSIT_TYPES
+      fields = types[:'HyperliquidTransaction:CDeposit']
+      expect(fields.map { |f| f[:name] }).to eq(%i[hyperliquidChain wei nonce])
+      expect(fields.map { |f| f[:type] }).to eq(%w[string uint64 uint64])
+    end
+
+    it 'defines C_WITHDRAW_TYPES with correct fields and types' do
+      types = described_class::C_WITHDRAW_TYPES
+      fields = types[:'HyperliquidTransaction:CWithdraw']
+      expect(fields.map { |f| f[:name] }).to eq(%i[hyperliquidChain wei nonce])
+      expect(fields.map { |f| f[:type] }).to eq(%w[string uint64 uint64])
+    end
+
     it 'defines SEND_TO_EVM_WITH_DATA_TYPES with correct fields and types' do
       types = described_class::SEND_TO_EVM_WITH_DATA_TYPES
       fields = types[:'HyperliquidTransaction:SendToEvmWithData']

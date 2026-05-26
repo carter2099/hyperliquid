@@ -1110,6 +1110,148 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Toggle cross-portfolio-margin mode for a user (`userPortfolioMargin` user-signed action).
+    # The `user` address is lowercased to match the Python SDK and protocol expectations.
+    # @param user [String] Wallet address whose portfolio-margin mode is being toggled
+    # @param enabled [Boolean] True to enable cross-portfolio margin, false to disable
+    # @return [Hash] Exchange response
+    def user_portfolio_margin(user:, enabled:)
+      nonce = timestamp_ms
+      user_lower = user.downcase
+      action = {
+        type: 'userPortfolioMargin',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
+        user: user_lower,
+        enabled: enabled,
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { user: user_lower, enabled: enabled, nonce: nonce },
+        'HyperliquidTransaction:UserPortfolioMargin',
+        Signing::EIP712::USER_PORTFOLIO_MARGIN_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Deposit native HYPE from the user's spot account into staking (`cDeposit` user-signed action).
+    # @param wei [Integer] Amount of wei to deposit into staking (float * 1e8)
+    # @return [Hash] Exchange response
+    def c_deposit(wei:)
+      nonce = timestamp_ms
+      wei_int = wei.to_i
+      action = {
+        type: 'cDeposit',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
+        wei: wei_int,
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { wei: wei_int, nonce: nonce },
+        'HyperliquidTransaction:CDeposit',
+        Signing::EIP712::C_DEPOSIT_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Withdraw native HYPE from staking back into the user's spot account (`cWithdraw` user-signed action).
+    # @param wei [Integer] Amount of wei to withdraw from staking (float * 1e8)
+    # @return [Hash] Exchange response
+    def c_withdraw(wei:)
+      nonce = timestamp_ms
+      wei_int = wei.to_i
+      action = {
+        type: 'cWithdraw',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
+        wei: wei_int,
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { wei: wei_int, nonce: nonce },
+        'HyperliquidTransaction:CWithdraw',
+        Signing::EIP712::C_WITHDRAW_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Place a TWAP order (`twapOrder` L1 action). The order is sliced over `minutes`
+    # minutes (5..1440). When `randomize` is true the protocol randomizes the timing
+    # of individual child orders. `size` is denominated in base currency units.
+    # @param coin [String] Asset symbol
+    # @param is_buy [Boolean] True for buy/long, false for sell/short
+    # @param size [String, Numeric] Total order size (base currency units)
+    # @param reduce_only [Boolean] Reduce-only flag
+    # @param minutes [Integer] TWAP duration in minutes (5..1440)
+    # @param randomize [Boolean] Randomize order timing
+    # @param vault_address [String, nil] Vault address if acting on behalf of a vault
+    # @return [Hash] Exchange response — on success `response.data.status.running.twapId`
+    def twap_order(coin:, is_buy:, size:, reduce_only:, minutes:, randomize:, vault_address: nil)
+      nonce = timestamp_ms
+      action = {
+        type: 'twapOrder',
+        twap: {
+          a: asset_index(coin),
+          b: is_buy,
+          s: float_to_wire(size),
+          r: reduce_only,
+          m: minutes,
+          t: randomize
+        }
+      }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        vault_address: vault_address,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, vault_address)
+    end
+
+    # Cancel a TWAP order by id (`twapCancel` L1 action).
+    # @param coin [String] Asset symbol the TWAP applies to
+    # @param twap_id [Integer] TWAP id returned by `twap_order`
+    # @param vault_address [String, nil] Vault address if acting on behalf of a vault
+    # @return [Hash] Exchange response
+    def twap_cancel(coin:, twap_id:, vault_address: nil)
+      nonce = timestamp_ms
+      action = { type: 'twapCancel', a: asset_index(coin), t: twap_id }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        vault_address: vault_address,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, vault_address)
+    end
+
+    # Reserve additional rate-limited actions for a fee (`reserveRequestWeight` L1 action).
+    # @param weight [Integer] Amount of request weight to reserve
+    # @return [Hash] Exchange response
+    def reserve_request_weight(weight:)
+      nonce = timestamp_ms
+      action = { type: 'reserveRequestWeight', weight: weight }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Opt in or out of spot dusting (`spotUser` L1 action).
+    # Spot dusting is the protocol's automatic conversion of small spot balances.
+    # Despite the generic action name, this method exclusively toggles that opt-out flag.
+    # @param opt_out [Boolean] True to opt out of spot dusting, false to opt in
+    # @return [Hash] Exchange response
+    def spot_user(opt_out:)
+      nonce = timestamp_ms
+      action = { type: 'spotUser', toggleSpotDusting: { optOut: opt_out } }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!

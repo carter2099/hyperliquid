@@ -359,6 +359,13 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'gossipRootIps' })
     end
 
+    # Retrieve gossip priority auction status (previous winners and current auctions)
+    # @return [Array] Two-element tuple: [0] array of previous-winner IPs per slot (String or nil),
+    #   [1] array of current auction statuses per slot (same shape as perp_deploy_auction_status)
+    def gossip_priority_auction_status
+      @client.post(Constants::INFO_ENDPOINT, { type: 'gossipPriorityAuctionStatus' })
+    end
+
     # Retrieve a user's legal verification status
     # @param user [String] Wallet address
     # @return [Hash] Keys: ipAllowed (Boolean), acceptedTerms (Boolean), userAllowed (Boolean)

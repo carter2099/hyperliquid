@@ -35,7 +35,9 @@ SCRIPTS = [
   'test_14_ws_candle.rb',
   'test_15_explorer.rb',
   'test_16_send_to_evm_with_data.rb',
-  'test_17_create_vault.rb'
+  'test_17_create_vault.rb',
+  'test_18_user_portfolio_margin.rb',
+  'test_19_spot_user.rb'
 ].freeze
 
 def green(text)
