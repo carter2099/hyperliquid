@@ -1,5 +1,25 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [1.6.0] - 2026-05-26
+
+### New Exchange actions
+
+- `Exchange#twap_order(asset:, is_buy:, sz:, reduce_only:, minutes:, randomize:, ...)` — L1 action that places a TWAP order with the nested `twap` dict shape (`a`/`b`/`s`/`r`/`m`/`t`). Size via `float_to_wire`; supports `vault_address`.
+- `Exchange#twap_cancel(asset:, twap_id:, ...)` — L1 action that cancels an active TWAP by asset index + twap id; supports `vault_address`.
+- `Exchange#reserve_request_weight(weight:, ...)` — L1 action with a weight-only body; supports `expires_after`, no `vault_address` per TS schema.
+- `Exchange#c_deposit(wei:)` — user-signed action depositing native HYPE to staking. Adds `C_DEPOSIT_TYPES`.
+- `Exchange#c_withdraw(wei:)` — user-signed action withdrawing native HYPE from staking. Adds `C_WITHDRAW_TYPES`.
+- `Exchange#user_portfolio_margin(user:, enabled:)` — user-signed action toggling cross-portfolio-margin mode. Adds `USER_PORTFOLIO_MARGIN_TYPES`.
+- `Exchange#spot_user(opt_out:)` — L1 action toggling spot-dusting opt-out (wraps the wire-shape `toggleSpotDusting` inner object); supports `expires_after`.
+
+### New Info methods
+
+- `Info#gossip_priority_auction_status` — returns the current `gossipPriorityAuctionStatus`.
+
+### Tests
+
+- New integration scripts `scripts/test_18_user_portfolio_margin.rb` and `scripts/test_19_spot_user.rb` wired into `test_all.rb` (not yet in `test_automated.rb`).
+
 ## [1.5.0] - 2026-05-08
 
 ### New Exchange actions
