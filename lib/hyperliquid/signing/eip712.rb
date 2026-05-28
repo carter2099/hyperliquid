@@ -130,6 +130,14 @@ module Hyperliquid
         ]
       }.freeze
 
+      STAKING_LINK_DISABLE_TRADING_USER_TYPES = {
+        'HyperliquidTransaction:StakingLinkDisableTradingUser': [
+          { name: :hyperliquidChain, type: 'string' },
+          { name: :tradingUser, type: 'address' },
+          { name: :nonce, type: 'uint64' }
+        ]
+      }.freeze
+
       MULTI_SIG_TYPES = {
         'HyperliquidTransaction:SendMultiSig': [
           { name: :hyperliquidChain,   type: 'string'  },

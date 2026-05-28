@@ -1017,6 +1017,31 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Permanently disable a linked trading user, locking its funds
+    # (`stakingLinkDisableTradingUser` user-signed action). Sent by the staking user.
+    # After 1 year of locking, funds from the trading user are automatically transferred
+    # to the staking user. **This action is irreversible.** The `trading_user` address is
+    # lowercased to match the address-field convention used by other user-signed actions.
+    # @param trading_user [String] Trading user address to disable
+    # @return [Hash] Exchange response
+    def staking_link_disable_trading_user(trading_user:)
+      nonce = timestamp_ms
+      trading_user_lower = trading_user.downcase
+      action = {
+        type: 'stakingLinkDisableTradingUser',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
+        tradingUser: trading_user_lower,
+        nonce: nonce
+      }
+      signature = @signer.sign_user_signed_action(
+        { tradingUser: trading_user_lower, nonce: nonce },
+        'HyperliquidTransaction:StakingLinkDisableTradingUser',
+        Signing::EIP712::STAKING_LINK_DISABLE_TRADING_USER_TYPES
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
     # Move assets between DEX instances on behalf of an agent's principal
     # (`agentSendAsset` L1 action). Unlike `send_asset` (which is user-signed),
     # this is signed by an agent and the destination must equal the agent's
@@ -1230,6 +1255,104 @@ module Hyperliquid
     def reserve_request_weight(weight:)
       nonce = timestamp_ms
       action = { type: 'reserveRequestWeight', weight: weight }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # HIP-4: split `amount` quote tokens into `amount` Yes and `amount` No shares
+    # of an outcome (`userOutcome` L1 action, splitOutcome variant).
+    # @param outcome [Integer] Outcome identifier
+    # @param amount [String, Numeric] Amount of quote tokens to split (UnsignedDecimal, coerced via to_s)
+    # @return [Hash] Exchange response
+    def split_outcome(outcome:, amount:)
+      nonce = timestamp_ms
+      action = {
+        type: 'userOutcome',
+        splitOutcome: { outcome: outcome, amount: amount.to_s }
+      }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # HIP-4: merge `amount` Yes and `amount` No shares of an outcome back into
+    # `amount` quote tokens (`userOutcome` L1 action, mergeOutcome variant).
+    # Pass `amount: nil` to merge the maximum available.
+    # @param outcome [Integer] Outcome identifier
+    # @param amount [String, Numeric, nil] Amount of shares to merge; nil = maximum available
+    # @return [Hash] Exchange response
+    def merge_outcome(outcome:, amount: nil)
+      nonce = timestamp_ms
+      action = {
+        type: 'userOutcome',
+        mergeOutcome: { outcome: outcome, amount: amount&.to_s }
+      }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # HIP-4: merge `amount` Yes shares from every outcome of a question into
+    # `amount` quote tokens (`userOutcome` L1 action, mergeQuestion variant).
+    # Pass `amount: nil` to merge the maximum available.
+    # @param question [Integer] Question identifier
+    # @param amount [String, Numeric, nil] Amount of shares to merge; nil = maximum available
+    # @return [Hash] Exchange response
+    def merge_question(question:, amount: nil)
+      nonce = timestamp_ms
+      action = {
+        type: 'userOutcome',
+        mergeQuestion: { question: question, amount: amount&.to_s }
+      }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # HIP-4: convert `amount` No shares from one outcome of a question into
+    # `amount` Yes shares of every other outcome associated with that question
+    # (`userOutcome` L1 action, negateOutcome variant).
+    # @param question [Integer] Question identifier
+    # @param outcome [Integer] Outcome identifier whose No shares are being negated
+    # @param amount [String, Numeric] Amount of No shares to negate (UnsignedDecimal, coerced via to_s)
+    # @return [Hash] Exchange response
+    def negate_outcome(question:, outcome:, amount:)
+      nonce = timestamp_ms
+      action = {
+        type: 'userOutcome',
+        negateOutcome: { question: question, outcome: outcome, amount: amount.to_s }
+      }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Finalize the link between a HyperCore spot token and an ERC-20 contract on
+    # HyperEVM (`finalizeEvmContract` L1 action). `input` selects the verification method
+    # and is passed through verbatim — accepts a Hash `{ create: { nonce: <int> } }` for an
+    # EOA-deployed contract, or one of the strings `"firstStorageSlot"` / `"customStorageSlot"`
+    # for contracts that store the finalizer address in a known storage slot.
+    # @param token [Integer] HyperCore spot token identifier to link
+    # @param input [Hash, String] Verification method (see above)
+    # @return [Hash] Exchange response
+    def finalize_evm_contract(token:, input:)
+      nonce = timestamp_ms
+      action = {
+        type: 'finalizeEvmContract',
+        token: token,
+        input: input
+      }
       signature = @signer.sign_l1_action(
         action, nonce,
         expires_after: @expires_after

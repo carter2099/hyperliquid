@@ -3286,6 +3286,204 @@ RSpec.describe Hyperliquid::Exchange do
     end
   end
 
+  describe 'HIP-4 userOutcome variants' do
+    let(:outcome_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    describe '#split_outcome' do
+      it 'sends userOutcome with splitOutcome inner shape and string amount' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            action = body['action']
+            action['type'] == 'userOutcome' &&
+              action['splitOutcome'] == { 'outcome' => 0, 'amount' => '1' } &&
+              body['signature'].is_a?(Hash) &&
+              !body.key?('vaultAddress')
+          end
+          .to_return(status: 200, body: outcome_response.to_json)
+
+        result = exchange.split_outcome(outcome: 0, amount: '1')
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'coerces numeric amount to string' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            body['action']['splitOutcome']['amount'] == '2.5'
+          end
+          .to_return(status: 200, body: outcome_response.to_json)
+
+        result = exchange.split_outcome(outcome: 3, amount: 2.5)
+        expect(result['status']).to eq('ok')
+      end
+    end
+
+    describe '#merge_outcome' do
+      it 'sends mergeOutcome with explicit amount as string' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            body['action']['mergeOutcome'] == { 'outcome' => 1, 'amount' => '5' }
+          end
+          .to_return(status: 200, body: outcome_response.to_json)
+
+        result = exchange.merge_outcome(outcome: 1, amount: 5)
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'passes amount as null when omitted (maximum available)' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            inner = body['action']['mergeOutcome']
+            inner['outcome'] == 2 && inner['amount'].nil?
+          end
+          .to_return(status: 200, body: outcome_response.to_json)
+
+        result = exchange.merge_outcome(outcome: 2)
+        expect(result['status']).to eq('ok')
+      end
+    end
+
+    describe '#merge_question' do
+      it 'sends mergeQuestion with explicit amount as string' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            body['action']['mergeQuestion'] == { 'question' => 7, 'amount' => '1.25' }
+          end
+          .to_return(status: 200, body: outcome_response.to_json)
+
+        result = exchange.merge_question(question: 7, amount: '1.25')
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'passes amount as null when omitted (maximum available)' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            inner = body['action']['mergeQuestion']
+            inner['question'] == 8 && inner['amount'].nil?
+          end
+          .to_return(status: 200, body: outcome_response.to_json)
+
+        result = exchange.merge_question(question: 8)
+        expect(result['status']).to eq('ok')
+      end
+    end
+
+    describe '#negate_outcome' do
+      it 'sends negateOutcome with question, outcome, and string amount' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            body['action']['negateOutcome'] == {
+              'question' => 4, 'outcome' => 1, 'amount' => '10'
+            }
+          end
+          .to_return(status: 200, body: outcome_response.to_json)
+
+        result = exchange.negate_outcome(question: 4, outcome: 1, amount: 10)
+        expect(result['status']).to eq('ok')
+      end
+    end
+  end
+
+  describe '#finalize_evm_contract' do
+    let(:finalize_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends finalizeEvmContract with create variant input as a Hash' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'finalizeEvmContract' &&
+            action['token'] == 200 &&
+            action['input'] == { 'create' => { 'nonce' => 0 } } &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash) &&
+            !body.key?('vaultAddress')
+        end
+        .to_return(status: 200, body: finalize_response.to_json)
+
+      result = exchange.finalize_evm_contract(token: 200, input: { create: { nonce: 0 } })
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'passes through the firstStorageSlot string variant' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['input'] == 'firstStorageSlot'
+        end
+        .to_return(status: 200, body: finalize_response.to_json)
+
+      result = exchange.finalize_evm_contract(token: 42, input: 'firstStorageSlot')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'passes through the customStorageSlot string variant' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['input'] == 'customStorageSlot'
+        end
+        .to_return(status: 200, body: finalize_response.to_json)
+
+      result = exchange.finalize_evm_contract(token: 99, input: 'customStorageSlot')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'propagates expires_after when set on the exchange' do
+      exchange.expires_after = 1_700_000_000_000
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['expiresAfter'] == 1_700_000_000_000
+        end
+        .to_return(status: 200, body: finalize_response.to_json)
+
+      result = exchange.finalize_evm_contract(token: 1, input: 'firstStorageSlot')
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#staking_link_disable_trading_user' do
+    let(:disable_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+    let(:trading_user) { '0xABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD' }
+
+    it 'sends stakingLinkDisableTradingUser with user-signed envelope and lowercased address' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'stakingLinkDisableTradingUser' &&
+            action['signatureChainId'] == '0x66eee' &&
+            action['hyperliquidChain'] == 'Testnet' &&
+            action['tradingUser'] == trading_user.downcase &&
+            action['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: disable_response.to_json)
+
+      result = exchange.staking_link_disable_trading_user(trading_user: trading_user)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes signature in request' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['signature'].is_a?(Hash) && body['signature']['r']&.start_with?('0x')
+        end
+        .to_return(status: 200, body: disable_response.to_json)
+
+      result = exchange.staking_link_disable_trading_user(trading_user: trading_user)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
   describe '#reserve_request_weight' do
     let(:reserve_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
 
