@@ -2247,6 +2247,36 @@ RSpec.describe Hyperliquid::Exchange do
       )
     end
 
+    it 'normalizes userSetAbstraction long-form abstraction values to wire enum in the L1 payload' do
+      # Python SDK 0.24.0 parity: when wrapping userSetAbstraction in multi_sig, the
+      # human-readable abstraction string ("disabled"/"unifiedAccount"/"portfolioMargin")
+      # must be translated to the wire enum ("i"/"u"/"p") in the payload sent to /exchange.
+      # Co-signers separately sign the long-form action — that part is unaffected.
+      inner = {
+        type: 'userSetAbstraction',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: 'Testnet',
+        user: '0x3b4d2cc2e144a0044002506c8b44508e9ace82e9',
+        abstraction: 'disabled',
+        nonce: 1_780_130_409_592
+      }
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          payload_action = body['action']['payload']['action']
+          payload_action['type'] == 'userSetAbstraction' &&
+            payload_action['abstraction'] == 'i'
+        end
+        .to_return(status: 200, body: multi_sig_response.to_json)
+
+      result = exchange.multi_sig(
+        multi_sig_user: multi_sig_user,
+        inner_action: inner,
+        signatures: []
+      )
+      expect(result['status']).to eq('ok')
+    end
+
     it 'propagates vault_address into the wire payload' do
       stub_request(:post, exchange_endpoint)
         .with do |req|
