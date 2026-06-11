@@ -166,6 +166,13 @@ RSpec.describe Hyperliquid::Signing::EIP712 do
       expect(fields.map { |f| f[:type] }).to eq(%w[string uint64 uint64])
     end
 
+    it 'defines STAKING_LINK_DISABLE_TRADING_USER_TYPES with correct fields and types' do
+      types = described_class::STAKING_LINK_DISABLE_TRADING_USER_TYPES
+      fields = types[:'HyperliquidTransaction:StakingLinkDisableTradingUser']
+      expect(fields.map { |f| f[:name] }).to eq(%i[hyperliquidChain tradingUser nonce])
+      expect(fields.map { |f| f[:type] }).to eq(%w[string address uint64])
+    end
+
     it 'defines SEND_TO_EVM_WITH_DATA_TYPES with correct fields and types' do
       types = described_class::SEND_TO_EVM_WITH_DATA_TYPES
       fields = types[:'HyperliquidTransaction:SendToEvmWithData']

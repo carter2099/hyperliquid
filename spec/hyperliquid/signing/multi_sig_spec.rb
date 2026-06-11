@@ -32,6 +32,57 @@ RSpec.describe Hyperliquid::Signing::MultiSig do
     end
   end
 
+  describe '.payload_action (userSetAbstraction wire-form normalization)' do
+    it 'translates long-form abstraction "disabled" to wire enum "i"' do
+      action = {
+        type: 'userSetAbstraction',
+        signatureChainId: '0x66eee',
+        hyperliquidChain: 'Testnet',
+        user: '0x3b4d2cc2e144a0044002506c8b44508e9ace82e9',
+        abstraction: 'disabled',
+        nonce: 1_780_130_409_592
+      }
+      result = described_class.payload_action(action)
+      expect(result[:abstraction]).to eq('i')
+      expect(action[:abstraction]).to eq('disabled') # original is not mutated
+    end
+
+    it 'translates "unifiedAccount" → "u" and "portfolioMargin" → "p"' do
+      unified = described_class.payload_action({ type: 'userSetAbstraction', abstraction: 'unifiedAccount' })
+      portfolio = described_class.payload_action({ type: 'userSetAbstraction', abstraction: 'portfolioMargin' })
+      expect(unified[:abstraction]).to eq('u')
+      expect(portfolio[:abstraction]).to eq('p')
+    end
+
+    it 'passes through wire enum values unchanged' do
+      %w[i u p].each do |code|
+        result = described_class.payload_action({ type: 'userSetAbstraction', abstraction: code })
+        expect(result[:abstraction]).to eq(code)
+      end
+    end
+
+    it 'passes through non-userSetAbstraction actions unchanged' do
+      action = { type: 'order', orders: [], grouping: 'na' }
+      expect(described_class.payload_action(action)).to equal(action)
+    end
+
+    it 'handles string-keyed inner actions (e.g. parsed from JSON)' do
+      action = { 'type' => 'userSetAbstraction', 'abstraction' => 'disabled' }
+      result = described_class.payload_action(action)
+      expect(result['abstraction']).to eq('i')
+    end
+
+    it 'build_envelope routes userSetAbstraction inner action through wire-form normalization' do
+      envelope = described_class.build_envelope(
+        inner_action: { type: 'userSetAbstraction', abstraction: 'disabled', user: '0x1' },
+        multi_sig_user: '0x0000000000000000000000000000000000000005',
+        outer_signer: '0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A',
+        signatures: []
+      )
+      expect(envelope[:payload][:action][:abstraction]).to eq('i')
+    end
+  end
+
   describe '.envelope_action_hash' do
     it 'matches Python SDK byte-parity for the multi-sig envelope (Fixture A: empty signatures + noop inner)' do
       envelope = described_class.build_envelope(

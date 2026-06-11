@@ -17,6 +17,16 @@ module Hyperliquid
     module MultiSig
       OUTER_PRIMARY_TYPE = 'HyperliquidTransaction:SendMultiSig'
 
+      # Wire-format normalization for userSetAbstraction inside multi_sig envelopes.
+      # Each co-signer's EIP-712 hash uses the human-readable abstraction string, but the
+      # L1 payload requires the single-char wire enum. Mirrors Python SDK 0.24.0's
+      # `_multi_sig_payload_action`.
+      USER_SET_ABSTRACTION_WIRE_VALUES = {
+        'disabled' => 'i',
+        'unifiedAccount' => 'u',
+        'portfolioMargin' => 'p'
+      }.freeze
+
       # Build the outer multi-sig envelope (the action body posted to /exchange).
       # @param inner_action [Hash] The wrapped action (any L1 or user-signed action body)
       # @param multi_sig_user [String] Address of the multi-sig user (lowercased)
@@ -31,9 +41,24 @@ module Hyperliquid
           payload: {
             multiSigUser: multi_sig_user.downcase,
             outerSigner: outer_signer.downcase,
-            action: inner_action
+            action: payload_action(inner_action)
           }
         }
+      end
+
+      # Normalize an inner action for the L1 payload. Currently only userSetAbstraction
+      # needs translation (long-form abstraction string → wire enum); all other actions
+      # pass through verbatim.
+      # @param inner_action [Hash] Inner action (symbol or string keys)
+      # @return [Hash] Possibly-normalized copy (or the original if no change needed)
+      def self.payload_action(inner_action)
+        return inner_action unless (inner_action[:type] || inner_action['type']) == 'userSetAbstraction'
+
+        key = inner_action.key?(:abstraction) ? :abstraction : 'abstraction'
+        abstraction = inner_action[key]
+        return inner_action unless USER_SET_ABSTRACTION_WIRE_VALUES.key?(abstraction)
+
+        inner_action.merge(key => USER_SET_ABSTRACTION_WIRE_VALUES[abstraction])
       end
 
       # Compute the multiSigActionHash that the submitter signs over.
