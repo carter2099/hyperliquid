@@ -1365,6 +1365,46 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#settled_outcome' do
+    it 'requests settled outcome information' do
+      expected_response = {
+        'spec' => {
+          'outcome' => 1,
+          'name' => 'Will X happen?',
+          'description' => 'Resolution criteria...',
+          'sideSpecs' => [{ 'name' => 'Yes', 'token' => 42 }, { 'name' => 'No', 'token' => 43 }],
+          'quoteToken' => 'USDC'
+        },
+        'settleFraction' => '0.75',
+        'details' => 'Settled at 75%'
+      }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'settledOutcome', outcome: 1 }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.settled_outcome(outcome: 1)
+      expect(result).to eq(expected_response)
+    end
+
+    it 'returns nil when outcome is not settled' do
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'settledOutcome', outcome: 999 }.to_json)
+        .to_return(status: 200, body: 'null')
+
+      result = info.settled_outcome(outcome: 999)
+      expect(result).to be_nil
+    end
+
+    it 'coerces outcome to integer' do
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'settledOutcome', outcome: 5 }.to_json)
+        .to_return(status: 200, body: 'null')
+
+      info.settled_outcome(outcome: '5')
+    end
+  end
+
   describe '#user_funding' do
     let(:user_address) { '0x1234567890123456789012345678901234567890' }
     let(:start_time) { 1_681_222_254_710 }

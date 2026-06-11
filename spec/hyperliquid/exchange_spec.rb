@@ -3130,6 +3130,75 @@ RSpec.describe Hyperliquid::Exchange do
     end
   end
 
+  describe '#authorize_aqav2_role' do
+    let(:ok_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends authorizeAqav2Role with token and role' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'authorizeAqav2Role' &&
+            action['token'] == 0 &&
+            action['role'] == 'technical' &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.authorize_aqav2_role(token: 0, role: 'technical')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'sends treasury role when role: "treasury"' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['role'] == 'treasury'
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.authorize_aqav2_role(token: 1, role: 'treasury')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'coerces token to integer' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['token'] == 5
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      exchange.authorize_aqav2_role(token: '5', role: 'technical')
+    end
+
+    it 'propagates expires_after when set on the exchange' do
+      exchange.expires_after = 9_999_999_999_999
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['expiresAfter'] == 9_999_999_999_999 &&
+            body.dig('action', 'type') == 'authorizeAqav2Role'
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.authorize_aqav2_role(token: 0, role: 'technical')
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'does not include vaultAddress in the payload' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          !body.key?('vaultAddress')
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      exchange.authorize_aqav2_role(token: 0, role: 'technical')
+    end
+  end
+
   describe '#c_deposit' do
     let(:c_deposit_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
 

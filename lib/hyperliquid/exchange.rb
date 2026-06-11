@@ -1375,6 +1375,20 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Authorize an AQAv2 role (`authorizeAqav2Role` L1 action).
+    # @param token [Integer] Token identifier
+    # @param role [String] Role to authorize ("technical" or "treasury")
+    # @return [Hash] Exchange response
+    def authorize_aqav2_role(token:, role:)
+      nonce = timestamp_ms
+      action = { type: 'authorizeAqav2Role', token: token.to_i, role: role }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!

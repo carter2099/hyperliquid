@@ -515,6 +515,13 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'outcomeMeta' })
     end
 
+    # Retrieve information about a settled outcome
+    # @param outcome [Integer] Outcome identifier
+    # @return [Hash, nil] Hash with spec, settleFraction, and details; or nil if not settled
+    def settled_outcome(outcome:)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'settledOutcome', outcome: outcome.to_i })
+    end
+
     # Retrieve a user's funding history
     # @param user [String]
     # @param start_time [Integer]
