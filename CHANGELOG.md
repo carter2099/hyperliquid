@@ -1,5 +1,22 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [1.7.0] - 2026-06-11
+
+### New Exchange actions
+
+- `Exchange#authorize_aqav2_role(token:, role:)` — L1 action authorizing an AQAv2 role (e.g. `"treasury"`); supports `expires_after`.
+- `Exchange#staking_link_disable_trading_user(trading_user:)` — user-signed action linking a staking account to a trading user (irreversible). Adds `STAKING_LINK_DISABLE_TRADING_USER_TYPES`.
+- `Exchange#finalize_evm_contract(input:)` — L1 action linking a HyperCore spot token to a HyperEVM ERC-20 contract. Accepts a `Hash` (`{create: {nonce:}}`) or string variant (`"firstStorageSlot"` / `"customStorageSlot"`).
+- HIP-4 `userOutcome` variants (L1 actions, not user-signed): `split_outcome(question:, outcome:, amount:)`, `merge_outcome(question:, amount:)`, `merge_question(question:, amount:)`, `negate_outcome(question:, outcome:, amount:)`. `merge_outcome` and `merge_question` accept `amount: nil` for the max-available case.
+
+### New Info methods
+
+- `Info#settled_outcome(outcome:)` — returns settled prediction-market outcome data.
+
+### Fixes
+
+- `Signing::MultiSig.payload_action` now normalizes `userSetAbstraction` long-form abstraction values (`"disabled"`, `"unifiedAccount"`, `"portfolioMargin"`) to their wire enum equivalents (`"i"`, `"u"`, `"p"`) in the L1 payload posted to `/exchange`, matching Python SDK 0.24.0. Pre-translated short codes pass through unchanged.
+
 ## [1.6.0] - 2026-05-26
 
 ### New Exchange actions
