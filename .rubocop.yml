@@ -41,3 +41,9 @@ Metrics/CyclomaticComplexity:
 Metrics/PerceivedComplexity:
   Exclude:
     - 'lib/hyperliquid/exchange.rb'
+    - 'lib/hyperliquid/ws/client.rb'
+
+# Empty blocks are intentional in specs (no-op callbacks for subscription tests)
+Lint/EmptyBlock:
+  Exclude:
+    - 'spec/**/*'
