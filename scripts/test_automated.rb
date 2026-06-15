@@ -23,7 +23,8 @@ SCRIPTS = [
   'test_11_builder_fee.rb',
   'test_13_ws_l2_book.rb',
   'test_14_ws_candle.rb',
-  'test_15_explorer.rb'
+  'test_15_explorer.rb',
+  'test_20_explorer_ws.rb'
 ].freeze
 
 def green(text)
