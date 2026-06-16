@@ -1,5 +1,16 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [1.8.0] - 2026-06-16
+
+### New WebSocket endpoints
+
+- `WS::Client#subscribe_explorer_block` — subscribe to Explorer WebSocket for block notifications. Uses a separate connection, queue, dispatch thread, and ping thread from the main API WebSocket to avoid cross-contamination.
+- `WS::Client#subscribe_explorer_txs` — subscribe to Explorer WebSocket for transaction notifications. Same dual-transport architecture; messages arrive as bare arrays duck-typed by field presence.
+
+### Fixes
+
+- Wired `test_20_explorer_ws` into the automated integration suite (was previously only in `test_all.rb`).
+
 ## [1.7.0] - 2026-06-11
 
 ### New Exchange actions
