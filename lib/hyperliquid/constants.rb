@@ -21,6 +21,10 @@ module Hyperliquid
     WS_PING_INTERVAL = 50        # seconds between pings
     WS_MAX_QUEUE_SIZE = 1024     # max queued messages before dropping
 
+    # Explorer WebSocket URLs (used by subscribe_explorer_block / subscribe_explorer_txs)
+    MAINNET_EXPLORER_WS_URL = 'wss://rpc.hyperliquid.xyz/ws'
+    TESTNET_EXPLORER_WS_URL = 'wss://rpc.hyperliquid-testnet.xyz/ws'
+
     # Request timeouts (seconds)
     DEFAULT_TIMEOUT = 30
     DEFAULT_READ_TIMEOUT = 30

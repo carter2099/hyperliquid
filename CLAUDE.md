@@ -26,12 +26,12 @@ ruby example.rb            # example usage script
 Integration scripts live in `scripts/` as standalone files (`test_NN_<name>.rb`). They require a real testnet private key and hit the live testnet API.
 
 ```bash
-HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_all.rb              # all 14
-HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_automated.rb        # CI-friendly subset
+HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_all.rb              # all 20
+HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_automated.rb        # CI-friendly subset (13)
 HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_08_usd_class_transfer.rb  # single
 ```
 
-`test_automated.rb` is the unattended runner — same as `test_all.rb` but excludes scripts that require manual testnet preconditions (e.g. `test_09_sub_account_lifecycle` needs $100k traded volume; `test_12_staking` needs HYPE balance). Some included tests (e.g. `test_08`, `test_11`) are also coded to skip-with-warning when known testnet preconditions aren't met, so the suite stays green on a stable wallet.
+`test_automated.rb` is the unattended runner — same as `test_all.rb` but excludes scripts that require manual testnet preconditions (e.g. `test_09_sub_account_lifecycle` needs $100k traded volume; `test_12_staking` needs HYPE balance; `test_20_explorer_ws` is new and not yet in automated). Some included tests (e.g. `test_08`, `test_11`) are also coded to skip-with-warning when known testnet preconditions aren't met, so the suite stays green on a stable wallet.
 
 `test_integration.rb` at the project root is a thin convenience wrapper.
 
@@ -51,7 +51,9 @@ Hyperliquid.new(...)
 - **Info path**: method builds `{ type: 'someType', ... }` body → `Client` POSTs to `/info` → parsed JSON returned.
 - **Exchange path**: method builds action payload → `Signer` generates EIP-712 signature over msgpack-encoded action → `Client` POSTs signed payload to `/exchange` → parsed JSON returned.
 - **Explorer RPC path** (`tx_details`, `user_details`): a separate base URL (`rpc.hyperliquid.xyz` / `rpc.hyperliquid-testnet.xyz`) with endpoint `/explorer`. `Client` holds a second Faraday connection for this, built lazily on first use; methods opt in via `client.post(EXPLORER_ENDPOINT, body, target: :explorer)`. The SDK wires this up automatically based on `testnet:`. Calling `target: :explorer` on a `Client` constructed without `explorer_base_url:` raises `ConfigurationError`. Don't add a public connection accessor — `target:` is the contract.
-- **WebSocket path**: `WS::Client` manages a persistent WSS connection with subscription tracking, automatic reconnection (exp backoff, 30s cap), 50s ping keepalive, and a bounded message queue (1024, drops oldest on overflow). Subscriptions are identified by a canonical key and dispatched via callbacks on a dedicated thread.
+- **WebSocket path**: `WS::Client` manages two independent WebSocket connections:
+  - **Main API WS** (`wss://api.hyperliquid.xyz/ws`): subscribes to market data channels (`l2Book`, `trades`, `candle`, etc.). Messages arrive as `{channel, data}` envelopes; `compute_identifier` extracts routing keys (e.g. `l2Book:eth`, `candle:btc:1h`). Callbacks are dispatched via a bounded queue (1024, drops on overflow) on a dedicated thread.
+  - **Explorer WS** (`wss://rpc.hyperliquid.xyz/ws`): subscribes to block/transaction streams (`explorerBlock`, `explorerTxs`). Messages arrive as **bare arrays** (no envelope), so `identify_explorer_array` duck-types by field presence (`blockTime`/`height` for blocks, `action`/`hash` for txs). Uses a separate queue, dispatch thread, and subscription ID namespace to avoid cross-contamination with main-API WS. Both connections share the same 50s ping keepalive, automatic reconnection (exp backoff, 30s cap), and lifecycle hooks (`on(:open)`, `on(:close)`, `on(:error)`).
 
 ### Signing (Python SDK Parity)
 
@@ -79,13 +81,13 @@ Many Info methods accept a `dex:` kwarg (e.g. `meta(dex: 'foo')`, `user_state(us
 
 ### Testing
 
-- **Unit tests** (`spec/`): RSpec + WebMock. WebMock resets between tests. Monkey-patching disabled. Test files mirror `lib/` structure. No live HTTP calls in unit tests.
-- **Integration tests** (`scripts/`): run against testnet with a real private key. Each script is self-contained. Helpers (separators, status dumping, retry-on-oracle-bounce) live in `scripts/test_helpers.rb`.
+- **Unit tests** (`spec/`): RSpec + WebMock. WebMock resets between tests. Monkey-patching disabled. Test files mirror `lib/` structure. No live HTTP calls in unit tests. The WS client spec (`spec/hyperliquid/ws/client_spec.rb`) includes comprehensive isolation tests verifying that explorer WS messages never route to main-API callbacks and vice versa — this is critical because the two transports share the same `WS::Client` class.
+- **Integration tests** (`scripts/`): run against testnet with a real private key. Each script is self-contained. Helpers (separators, status dumping, retry-on-oracle-bounce) live in `scripts/test_helpers.rb`. `test_20_explorer_ws.rb` subscribes to `explorerBlock` on testnet and collects 3 block events (60s timeout) to verify the explorer WS transport works end-to-end.
 - **`dump_status` / `check_result` helpers** in `test_helpers.rb` must guard against `result['response']` *itself* being a String for transfer-style actions (`usdClassTransfer`, `approveBuilderFee`) — not just `result['response']['data']`. This was a real bug fixed in 1.1.0; preserve the guards if refactoring those helpers.
 
 ### Code Style
 
-RuboCop targets Ruby 3.3. Key relaxations: methods up to 50 lines, no class length limit (Info/Exchange are large by design), no block length limit in specs, no parameter list limit in Exchange. `scripts/`, `test_*.rb`, `local/`, and `vendor/` are excluded from linting.
+RuboCop targets Ruby 3.3. Key relaxations: methods up to 50 lines, no class length limit (Info/Exchange are large by design), no block length limit in specs, no parameter list limit in Exchange, empty blocks allowed in specs (intentional no-op callbacks). `scripts/`, `test_*.rb`, `local/`, and `vendor/` are excluded from linting. The WS client's `initialize` method was refactored to extract `init_main_ws_state` and `init_explorer_ws_state` helpers to reduce ABC size (33 assignments across two transports).
 
 Predicate methods follow Ruby style (`vip?`, `connected?`, `testnet?`) — not `is_vip` / `is_connected`. RuboCop's `Naming/PredicateName` enforces this.
 

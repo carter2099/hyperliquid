@@ -58,7 +58,8 @@ module Hyperliquid
       @info = Info.new(client)
       @testnet = testnet
       @exchange = nil
-      @ws = WS::Client.new(testnet: testnet)
+      explorer_ws_url = testnet ? Constants::TESTNET_EXPLORER_WS_URL : Constants::MAINNET_EXPLORER_WS_URL
+      @ws = WS::Client.new(testnet: testnet, explorer_ws_url: explorer_ws_url)
 
       return unless private_key
 
