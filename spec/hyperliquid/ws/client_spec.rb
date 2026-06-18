@@ -83,6 +83,16 @@ RSpec.describe Hyperliquid::WS::Client do
       id = client.subscribe({ 'type' => 'l2Book', 'coin' => 'ETH' }, &noop)
       expect(id).to be_a(Integer)
     end
+
+    it 'passes through fast parameter for l2Book subscription' do
+      client.instance_variable_set(:@connected, true)
+      client.instance_variable_set(:@ws, mock_ws)
+
+      expected_msg = JSON.generate({ method: 'subscribe', subscription: { type: 'l2Book', coin: 'ETH', fast: true } })
+      expect(mock_ws).to receive(:send).with(expected_msg)
+
+      client.subscribe({ type: 'l2Book', coin: 'ETH', fast: true }, &noop)
+    end
   end
 
   describe '#unsubscribe' do

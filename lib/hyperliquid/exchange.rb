@@ -144,13 +144,17 @@ module Hyperliquid
     # @param coin [String] Asset symbol
     # @param oid [Integer] Order ID
     # @param vault_address [String, nil] Vault address for vault trading (optional)
+    # @param fast [Boolean, nil] Whether to use fast cancel (optional)
     # @return [Hash] Cancel response
-    def cancel(coin:, oid:, vault_address: nil)
+    def cancel(coin:, oid:, vault_address: nil, fast: nil)
       nonce = timestamp_ms
+
+      cancel_entry = { a: asset_index(coin), o: oid }
+      cancel_entry[:f] = true if fast
 
       action = {
         type: 'cancel',
-        cancels: [{ a: asset_index(coin), o: oid }]
+        cancels: [cancel_entry]
       }
 
       signature = @signer.sign_l1_action(
@@ -165,14 +169,18 @@ module Hyperliquid
     # @param coin [String] Asset symbol
     # @param cloid [Cloid, String] Client order ID
     # @param vault_address [String, nil] Vault address for vault trading (optional)
+    # @param fast [Boolean, nil] Whether to use fast cancel (optional)
     # @return [Hash] Cancel response
-    def cancel_by_cloid(coin:, cloid:, vault_address: nil)
+    def cancel_by_cloid(coin:, cloid:, vault_address: nil, fast: nil)
       nonce = timestamp_ms
       cloid_raw = normalize_cloid(cloid)
 
+      cancel_entry = { asset: asset_index(coin), cloid: cloid_raw }
+      cancel_entry[:f] = true if fast
+
       action = {
         type: 'cancelByCloid',
-        cancels: [{ asset: asset_index(coin), cloid: cloid_raw }]
+        cancels: [cancel_entry]
       }
 
       signature = @signer.sign_l1_action(
@@ -233,15 +241,17 @@ module Hyperliquid
     # @param reduce_only [Boolean] Reduce-only flag (default: false)
     # @param cloid [Cloid, String, nil] Client order ID for the modified order (optional)
     # @param vault_address [String, nil] Vault address for vault trading (optional)
+    # @param always_place [Boolean, nil] Always place the order even if cancel fails (optional)
     # @return [Hash] Modify response
     def modify_order(oid:, coin:, is_buy:, size:, limit_px:,
                      order_type: { limit: { tif: 'Gtc' } },
-                     reduce_only: false, cloid: nil, vault_address: nil)
+                     reduce_only: false, cloid: nil, vault_address: nil, always_place: nil)
       batch_modify(
         modifies: [{
           oid: oid, coin: coin, is_buy: is_buy, size: size,
           limit_px: limit_px, order_type: order_type,
-          reduce_only: reduce_only, cloid: cloid
+          reduce_only: reduce_only, cloid: cloid,
+          always_place: always_place
         }],
         vault_address: vault_address
       )
@@ -249,7 +259,7 @@ module Hyperliquid
 
     # Modify multiple orders at once
     # @param modifies [Array<Hash>] Array of modify hashes with keys:
-    #   :oid, :coin, :is_buy, :size, :limit_px, :order_type, :reduce_only, :cloid
+    #   :oid, :coin, :is_buy, :size, :limit_px, :order_type, :reduce_only, :cloid, :always_place
     # @param vault_address [String, nil] Vault address for vault trading (optional)
     # @return [Hash] Batch modify response
     def batch_modify(modifies:, vault_address: nil)
@@ -265,7 +275,9 @@ module Hyperliquid
           reduce_only: m[:reduce_only] || false,
           cloid: m[:cloid]
         )
-        { oid: normalize_oid(m[:oid]), order: order_wire }
+        entry = { oid: normalize_oid(m[:oid]), order: order_wire }
+        entry[:a] = true if m[:always_place]
+        entry
       end
 
       action = {
