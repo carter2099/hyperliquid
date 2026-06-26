@@ -1,0 +1,24 @@
+# Dependabot version updates for the Hyperliquid Ruby SDK.
+# Two ecosystems: bundler (Gemfile gems) + github-actions (workflow actions).
+# Cooldown policy (per homelab convention): 14-day default cooldown so freshly
+# released versions get a soak period before Dependabot opens a PR; major-version
+# bumps on bundler gems get an extended 30-day cooldown (highest risk).
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+version: 2
+updates:
+  - package-ecosystem: "bundler"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    cooldown:
+      default-days: 14
+      semver-major-days: 30
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    cooldown:
+      default-days: 14
