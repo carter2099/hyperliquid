@@ -1200,6 +1200,48 @@ RSpec.describe Hyperliquid::Exchange do
       result = exchange.usd_class_transfer(amount: 50, to_perp: false)
       expect(result['status']).to eq('ok')
     end
+
+    context 'with sub_account (TS SDK v0.33.1 amount union)' do
+      let(:sub_account_addr) { '0x1234567890123456789012345678901234567890' }
+
+      it 'appends the ` subaccount:<address>` suffix to the signed amount' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            action = body['action']
+            action['type'] == 'usdClassTransfer' &&
+              action['amount'] == '100 subaccount:0x1234567890123456789012345678901234567890' &&
+              action['toPerp'] == true
+          end
+          .to_return(status: 200, body: transfer_response.to_json)
+
+        result = exchange.usd_class_transfer(amount: 100, to_perp: true, sub_account: sub_account_addr)
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'passes the sub-account address through verbatim (no lowercasing)' do
+        mixed_case = '0xAbCdef0123456789AbCdEf0123456789AbCdEf01'
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            body['action']['amount'] == "5 subaccount:#{mixed_case}"
+          end
+          .to_return(status: 200, body: transfer_response.to_json)
+
+        exchange.usd_class_transfer(amount: 5, to_perp: false, sub_account: mixed_case)
+      end
+
+      it 'leaves the amount plain when sub_account is omitted (default nil)' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            body['action']['amount'] == '100' && !body['action']['amount'].to_s.include?('subaccount')
+          end
+          .to_return(status: 200, body: transfer_response.to_json)
+
+        exchange.usd_class_transfer(amount: 100, to_perp: true)
+      end
+    end
   end
 
   describe '#withdraw_from_bridge' do

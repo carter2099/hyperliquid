@@ -432,19 +432,25 @@ module Hyperliquid
     # Move USDC between perp and spot accounts
     # @param amount [String, Numeric] Amount to transfer
     # @param to_perp [Boolean] True to move to perp, false to move to spot
+    # @param sub_account [String, nil] Optional sub-account address (0x-prefixed hex).
+    #   When provided, the transfer targets the sub-account rather than the
+    #   master account; the suffix ` subaccount:<address>` is appended to the
+    #   signed amount string (mirrors TS SDK v0.33.1's amount union shape).
     # @return [Hash] Transfer response
-    def usd_class_transfer(amount:, to_perp:)
+    def usd_class_transfer(amount:, to_perp:, sub_account: nil)
       nonce = timestamp_ms
+      amount_str = amount.to_s
+      amount_str = "#{amount_str} subaccount:#{sub_account}" if sub_account
       action = {
         type: 'usdClassTransfer',
         signatureChainId: '0x66eee',
         hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
-        amount: amount.to_s,
+        amount: amount_str,
         toPerp: to_perp,
         nonce: nonce
       }
       signature = @signer.sign_user_signed_action(
-        { amount: amount.to_s, toPerp: to_perp, nonce: nonce },
+        { amount: amount_str, toPerp: to_perp, nonce: nonce },
         'HyperliquidTransaction:UsdClassTransfer',
         Signing::EIP712::USD_CLASS_TRANSFER_TYPES
       )
