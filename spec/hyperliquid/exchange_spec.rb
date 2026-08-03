@@ -3646,6 +3646,62 @@ RSpec.describe Hyperliquid::Exchange do
     end
   end
 
+  describe '#activate_outcome_deployer' do
+    let(:ok_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends activateOutcomeDeployer with isDeactivate: false to activate' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['type'] == 'activateOutcomeDeployer' &&
+            body['action']['isDeactivate'] == false &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.activate_outcome_deployer(is_deactivate: false)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'sends activateOutcomeDeployer with isDeactivate: true to deactivate' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['isDeactivate'] == true
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.activate_outcome_deployer(is_deactivate: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'does not include vaultAddress in the payload' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          !body.key?('vaultAddress')
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      exchange.activate_outcome_deployer(is_deactivate: false)
+    end
+
+    it 'propagates expires_after when set on the exchange' do
+      exchange.expires_after = 9_999_999_999_999
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['expiresAfter'] == 9_999_999_999_999 &&
+            body.dig('action', 'type') == 'activateOutcomeDeployer'
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.activate_outcome_deployer(is_deactivate: false)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
   describe '#finalize_evm_contract' do
     let(:finalize_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
 

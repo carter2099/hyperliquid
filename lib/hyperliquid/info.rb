@@ -522,6 +522,20 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'settledOutcome', outcome: outcome.to_i })
     end
 
+    # Retrieve outcome templates for HIP-4 prediction market deployers
+    # @return [Array<Hash>] Array of templates, each with id, role (standaloneOutcome
+    #   with sideNames), name, description (both with {keyword} placeholders), and
+    #   keywords (array of [name, type] where type is "dateTime", "date", "string", or "hlPerp")
+    def outcome_templates
+      @client.post(Constants::INFO_ENDPOINT, { type: 'outcomeTemplates' })
+    end
+
+    # Retrieve USDC transfer routing configuration
+    # @return [Hash] Hash with depositRoute and withdrawalRoute, each "bridge" or "cctp"
+    def usdc_routing
+      @client.post(Constants::INFO_ENDPOINT, { type: 'usdcRouting' })
+    end
+
     # Retrieve a user's funding history
     # @param user [String]
     # @param start_time [Integer]

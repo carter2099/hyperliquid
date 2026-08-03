@@ -1405,6 +1405,40 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#outcome_templates' do
+    it 'requests outcome templates for HIP-4 deployers' do
+      expected_response = [
+        {
+          'id' => 'standalone',
+          'role' => { 'standaloneOutcome' => { 'sideNames' => %w[Yes No] } },
+          'name' => 'Will {event} happen?',
+          'description' => 'Resolves based on {criteria}',
+          'keywords' => [%w[event string], %w[criteria string]]
+        }
+      ]
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'outcomeTemplates' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.outcome_templates
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#usdc_routing' do
+    it 'requests USDC transfer routing configuration' do
+      expected_response = { 'depositRoute' => 'bridge', 'withdrawalRoute' => 'cctp' }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'usdcRouting' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.usdc_routing
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#user_funding' do
     let(:user_address) { '0x1234567890123456789012345678901234567890' }
     let(:start_time) { 1_681_222_254_710 }

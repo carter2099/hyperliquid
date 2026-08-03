@@ -1356,6 +1356,20 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Activate or deactivate the signer as an outcome deployer
+    # (`activateOutcomeDeployer` L1 action, HIP-4).
+    # @param is_deactivate [Boolean] True to deactivate, false to activate
+    # @return [Hash] Exchange response
+    def activate_outcome_deployer(is_deactivate:)
+      nonce = timestamp_ms
+      action = { type: 'activateOutcomeDeployer', isDeactivate: is_deactivate }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
     # Finalize the link between a HyperCore spot token and an ERC-20 contract on
     # HyperEVM (`finalizeEvmContract` L1 action). `input` selects the verification method
     # and is passed through verbatim — accepts a Hash `{ create: { nonce: <int> } }` for an
