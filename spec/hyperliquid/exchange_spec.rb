@@ -3504,6 +3504,40 @@ RSpec.describe Hyperliquid::Exchange do
       )
       expect(result['status']).to eq('ok')
     end
+
+    it 'passes the details field through verbatim when provided' do
+      details = { 't' => { 'p' => '100.5', 'a' => true }, 's' => '95' }
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'twapOrder' &&
+            action['details'] == { 't' => { 'p' => '100.5', 'a' => true }, 's' => '95' }
+        end
+        .to_return(status: 200, body: twap_order_response.to_json)
+
+      result = exchange.twap_order(
+        coin: 'ETH', is_buy: true, size: '1', reduce_only: false, minutes: 10, randomize: true,
+        details: details
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'accepts nil trigger and stop price (details with nulls)' do
+      details = { 't' => nil, 's' => nil }
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['details'] == { 't' => nil, 's' => nil }
+        end
+        .to_return(status: 200, body: twap_order_response.to_json)
+
+      result = exchange.twap_order(
+        coin: 'BTC', is_buy: false, size: '0.5', reduce_only: true, minutes: 5, randomize: false,
+        details: details
+      )
+      expect(result['status']).to eq('ok')
+    end
   end
 
   describe '#twap_cancel' do
@@ -3826,6 +3860,22 @@ RSpec.describe Hyperliquid::Exchange do
         .to_return(status: 200, body: reserve_response.to_json)
 
       result = exchange.reserve_request_weight(weight: 5)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes the destination address when provided' do
+      destination = '0x1234567890123456789012345678901234567890'
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'reserveRequestWeight' &&
+            action['weight'] == 10 &&
+            action['destination'] == destination
+        end
+        .to_return(status: 200, body: reserve_response.to_json)
+
+      result = exchange.reserve_request_weight(weight: 10, destination: destination)
       expect(result['status']).to eq('ok')
     end
   end

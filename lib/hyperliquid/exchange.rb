@@ -1229,8 +1229,9 @@ module Hyperliquid
     # @param minutes [Integer] TWAP duration in minutes (5..1440)
     # @param randomize [Boolean] Randomize order timing
     # @param vault_address [String, nil] Vault address if acting on behalf of a vault
+    # @param details [Hash, nil] Optional trigger/stop price config: { t: { p:, a: } | nil, s: <UnsignedDecimal> | nil }
     # @return [Hash] Exchange response — on success `response.data.status.running.twapId`
-    def twap_order(coin:, is_buy:, size:, reduce_only:, minutes:, randomize:, vault_address: nil)
+    def twap_order(coin:, is_buy:, size:, reduce_only:, minutes:, randomize:, vault_address: nil, details: nil)
       nonce = timestamp_ms
       action = {
         type: 'twapOrder',
@@ -1243,6 +1244,7 @@ module Hyperliquid
           t: randomize
         }
       }
+      action[:details] = details unless details.nil?
       signature = @signer.sign_l1_action(
         action, nonce,
         vault_address: vault_address,
@@ -1269,10 +1271,12 @@ module Hyperliquid
 
     # Reserve additional rate-limited actions for a fee (`reserveRequestWeight` L1 action).
     # @param weight [Integer] Amount of request weight to reserve
+    # @param destination [String, nil] Address of an existing user to reserve the weight for; nil omits the field
     # @return [Hash] Exchange response
-    def reserve_request_weight(weight:)
+    def reserve_request_weight(weight:, destination: nil)
       nonce = timestamp_ms
       action = { type: 'reserveRequestWeight', weight: weight }
+      action[:destination] = destination unless destination.nil?
       signature = @signer.sign_l1_action(
         action, nonce,
         expires_after: @expires_after

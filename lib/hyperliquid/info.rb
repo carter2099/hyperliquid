@@ -375,9 +375,12 @@ module Hyperliquid
 
     # Retrieve the margin requirements table for a given id
     # @param id [Integer] Margin table id
+    # @param dex [String, nil] DEX name (empty string for main dex); nil omits the field
     # @return [Hash] Keys: description (String), marginTiers (Array of { lowerBound, maxLeverage })
-    def margin_table(id)
-      @client.post(Constants::INFO_ENDPOINT, { type: 'marginTable', id: id })
+    def margin_table(id, dex: nil)
+      body = { type: 'marginTable', id: id }
+      body[:dex] = dex unless dex.nil?
+      @client.post(Constants::INFO_ENDPOINT, body)
     end
 
     # Retrieve the vaults a user is leading

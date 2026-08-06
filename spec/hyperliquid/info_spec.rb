@@ -973,6 +973,28 @@ RSpec.describe Hyperliquid::Info do
       result = info.margin_table(1)
       expect(result).to eq(expected_response)
     end
+
+    it 'includes the dex param when provided' do
+      expected_response = { 'description' => 'Dex', 'marginTiers' => [] }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'marginTable', id: 2, dex: 'test' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.margin_table(2, dex: 'test')
+      expect(result).to eq(expected_response)
+    end
+
+    it 'accepts an empty-string dex for the main dex' do
+      expected_response = { 'description' => 'Default', 'marginTiers' => [] }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'marginTable', id: 1, dex: '' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.margin_table(1, dex: '')
+      expect(result).to eq(expected_response)
+    end
   end
 
   describe '#leading_vaults' do
