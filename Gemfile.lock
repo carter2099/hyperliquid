@@ -90,7 +90,7 @@ GEM
     public_suffix (6.0.2)
     racc (1.8.1)
     rainbow (3.1.1)
-    rake (13.3.0)
+    rake (13.4.2)
     rbsecp256k1 (6.0.0)
       mini_portile2 (~> 2.8)
       pkg-config (~> 1.5)
@@ -157,7 +157,7 @@ PLATFORMS
 DEPENDENCIES
   hyperliquid!
   irb
-  rake (~> 13.0)
+  rake (~> 13.4)
   rspec (~> 3.0)
   rubocop (~> 1.21)
   webmock (~> 3.0)
