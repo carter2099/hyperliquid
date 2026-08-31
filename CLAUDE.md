@@ -27,11 +27,11 @@ Integration scripts live in `scripts/` as standalone files (`test_NN_<name>.rb`)
 
 ```bash
 HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_all.rb              # all 20
-HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_automated.rb        # CI-friendly subset (13)
+HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_automated.rb        # CI-friendly subset (14)
 HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_08_usd_class_transfer.rb  # single
 ```
 
-`test_automated.rb` is the unattended runner — same as `test_all.rb` but excludes scripts that require manual testnet preconditions (e.g. `test_09_sub_account_lifecycle` needs $100k traded volume; `test_12_staking` needs HYPE balance; `test_20_explorer_ws` is new and not yet in automated). Some included tests (e.g. `test_08`, `test_11`) are also coded to skip-with-warning when known testnet preconditions aren't met, so the suite stays green on a stable wallet.
+`test_automated.rb` is the unattended runner — same as `test_all.rb` but excludes scripts that require manual testnet preconditions (e.g. `test_09_sub_account_lifecycle` needs $100k traded volume; `test_12_staking` needs HYPE balance). Some included tests (e.g. `test_08`, `test_11`) are also coded to skip-with-warning when known testnet preconditions aren't met, so the suite stays green on a stable wallet.
 
 `test_integration.rb` at the project root is a thin convenience wrapper.
 
@@ -93,7 +93,7 @@ Predicate methods follow Ruby style (`vip?`, `connected?`, `testnet?`) — not `
 
 ### CI
 
-GitHub Actions (`.github/workflows/main.yml`): runs `bundle exec rake` (tests + lint) on the Ruby matrix defined in that workflow, for pushes to `main` and on all PRs. The release workflow creates GitHub releases from `CHANGELOG.md` on version tags.
+GitHub Actions (`.github/workflows/main.yml`): runs `bundle exec rake` (tests + lint) on the Ruby matrix defined in that workflow, for pushes to `main` and on all PRs. The release workflow creates GitHub releases from `CHANGELOG.md` on version tags. Dependabot checks Bundler and GitHub Actions dependencies weekly with a 14-day default cooldown; Bundler major updates use a 30-day cooldown.
 
 ## Release Flow
 

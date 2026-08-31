@@ -1,5 +1,30 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [1.9.0] - 2026-08-31
+
+### New Exchange actions
+
+- `Exchange#activate_outcome_deployer(is_deactivate:)` activates or deactivates a HIP-4 outcome deployer.
+
+### New Info methods
+
+- `Info#outcome_templates` retrieves HIP-4 prediction-market deployer templates.
+- `Info#usdc_routing` retrieves the active USDC deposit and withdrawal routing configuration.
+
+### Extended API support
+
+- Added fast-cancel support to `Exchange#cancel`, `Exchange#cancel_by_cloid`, and `l2Book` WebSocket subscriptions.
+- Added always-place support to individual `Exchange#modify_order` and `Exchange#batch_modify` entries.
+- Added optional sub-account routing to `Exchange#usd_class_transfer`.
+- Added optional trigger and stop-price details to `Exchange#twap_order`.
+- Added optional destination routing to `Exchange#reserve_request_weight`.
+- Added optional DEX selection to `Info#margin_table`.
+
+### Tooling
+
+- Added weekly Dependabot checks for Bundler and GitHub Actions dependencies.
+- Updated the repository Ruby version to 3.4.10.
+
 ## [1.8.0] - 2026-06-16
 
 ### New WebSocket endpoints
