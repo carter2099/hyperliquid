@@ -70,7 +70,7 @@ GEM
     lint_roller (1.1.0)
     logger (1.7.0)
     mini_portile2 (2.8.9)
-    msgpack (1.8.0)
+    msgpack (1.8.4)
     mutex_m (0.3.0)
     net-http (0.6.0)
       uri
