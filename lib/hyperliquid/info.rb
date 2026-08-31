@@ -375,9 +375,12 @@ module Hyperliquid
 
     # Retrieve the margin requirements table for a given id
     # @param id [Integer] Margin table id
+    # @param dex [String, nil] DEX name (empty string for main dex); nil omits the field
     # @return [Hash] Keys: description (String), marginTiers (Array of { lowerBound, maxLeverage })
-    def margin_table(id)
-      @client.post(Constants::INFO_ENDPOINT, { type: 'marginTable', id: id })
+    def margin_table(id, dex: nil)
+      body = { type: 'marginTable', id: id }
+      body[:dex] = dex unless dex.nil?
+      @client.post(Constants::INFO_ENDPOINT, body)
     end
 
     # Retrieve the vaults a user is leading
@@ -520,6 +523,20 @@ module Hyperliquid
     # @return [Hash, nil] Hash with spec, settleFraction, and details; or nil if not settled
     def settled_outcome(outcome:)
       @client.post(Constants::INFO_ENDPOINT, { type: 'settledOutcome', outcome: outcome.to_i })
+    end
+
+    # Retrieve outcome templates for HIP-4 prediction market deployers
+    # @return [Array<Hash>] Array of templates, each with id, role (standaloneOutcome
+    #   with sideNames), name, description (both with {keyword} placeholders), and
+    #   keywords (array of [name, type] where type is "dateTime", "date", "string", or "hlPerp")
+    def outcome_templates
+      @client.post(Constants::INFO_ENDPOINT, { type: 'outcomeTemplates' })
+    end
+
+    # Retrieve USDC transfer routing configuration
+    # @return [Hash] Hash with depositRoute and withdrawalRoute, each "bridge" or "cctp"
+    def usdc_routing
+      @client.post(Constants::INFO_ENDPOINT, { type: 'usdcRouting' })
     end
 
     # Retrieve a user's funding history

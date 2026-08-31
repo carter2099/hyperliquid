@@ -556,6 +556,34 @@ RSpec.describe Hyperliquid::Exchange do
       result = exchange.cancel(coin: 'BTC', oid: 12_345)
       expect(result['status']).to eq('ok')
     end
+
+    it 'supports fast cancel flag' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'cancel' &&
+            action['cancels'][0]['f'] == true
+        end
+        .to_return(status: 200, body: cancel_response.to_json)
+
+      result = exchange.cancel(coin: 'BTC', oid: 12_345, fast: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'omits fast flag when not specified' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'cancel' &&
+            !action['cancels'][0].key?('f')
+        end
+        .to_return(status: 200, body: cancel_response.to_json)
+
+      result = exchange.cancel(coin: 'BTC', oid: 12_345)
+      expect(result['status']).to eq('ok')
+    end
   end
 
   describe '#cancel_by_cloid' do
@@ -596,6 +624,38 @@ RSpec.describe Hyperliquid::Exchange do
         .to_return(status: 200, body: cancel_response.to_json)
 
       result = exchange.cancel_by_cloid(coin: 'BTC', cloid: cloid_str)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'supports fast cancel flag' do
+      cloid = Hyperliquid::Cloid.from_int(123)
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'cancelByCloid' &&
+            action['cancels'][0]['f'] == true
+        end
+        .to_return(status: 200, body: cancel_response.to_json)
+
+      result = exchange.cancel_by_cloid(coin: 'BTC', cloid: cloid, fast: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'omits fast flag when not specified' do
+      cloid = Hyperliquid::Cloid.from_int(123)
+
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'cancelByCloid' &&
+            !action['cancels'][0].key?('f')
+        end
+        .to_return(status: 200, body: cancel_response.to_json)
+
+      result = exchange.cancel_by_cloid(coin: 'BTC', cloid: cloid)
       expect(result['status']).to eq('ok')
     end
   end
@@ -764,6 +824,25 @@ RSpec.describe Hyperliquid::Exchange do
         )
       end.to raise_error(ArgumentError, /oid must be Integer, Cloid, or String/)
     end
+
+    it 'supports always_place flag' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['modifies'][0]['a'] == true
+        end
+        .to_return(status: 200, body: modify_response.to_json)
+
+      result = exchange.modify_order(
+        oid: 12_345,
+        coin: 'BTC',
+        is_buy: true,
+        size: '0.02',
+        limit_px: '96000',
+        always_place: true
+      )
+      expect(result['status']).to eq('ok')
+    end
   end
 
   describe '#batch_modify' do
@@ -840,6 +919,42 @@ RSpec.describe Hyperliquid::Exchange do
       modifies = [
         { oid: 111, coin: 'BTC', is_buy: true, size: '0.01', limit_px: '95000' },
         { oid: cloid, coin: 'ETH', is_buy: false, size: '0.5', limit_px: '3200' }
+      ]
+
+      result = exchange.batch_modify(modifies: modifies)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'supports always_place flag on individual entries' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          modifies = body['action']['modifies']
+          modifies[0]['a'] == true && !modifies[1].key?('a')
+        end
+        .to_return(status: 200, body: batch_modify_response.to_json)
+
+      modifies = [
+        { oid: 111, coin: 'BTC', is_buy: true, size: '0.01', limit_px: '95000', always_place: true },
+        { oid: 222, coin: 'ETH', is_buy: false, size: '0.5', limit_px: '3200' }
+      ]
+
+      result = exchange.batch_modify(modifies: modifies)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'omits always_place flag when not specified' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          modifies = body['action']['modifies']
+          modifies.none? { |m| m.key?('a') }
+        end
+        .to_return(status: 200, body: batch_modify_response.to_json)
+
+      modifies = [
+        { oid: 111, coin: 'BTC', is_buy: true, size: '0.01', limit_px: '95000' },
+        { oid: 222, coin: 'ETH', is_buy: false, size: '0.5', limit_px: '3200' }
       ]
 
       result = exchange.batch_modify(modifies: modifies)
@@ -1084,6 +1199,48 @@ RSpec.describe Hyperliquid::Exchange do
 
       result = exchange.usd_class_transfer(amount: 50, to_perp: false)
       expect(result['status']).to eq('ok')
+    end
+
+    context 'with sub_account (TS SDK v0.33.1 amount union)' do
+      let(:sub_account_addr) { '0x1234567890123456789012345678901234567890' }
+
+      it 'appends the ` subaccount:<address>` suffix to the signed amount' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            action = body['action']
+            action['type'] == 'usdClassTransfer' &&
+              action['amount'] == '100 subaccount:0x1234567890123456789012345678901234567890' &&
+              action['toPerp'] == true
+          end
+          .to_return(status: 200, body: transfer_response.to_json)
+
+        result = exchange.usd_class_transfer(amount: 100, to_perp: true, sub_account: sub_account_addr)
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'passes the sub-account address through verbatim (no lowercasing)' do
+        mixed_case = '0xAbCdef0123456789AbCdEf0123456789AbCdEf01'
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            body['action']['amount'] == "5 subaccount:#{mixed_case}"
+          end
+          .to_return(status: 200, body: transfer_response.to_json)
+
+        exchange.usd_class_transfer(amount: 5, to_perp: false, sub_account: mixed_case)
+      end
+
+      it 'leaves the amount plain when sub_account is omitted (default nil)' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            body = JSON.parse(req.body)
+            body['action']['amount'] == '100' && !body['action']['amount'].to_s.include?('subaccount')
+          end
+          .to_return(status: 200, body: transfer_response.to_json)
+
+        exchange.usd_class_transfer(amount: 100, to_perp: true)
+      end
     end
   end
 
@@ -3347,6 +3504,40 @@ RSpec.describe Hyperliquid::Exchange do
       )
       expect(result['status']).to eq('ok')
     end
+
+    it 'passes the details field through verbatim when provided' do
+      details = { 't' => { 'p' => '100.5', 'a' => true }, 's' => '95' }
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'twapOrder' &&
+            action['details'] == { 't' => { 'p' => '100.5', 'a' => true }, 's' => '95' }
+        end
+        .to_return(status: 200, body: twap_order_response.to_json)
+
+      result = exchange.twap_order(
+        coin: 'ETH', is_buy: true, size: '1', reduce_only: false, minutes: 10, randomize: true,
+        details: details
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'accepts nil trigger and stop price (details with nulls)' do
+      details = { 't' => nil, 's' => nil }
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['details'] == { 't' => nil, 's' => nil }
+        end
+        .to_return(status: 200, body: twap_order_response.to_json)
+
+      result = exchange.twap_order(
+        coin: 'BTC', is_buy: false, size: '0.5', reduce_only: true, minutes: 5, randomize: false,
+        details: details
+      )
+      expect(result['status']).to eq('ok')
+    end
   end
 
   describe '#twap_cancel' do
@@ -3489,6 +3680,62 @@ RSpec.describe Hyperliquid::Exchange do
     end
   end
 
+  describe '#activate_outcome_deployer' do
+    let(:ok_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends activateOutcomeDeployer with isDeactivate: false to activate' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['type'] == 'activateOutcomeDeployer' &&
+            body['action']['isDeactivate'] == false &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.activate_outcome_deployer(is_deactivate: false)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'sends activateOutcomeDeployer with isDeactivate: true to deactivate' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action']['isDeactivate'] == true
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.activate_outcome_deployer(is_deactivate: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'does not include vaultAddress in the payload' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          !body.key?('vaultAddress')
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      exchange.activate_outcome_deployer(is_deactivate: false)
+    end
+
+    it 'propagates expires_after when set on the exchange' do
+      exchange.expires_after = 9_999_999_999_999
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['expiresAfter'] == 9_999_999_999_999 &&
+            body.dig('action', 'type') == 'activateOutcomeDeployer'
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.activate_outcome_deployer(is_deactivate: false)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
   describe '#finalize_evm_contract' do
     let(:finalize_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
 
@@ -3613,6 +3860,22 @@ RSpec.describe Hyperliquid::Exchange do
         .to_return(status: 200, body: reserve_response.to_json)
 
       result = exchange.reserve_request_weight(weight: 5)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'includes the destination address when provided' do
+      destination = '0x1234567890123456789012345678901234567890'
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'reserveRequestWeight' &&
+            action['weight'] == 10 &&
+            action['destination'] == destination
+        end
+        .to_return(status: 200, body: reserve_response.to_json)
+
+      result = exchange.reserve_request_weight(weight: 10, destination: destination)
       expect(result['status']).to eq('ok')
     end
   end

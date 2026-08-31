@@ -144,13 +144,17 @@ module Hyperliquid
     # @param coin [String] Asset symbol
     # @param oid [Integer] Order ID
     # @param vault_address [String, nil] Vault address for vault trading (optional)
+    # @param fast [Boolean, nil] Whether to use fast cancel (optional)
     # @return [Hash] Cancel response
-    def cancel(coin:, oid:, vault_address: nil)
+    def cancel(coin:, oid:, vault_address: nil, fast: nil)
       nonce = timestamp_ms
+
+      cancel_entry = { a: asset_index(coin), o: oid }
+      cancel_entry[:f] = true if fast
 
       action = {
         type: 'cancel',
-        cancels: [{ a: asset_index(coin), o: oid }]
+        cancels: [cancel_entry]
       }
 
       signature = @signer.sign_l1_action(
@@ -165,14 +169,18 @@ module Hyperliquid
     # @param coin [String] Asset symbol
     # @param cloid [Cloid, String] Client order ID
     # @param vault_address [String, nil] Vault address for vault trading (optional)
+    # @param fast [Boolean, nil] Whether to use fast cancel (optional)
     # @return [Hash] Cancel response
-    def cancel_by_cloid(coin:, cloid:, vault_address: nil)
+    def cancel_by_cloid(coin:, cloid:, vault_address: nil, fast: nil)
       nonce = timestamp_ms
       cloid_raw = normalize_cloid(cloid)
 
+      cancel_entry = { asset: asset_index(coin), cloid: cloid_raw }
+      cancel_entry[:f] = true if fast
+
       action = {
         type: 'cancelByCloid',
-        cancels: [{ asset: asset_index(coin), cloid: cloid_raw }]
+        cancels: [cancel_entry]
       }
 
       signature = @signer.sign_l1_action(
@@ -233,15 +241,17 @@ module Hyperliquid
     # @param reduce_only [Boolean] Reduce-only flag (default: false)
     # @param cloid [Cloid, String, nil] Client order ID for the modified order (optional)
     # @param vault_address [String, nil] Vault address for vault trading (optional)
+    # @param always_place [Boolean, nil] Always place the order even if cancel fails (optional)
     # @return [Hash] Modify response
     def modify_order(oid:, coin:, is_buy:, size:, limit_px:,
                      order_type: { limit: { tif: 'Gtc' } },
-                     reduce_only: false, cloid: nil, vault_address: nil)
+                     reduce_only: false, cloid: nil, vault_address: nil, always_place: nil)
       batch_modify(
         modifies: [{
           oid: oid, coin: coin, is_buy: is_buy, size: size,
           limit_px: limit_px, order_type: order_type,
-          reduce_only: reduce_only, cloid: cloid
+          reduce_only: reduce_only, cloid: cloid,
+          always_place: always_place
         }],
         vault_address: vault_address
       )
@@ -249,7 +259,7 @@ module Hyperliquid
 
     # Modify multiple orders at once
     # @param modifies [Array<Hash>] Array of modify hashes with keys:
-    #   :oid, :coin, :is_buy, :size, :limit_px, :order_type, :reduce_only, :cloid
+    #   :oid, :coin, :is_buy, :size, :limit_px, :order_type, :reduce_only, :cloid, :always_place
     # @param vault_address [String, nil] Vault address for vault trading (optional)
     # @return [Hash] Batch modify response
     def batch_modify(modifies:, vault_address: nil)
@@ -265,7 +275,9 @@ module Hyperliquid
           reduce_only: m[:reduce_only] || false,
           cloid: m[:cloid]
         )
-        { oid: normalize_oid(m[:oid]), order: order_wire }
+        entry = { oid: normalize_oid(m[:oid]), order: order_wire }
+        entry[:a] = true if m[:always_place]
+        entry
       end
 
       action = {
@@ -420,19 +432,25 @@ module Hyperliquid
     # Move USDC between perp and spot accounts
     # @param amount [String, Numeric] Amount to transfer
     # @param to_perp [Boolean] True to move to perp, false to move to spot
+    # @param sub_account [String, nil] Optional sub-account address (0x-prefixed hex).
+    #   When provided, the transfer targets the sub-account rather than the
+    #   master account; the suffix ` subaccount:<address>` is appended to the
+    #   signed amount string (mirrors TS SDK v0.33.1's amount union shape).
     # @return [Hash] Transfer response
-    def usd_class_transfer(amount:, to_perp:)
+    def usd_class_transfer(amount:, to_perp:, sub_account: nil)
       nonce = timestamp_ms
+      amount_str = amount.to_s
+      amount_str = "#{amount_str} subaccount:#{sub_account}" if sub_account
       action = {
         type: 'usdClassTransfer',
         signatureChainId: '0x66eee',
         hyperliquidChain: Signing::EIP712.hyperliquid_chain(testnet: @testnet),
-        amount: amount.to_s,
+        amount: amount_str,
         toPerp: to_perp,
         nonce: nonce
       }
       signature = @signer.sign_user_signed_action(
-        { amount: amount.to_s, toPerp: to_perp, nonce: nonce },
+        { amount: amount_str, toPerp: to_perp, nonce: nonce },
         'HyperliquidTransaction:UsdClassTransfer',
         Signing::EIP712::USD_CLASS_TRANSFER_TYPES
       )
@@ -1211,8 +1229,9 @@ module Hyperliquid
     # @param minutes [Integer] TWAP duration in minutes (5..1440)
     # @param randomize [Boolean] Randomize order timing
     # @param vault_address [String, nil] Vault address if acting on behalf of a vault
+    # @param details [Hash, nil] Optional trigger/stop price config: { t: { p:, a: } | nil, s: <UnsignedDecimal> | nil }
     # @return [Hash] Exchange response — on success `response.data.status.running.twapId`
-    def twap_order(coin:, is_buy:, size:, reduce_only:, minutes:, randomize:, vault_address: nil)
+    def twap_order(coin:, is_buy:, size:, reduce_only:, minutes:, randomize:, vault_address: nil, details: nil)
       nonce = timestamp_ms
       action = {
         type: 'twapOrder',
@@ -1225,6 +1244,7 @@ module Hyperliquid
           t: randomize
         }
       }
+      action[:details] = details unless details.nil?
       signature = @signer.sign_l1_action(
         action, nonce,
         vault_address: vault_address,
@@ -1251,10 +1271,12 @@ module Hyperliquid
 
     # Reserve additional rate-limited actions for a fee (`reserveRequestWeight` L1 action).
     # @param weight [Integer] Amount of request weight to reserve
+    # @param destination [String, nil] Address of an existing user to reserve the weight for; nil omits the field
     # @return [Hash] Exchange response
-    def reserve_request_weight(weight:)
+    def reserve_request_weight(weight:, destination: nil)
       nonce = timestamp_ms
       action = { type: 'reserveRequestWeight', weight: weight }
+      action[:destination] = destination unless destination.nil?
       signature = @signer.sign_l1_action(
         action, nonce,
         expires_after: @expires_after
@@ -1331,6 +1353,20 @@ module Hyperliquid
         type: 'userOutcome',
         negateOutcome: { question: question, outcome: outcome, amount: amount.to_s }
       }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Activate or deactivate the signer as an outcome deployer
+    # (`activateOutcomeDeployer` L1 action, HIP-4).
+    # @param is_deactivate [Boolean] True to deactivate, false to activate
+    # @return [Hash] Exchange response
+    def activate_outcome_deployer(is_deactivate:)
+      nonce = timestamp_ms
+      action = { type: 'activateOutcomeDeployer', isDeactivate: is_deactivate }
       signature = @signer.sign_l1_action(
         action, nonce,
         expires_after: @expires_after
