@@ -1,5 +1,17 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [1.9.1] - 2026-09-29
+
+### Security
+
+- Updated locked development and CI dependencies to patched releases: faraday 2.14.3, addressable 2.9.0, erb 6.0.1.1, json 2.19.9, msgpack 1.8.5, rexml 3.4.2 and uri 1.0.4. The gem's runtime constraints are unchanged; applications pick up the fixes by updating their own lockfiles.
+- Known remaining advisory: rubyzip GHSA-47m2-wp7j-p9vc (CVE-2026-85396) stays at 2.4.1 because `eth` requires `rbsecp256k1 ~> 6.0`, whose latest release (6.0.0) pins `rubyzip ~> 2.3`. rbsecp256k1 uses rubyzip only at install time, to unpack its SHA-256-pinned libsecp256k1 archive; the SDK never loads rubyzip at runtime.
+
+### Tooling
+
+- Updated RuboCop to 1.91.0, rake to 13.4.2, rspec to 3.13.2, webmock to 3.26.4, irb to 1.18.0 and faraday-retry to 2.4.0.
+- Updated GitHub Actions to `actions/checkout@v7` and `softprops/action-gh-release@v3`.
+
 ## [1.9.0] - 2026-08-31
 
 ### New Exchange actions
