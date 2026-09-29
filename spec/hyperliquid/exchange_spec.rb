@@ -2919,7 +2919,7 @@ RSpec.describe Hyperliquid::Exchange do
             action['fromSubAccount'] == '' &&
             action['nonce'].is_a?(Integer) &&
             action['nonce'] == body['nonce'] &&
-            action.keys.none? { |k| %w[signatureChainId hyperliquidChain].include?(k) } &&
+            !action.keys.intersect?(%w[signatureChainId hyperliquidChain]) &&
             body['signature'].is_a?(Hash)
         end
         .to_return(status: 200, body: agent_send_response.to_json)
