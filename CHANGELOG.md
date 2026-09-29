@@ -1,5 +1,16 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [1.9.2] - 2026-09-29
+
+### Security
+
+- The development and CI lockfile now builds `rbsecp256k1` from the `carter2099/rbsecp256k1` fork (6.1.0, pinned by commit), which allows rubyzip 3.x and bundles libsecp256k1 0.8.0; rubyzip moves from 2.4.1 to 3.7.0, clearing GHSA-47m2-wp7j-p9vc (CVE-2026-85396) for this repository.
+- **Residual exposure for gem consumers:** a gemspec cannot declare git sources, so applications installing the published gem still resolve rubygems `rbsecp256k1` 6.0.0 (via `eth ~> 0.5`), which pins `rubyzip ~> 2.3`. rbsecp256k1 uses rubyzip only at install time, to unpack its SHA-256-pinned libsecp256k1 archive; the SDK never loads rubyzip at runtime. Applications that want rubyzip 3.x now can add the same `gem 'rbsecp256k1', github: 'carter2099/rbsecp256k1', ref: 'bbfe3e346828e39d13aa590cca7cc74f663d2fde'` line to their own Gemfile.
+
+### Release
+
+- 1.9.1 was tagged and has a GitHub Release but was never published to RubyGems; 1.9.2 supersedes it and includes all of its changes.
+
 ## [1.9.1] - 2026-09-29
 
 ### Security
