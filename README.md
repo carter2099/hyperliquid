@@ -24,6 +24,32 @@ Or install it yourself as:
 
     $ gem install hyperliquid
 
+### rubyzip 3 (optional)
+
+This gem signs with [`eth`](https://github.com/q9f/eth.rb), which depends on
+`rbsecp256k1 ~> 6.0`. The latest `rbsecp256k1` on RubyGems (6.0.0) pins `rubyzip ~> 2.3`,
+so your app stays on rubyzip 2.x and scanners report
+[GHSA-47m2-wp7j-p9vc](https://github.com/advisories/GHSA-47m2-wp7j-p9vc) (fixed in rubyzip
+3.4.0).
+
+The practical risk is small. `rbsecp256k1` uses rubyzip only while installing, to unpack
+its libsecp256k1 source archive, which is checked against a pinned SHA-256. Neither this
+SDK nor `eth` loads rubyzip at runtime.
+
+Upstream has merged rubyzip 3 support
+([etscrivner/rbsecp256k1#85](https://github.com/etscrivner/rbsecp256k1/pull/85)), but it
+is not on RubyGems yet. Until that release, you can move to rubyzip 3 by adding the
+maintained fork to your own Gemfile. The fork is version 6.1.0: it allows `rubyzip >= 3.4,
+< 4` and bundles libsecp256k1 0.8.0, and it still satisfies `eth`'s `~> 6.0` requirement.
+
+```ruby
+gem 'hyperliquid'
+gem 'rbsecp256k1', github: 'carter2099/rbsecp256k1', ref: 'bbfe3e346828e39d13aa590cca7cc74f663d2fde'
+```
+
+Then run `bundle update rbsecp256k1 rubyzip`. This SDK's own test suite and CI run against
+that fork.
+
 ## Usage
 
 ### Basic Setup
