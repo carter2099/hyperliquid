@@ -1269,6 +1269,35 @@ module Hyperliquid
       post_action(action, signature, nonce, vault_address)
     end
 
+    # Place a trailing stop order (`trailingStop` L1 action).
+    # @param coin [String] Asset symbol
+    # @param is_buy [Boolean] True for buy/long, false for sell/short
+    # @param size [String, Numeric] Order size (base currency units)
+    # @param reduce_only [Boolean] Reduce-only flag
+    # @param retracement [Hash] Trailing retracement config, passed through verbatim:
+    #   { pct: "<percent String, e.g. '1.234%'>" } or { px: "<price String>" }
+    # @param activation_px [String, nil] Activation price; nil sends null (no activation threshold)
+    # @param vault_address [String, nil] Vault address if acting on behalf of a vault
+    # @return [Hash] Exchange response — on success `response.data.oid`
+    def trailing_stop(coin:, is_buy:, size:, reduce_only:, retracement:, activation_px: nil, vault_address: nil)
+      nonce = timestamp_ms
+      action = {
+        type: 'trailingStop',
+        asset: asset_index(coin),
+        isBuy: is_buy,
+        sz: float_to_wire(size),
+        reduceOnly: reduce_only,
+        retracement: retracement,
+        activationPx: activation_px
+      }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        vault_address: vault_address,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, vault_address)
+    end
+
     # Reserve additional rate-limited actions for a fee (`reserveRequestWeight` L1 action).
     # @param weight [Integer] Amount of request weight to reserve
     # @param destination [String, nil] Address of an existing user to reserve the weight for; nil omits the field

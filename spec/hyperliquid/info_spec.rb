@@ -1448,6 +1448,19 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#outcome_deployer_limits' do
+    it 'requests deployer limits for a HIP-4 outcome venue' do
+      expected_response = { 'nDailyOutcomesRemaining' => 50, 'nActiveOutcomesRemaining' => 14 }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'outcomeDeployerLimits', venue: 'ab' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.outcome_deployer_limits('ab')
+      expect(result).to eq(expected_response)
+    end
+  end
+
   describe '#usdc_routing' do
     it 'requests USDC transfer routing configuration' do
       expected_response = { 'depositRoute' => 'bridge', 'withdrawalRoute' => 'cctp' }

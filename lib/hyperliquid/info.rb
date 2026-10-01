@@ -533,6 +533,13 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'outcomeTemplates' })
     end
 
+    # Retrieve deployer limits for a HIP-4 outcome venue
+    # @param venue [String] HIP-4 deployer venue name (2-4 lowercase ASCII letters)
+    # @return [Hash] Hash with nDailyOutcomesRemaining and nActiveOutcomesRemaining
+    def outcome_deployer_limits(venue)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'outcomeDeployerLimits', venue: venue })
+    end
+
     # Retrieve USDC transfer routing configuration
     # @return [Hash] Hash with depositRoute and withdrawalRoute, each "bridge" or "cctp"
     def usdc_routing

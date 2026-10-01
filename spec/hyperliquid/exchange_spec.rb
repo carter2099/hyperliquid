@@ -3576,6 +3576,70 @@ RSpec.describe Hyperliquid::Exchange do
     end
   end
 
+  describe '#trailing_stop' do
+    let(:trailing_stop_response) do
+      { 'status' => 'ok',
+        'response' => { 'type' => 'trailingStop', 'data' => { 'oid' => 7_773_830_8 } } }
+    end
+
+    it 'sends trailingStop with the documented action shape' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['type'] == 'trailingStop' &&
+            action['asset'] == 1 &&
+            action['isBuy'] == true &&
+            action['sz'] == '1.5' &&
+            action['reduceOnly'] == false &&
+            action['retracement'] == { 'pct' => '1.234%' } &&
+            action['activationPx'].nil? &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: trailing_stop_response.to_json)
+
+      result = exchange.trailing_stop(
+        coin: 'ETH', is_buy: true, size: '1.5', reduce_only: false, retracement: { pct: '1.234%' }
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'normalizes numeric size and passes px retracement and activation_px through' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          action = body['action']
+          action['sz'] == '0.5' &&
+            action['retracement'] == { 'px' => '3500' } &&
+            action['activationPx'] == '3600'
+        end
+        .to_return(status: 200, body: trailing_stop_response.to_json)
+
+      result = exchange.trailing_stop(
+        coin: 'BTC', is_buy: false, size: 0.5, reduce_only: true,
+        retracement: { px: '3500' }, activation_px: '3600'
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'propagates vault_address into the payload' do
+      vault = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['vaultAddress'] == vault
+        end
+        .to_return(status: 200, body: trailing_stop_response.to_json)
+
+      result = exchange.trailing_stop(
+        coin: 'ETH', is_buy: true, size: '1', reduce_only: false,
+        retracement: { pct: '1%' }, vault_address: vault
+      )
+      expect(result['status']).to eq('ok')
+    end
+  end
+
   describe 'HIP-4 userOutcome variants' do
     let(:outcome_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
 
