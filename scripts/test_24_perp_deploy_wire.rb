@@ -73,4 +73,33 @@ check_wire('perp_deploy_disable_dex') do
   sdk.exchange.perp_deploy_disable_dex(dex: dex)
 end
 
+check_wire('perp_deploy_set_funding_multipliers') do
+  sdk.exchange.perp_deploy_set_funding_multipliers(multipliers: { coin => '1' })
+end
+
+check_wire('perp_deploy_set_funding_interest_rates') do
+  sdk.exchange.perp_deploy_set_funding_interest_rates(rates: { coin => '0' })
+end
+
+check_wire('perp_deploy_set_funding_clamps') do
+  sdk.exchange.perp_deploy_set_funding_clamps(clamps: { coin => '0.0003' })
+end
+
+check_wire('perp_deploy_insert_margin_table') do
+  sdk.exchange.perp_deploy_insert_margin_table(dex: dex, description: 'wire',
+                                               margin_tiers: [{ lower_bound: 0, max_leverage: 10 }])
+end
+
+check_wire('perp_deploy_set_margin_table_ids') do
+  sdk.exchange.perp_deploy_set_margin_table_ids(margin_table_ids: { coin => 10 })
+end
+
+check_wire('perp_deploy_set_margin_modes') do
+  sdk.exchange.perp_deploy_set_margin_modes(margin_modes: { coin => 'noCross' })
+end
+
+check_wire('perp_deploy_set_open_interest_caps') do
+  sdk.exchange.perp_deploy_set_open_interest_caps(caps: { coin => 1_000_000 })
+end
+
 test_passed('Test 24 perp_deploy wire check')

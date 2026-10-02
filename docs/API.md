@@ -226,7 +226,14 @@ HIP-3 deployer actions: each method signs one variant of the `perpDeploy` L1 act
 - `perp_deploy_register_asset(dex:, coin:, sz_decimals:, oracle_px:, margin_table_id:, only_isolated:, max_gas: nil, schema: nil)` - Register an asset (legacy `registerAsset`, Python SDK parity); `max_gas: nil` bids the current auction price; `schema: { full_name:, collateral_token:, oracle_updater: nil }` also creates the dex on its first registration (`oracle_updater` is lowercased; an optional `is_star:` key is passed through)
 - `perp_deploy_register_asset2(dex:, coin:, sz_decimals:, oracle_px:, margin_table_id:, margin_mode:, max_gas: nil, schema: nil)` - Register an asset with `margin_mode:` `'strictIsolated'`, `'noCross'` or `'normal'` (`registerAsset2`); other arguments as `perp_deploy_register_asset`
 - `perp_deploy_set_oracle(dex:, oracle_pxs:, all_mark_pxs:, external_perp_pxs:)` - Push prices: `oracle_pxs` and `external_perp_pxs` are `{ coin => price }` (`external_perp_pxs` must cover every asset); `all_mark_pxs` is an Array of 0-2 such Hashes; at most one call per 2.5s
+- `perp_deploy_set_funding_multipliers(multipliers:)` - Set funding multipliers: `{ coin => multiplier }` (0-10)
+- `perp_deploy_set_funding_interest_rates(rates:)` - Set 8h funding interest rates: `{ coin => rate }` (-0.01 to 0.01)
+- `perp_deploy_set_funding_clamps(clamps:)` - Set 8h funding clamps: `{ coin => clamp }` (0 to 0.01; default 0.0003)
 - `perp_deploy_halt_trading(coin:, is_halted:)` - Halt (`true`) or resume (`false`) trading on an asset
+- `perp_deploy_insert_margin_table(dex:, description:, margin_tiers:)` - Insert a margin table; `margin_tiers` is an Array of up to 3 `{ lower_bound:, max_leverage: }` Hashes (`lower_bound` in 1e-6 collateral units, `max_leverage` 1-50), sent in the given order
+- `perp_deploy_set_margin_table_ids(margin_table_ids:)` - Assign margin tables: `{ coin => margin_table_id }` (non-zero Integer ids)
+- `perp_deploy_set_margin_modes(margin_modes:)` - Set margin modes: `{ coin => mode }` with `'strictIsolated'`, `'noCross'` or `'normal'`
+- `perp_deploy_set_open_interest_caps(caps:)` - Set open interest caps: `{ coin => cap }` in 1e-6 collateral units (at least 1_000_000); a `nil` cap removes the custom cap
 - `perp_deploy_disable_dex(dex:)` - Disable (shut down) a perp dex
 
 ### Outcomes (HIP-4)

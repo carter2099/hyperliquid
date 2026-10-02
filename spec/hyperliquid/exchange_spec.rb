@@ -3510,6 +3510,38 @@ RSpec.describe Hyperliquid::Exchange do
       expect(json).to include('"markPxs":[]')
     end
 
+    it 'D3: setFundingMultipliers sorts by coin and normalizes numerics' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_set_funding_multipliers(multipliers: { 'test:B' => 2, 'test:A' => '0.5' })
+      end
+      expect(json).to eq('{"type":"perpDeploy","setFundingMultipliers":[["test:A","0.5"],["test:B","2"]]}')
+      expect_signature(body,
+                       '0xe094af5e0147a7f986554314c3bfdf9f2232463a0219a09ac94b852d18979a4f',
+                       '0x4b1c02770a3291e4c07e12641ccec0b00ab0337163dc8803fb5dbc2dfd59191a', 28)
+    end
+
+    it 'D4: setFundingInterestRates keeps signed decimals' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_set_funding_interest_rates(rates: { 'test:A' => -0.0001, 'test:B' => '0.00005' })
+      end
+      expect(json).to eq(
+        '{"type":"perpDeploy","setFundingInterestRates":[["test:A","-0.0001"],["test:B","0.00005"]]}'
+      )
+      expect_signature(body,
+                       '0xf0d4bef909927f77abcf2c248b380bdd498c2b64198ede5f73d99923a44332a1',
+                       '0x4db0eab46a724be79df52d1127e691b7952e786335ff7a670f80933ce3e7de6f', 27)
+    end
+
+    it 'D5: setFundingClamps sorts by coin and normalizes numerics' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_set_funding_clamps(clamps: { 'test:A' => '0.0003', 'test:B' => 0.01 })
+      end
+      expect(json).to eq('{"type":"perpDeploy","setFundingClamps":[["test:A","0.0003"],["test:B","0.01"]]}')
+      expect_signature(body,
+                       '0x40a0321ff5eab42664b1106ddceaab3b134212006e86b394683c9c82e13eaaa3',
+                       '0x48e2adf87085182c1f8cb3d3a3860b314c87bc37facbf2173bcb3b1efe473fd3', 27)
+    end
+
     it 'D6: haltTrading sends coin and isHalted' do
       json, body = capture_perp_deploy do
         fixture_exchange.perp_deploy_halt_trading(coin: 'test:A', is_halted: true)
@@ -3518,6 +3550,56 @@ RSpec.describe Hyperliquid::Exchange do
       expect_signature(body,
                        '0x23a967f621a19a85e5d7d26e605902e28f92c2f9894b9e573c09d63f9afec93a',
                        '0x2eba0cf40566517e588dc6f8d939b49ad164141312fb79fd2579ff96e62eaf91', 27)
+    end
+
+    it 'D7: insertMarginTable keeps tier order and coerces integers' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_insert_margin_table(
+          dex: 'test', description: 'tiered',
+          margin_tiers: [{ lower_bound: 0, max_leverage: 20 }, { lower_bound: '1000000', max_leverage: 10 }]
+        )
+      end
+      expect(json).to eq(
+        '{"type":"perpDeploy","insertMarginTable":{"dex":"test","marginTable":{"description":"tiered",' \
+        '"marginTiers":[{"lowerBound":0,"maxLeverage":20},{"lowerBound":1000000,"maxLeverage":10}]}}}'
+      )
+      expect_signature(body,
+                       '0x96b7b729f59cad9e76c5988ca0c495f8d5b4482de932fe2127c8ef4cd6b538a9',
+                       '0x77964b77ede19e8863c7975770062c92c565226069bc68303cde8bcacd20e7a7', 27)
+    end
+
+    it 'D8: setMarginTableIds sorts by coin and coerces ids to Integer' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_set_margin_table_ids(margin_table_ids: { 'test:B' => 20, 'test:A' => '10' })
+      end
+      expect(json).to eq('{"type":"perpDeploy","setMarginTableIds":[["test:A",10],["test:B",20]]}')
+      expect_signature(body,
+                       '0xe9fd3950d7d2f99154d04c54566f961f4a7b8aff9522962a0f018575c058da00',
+                       '0x01f47a245b78195d2bb3851919576dc121791a946cbca9fd575569944ce75ddb', 28)
+    end
+
+    it 'D12: setMarginModes sorts by coin and passes modes through' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_set_margin_modes(
+          margin_modes: { 'test:B' => 'strictIsolated', 'test:A' => 'noCross' }
+        )
+      end
+      expect(json).to eq(
+        '{"type":"perpDeploy","setMarginModes":[["test:A","noCross"],["test:B","strictIsolated"]]}'
+      )
+      expect_signature(body,
+                       '0x5385a57fd6f57c1c1c57a115641af91c8ff52635fb8e73c1520b9d4a0168dba0',
+                       '0x4aae95c24660336b03b72d9db8ea5816a0e66b3350a75b52f7fa28cf4510db76', 27)
+    end
+
+    it 'D10: setOpenInterestCaps sorts by coin and sends nil caps as null' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_set_open_interest_caps(caps: { 'test:B' => nil, 'test:A' => 1_000_000 })
+      end
+      expect(json).to eq('{"type":"perpDeploy","setOpenInterestCaps":[["test:A",1000000],["test:B",null]]}')
+      expect_signature(body,
+                       '0xad771891b3b5b3fca5aa292885cb3846e691c60965a60ad893b025963de1f5d4',
+                       '0x77a48e15a935cdb8681591a064c63c6607e4c6049a21bd393dfafca6dd342faa', 27)
     end
 
     it 'D15: disableDex sends the dex name as a bare string' do

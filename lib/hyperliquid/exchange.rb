@@ -1594,12 +1594,70 @@ module Hyperliquid
                          })
     end
 
+    # Set per-asset funding multipliers (`setFundingMultipliers` variant).
+    # @param multipliers [Hash{String=>String,Numeric}] coin => funding multiplier (0-10)
+    # @return [Hash] Exchange response
+    def perp_deploy_set_funding_multipliers(multipliers:)
+      perp_deploy_action(:setFundingMultipliers, sorted_coin_pairs(multipliers) { |v| perp_deploy_decimal(v) })
+    end
+
+    # Set per-asset funding interest rates (`setFundingInterestRates` variant).
+    # @param rates [Hash{String=>String,Numeric}] coin => 8h interest rate (-0.01..0.01)
+    # @return [Hash] Exchange response
+    def perp_deploy_set_funding_interest_rates(rates:)
+      perp_deploy_action(:setFundingInterestRates, sorted_coin_pairs(rates) { |v| perp_deploy_decimal(v) })
+    end
+
+    # Set per-asset funding clamps (`setFundingClamps` variant).
+    # @param clamps [Hash{String=>String,Numeric}] coin => 8h funding clamp (0..0.01; default 0.0003)
+    # @return [Hash] Exchange response
+    def perp_deploy_set_funding_clamps(clamps:)
+      perp_deploy_action(:setFundingClamps, sorted_coin_pairs(clamps) { |v| perp_deploy_decimal(v) })
+    end
+
     # Halt or resume trading on a HIP-3 asset (`haltTrading` variant).
     # @param coin [String] Full asset name
     # @param is_halted [Boolean] true halts trading, false resumes
     # @return [Hash] Exchange response
     def perp_deploy_halt_trading(coin:, is_halted:)
       perp_deploy_action(:haltTrading, { coin: coin, isHalted: is_halted })
+    end
+
+    # Insert a margin table on a HIP-3 perp dex (`insertMarginTable` variant).
+    # Integer() coercion: Floats truncate; Strings use Ruby literal prefixes ('0x10' == 16).
+    # @param dex [String] Perp dex name
+    # @param description [String] Margin table description
+    # @param margin_tiers [Array<Hash>] ≤3 tiers { lower_bound: Integer (1e-6 collateral units), max_leverage: 1..50 },
+    #   increasing lower_bound / decreasing max_leverage; order preserved
+    # @return [Hash] Exchange response
+    def perp_deploy_insert_margin_table(dex:, description:, margin_tiers:)
+      tiers = margin_tiers.map do |tier|
+        { lowerBound: Integer(tier.fetch(:lower_bound)), maxLeverage: Integer(tier.fetch(:max_leverage)) }
+      end
+      perp_deploy_action(:insertMarginTable,
+                         { dex: dex, marginTable: { description: description, marginTiers: tiers } })
+    end
+
+    # Assign margin tables to assets (`setMarginTableIds` variant).
+    # @param margin_table_ids [Hash{String=>Integer}] coin => non-zero margin table id
+    # @return [Hash] Exchange response
+    def perp_deploy_set_margin_table_ids(margin_table_ids:)
+      perp_deploy_action(:setMarginTableIds, sorted_coin_pairs(margin_table_ids) { |id| Integer(id) })
+    end
+
+    # Set per-asset margin modes (`setMarginModes` variant); modes are passed through verbatim.
+    # @param margin_modes [Hash{String=>String}] coin => "strictIsolated" | "noCross" | "normal"
+    # @return [Hash] Exchange response
+    def perp_deploy_set_margin_modes(margin_modes:)
+      perp_deploy_action(:setMarginModes, sorted_coin_pairs(margin_modes) { |mode| mode })
+    end
+
+    # Set per-asset open interest caps (`setOpenInterestCaps` variant; caps ≥ 1_000_000).
+    # @param caps [Hash{String=>Integer,nil}] coin => OI cap notional in 1e-6 collateral units;
+    #   nil removes the custom cap
+    # @return [Hash] Exchange response
+    def perp_deploy_set_open_interest_caps(caps:)
+      perp_deploy_action(:setOpenInterestCaps, sorted_coin_pairs(caps) { |cap| cap.nil? ? nil : Integer(cap) })
     end
 
     # Disable (shut down) a HIP-3 perp dex (`disableDex` variant).
