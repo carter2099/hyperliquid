@@ -108,4 +108,11 @@ probe('set_outcome_sub_deployers') do
   exchange.set_outcome_sub_deployers(venue: venue, changes: [{ variant: 'settleOutcome', user: signer, allowed: false }])
 end
 
+probe('settle_question') do
+  exchange.settle_question(
+    venue: venue, question: 0, name: 'x', description: 'x',
+    settlements: [{ outcome: 0, settle_fraction: '1', name: 'x', description: 'x', side_names: %w[Yes No] }]
+  )
+end
+
 test_passed('Test 22 outcome deploy')

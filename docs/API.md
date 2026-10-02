@@ -257,6 +257,7 @@ Deployer actions for HIP-4 outcome venues. `keyword_to_value` takes a Hash or an
 - `register_question_from_template(venue:, template_id:, keyword_to_value:, deployer_fee_scale:, named_outcomes:)` - Deploy a question and its named outcomes; `named_outcomes` is an Array of `{ template_id:, keyword_to_value: }` (order kept); the fee scale applies to every outcome of the question
 - `register_and_associate_named_outcome_from_template(venue:, question:, template_id:, keyword_to_value:)` - Add one named outcome to a live template-deployed question
 - `settle_outcome(venue:, outcome:, settle_fraction:, name:, description:, side_names:, details: '')` - Settle one outcome; `settle_fraction` is the first side's payout in [0, 1]; `side_names` is the two side names
+- `settle_question(venue:, question:, name:, description:, settlements:)` - Settle all remaining named outcomes of a question (wire `settleQuestion2`); `settlements` is an Array of `{ outcome:, settle_fraction:, name:, description:, side_names:, details: '' }` (Symbol keys, order kept), exactly one with fraction `'1'`, the rest `'0'`
 - `set_outcome_sub_deployers(venue:, changes:)` - Grant or revoke sub-deployer permissions; `changes` is an Array of `{ variant:, user:, allowed: }` with the camelCase operation name (`'settleQuestion'` authorizes `settle_question`); `user` is lowercased, order kept
 
 ### Tokens and HyperEVM

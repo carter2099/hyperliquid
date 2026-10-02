@@ -1478,6 +1478,27 @@ module Hyperliquid
       outcome_deploy_action(venue, { settleOutcome: settlement })
     end
 
+    # HIP-4: settle all remaining named outcomes of a question in one action
+    # (`outcomeDeploy` L1 action, settleQuestion2 operation; the original settleQuestion
+    # is discontinued). Exactly one settlement must use fraction "1", the rest "0".
+    # @param venue [String] Deployer venue
+    # @param question [Integer] Question identifier
+    # @param name [String] Question name (must match outcome_meta)
+    # @param description [String] Question description (must match outcome_meta)
+    # @param settlements [Array<Hash>] Each `{ outcome:, settle_fraction:, name:, description:,
+    #   side_names:, details: '' }` with Symbol keys; order preserved
+    # @return [Hash] Exchange response
+    def settle_question(venue:, question:, name:, description:, settlements:)
+      outcome_deploy_action(
+        venue,
+        { settleQuestion2: {
+          question: question.to_i,
+          outcomeSettlements: settlements.map { |s| outcome_settlement(**s) },
+          nameAndDescription: [name, description]
+        } }
+      )
+    end
+
     # HIP-4: grant or revoke sub-deployer permissions per operation
     # (`outcomeDeploy` L1 action, setSubDeployers operation).
     # @param venue [String] Deployer venue

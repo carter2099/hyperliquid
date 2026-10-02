@@ -4296,6 +4296,41 @@ RSpec.describe Hyperliquid::Exchange do
         )
       end
     end
+
+    describe '#settle_question' do
+      before do
+        exchange.settle_question(
+          venue: 'ab',
+          question: '3',
+          name: 'template:abc',
+          description: 'expiry:20260801-1830',
+          settlements: [
+            { outcome: 11, settle_fraction: 1, name: 'template:abc-outcome', description: 'choice:A',
+              side_names: %w[Yes No] },
+            { outcome: 12, settle_fraction: 0, name: 'template:abc-outcome', description: 'choice:B',
+              side_names: %w[Yes No], details: '' }
+          ]
+        )
+      end
+
+      let(:operation) { body.dig('action', 'operation') }
+
+      it 'sends the settleQuestion2 wire variant with question, settlements, nameAndDescription in order' do
+        expect(operation.keys).to eq(['settleQuestion2'])
+        expect(operation['settleQuestion2'].keys).to eq(%w[question outcomeSettlements nameAndDescription])
+        expect(operation['settleQuestion2']['question']).to eq(3)
+        expect(operation['settleQuestion2']['nameAndDescription']).to eq(['template:abc', 'expiry:20260801-1830'])
+      end
+
+      it 'builds settlements in caller order and wire key order, defaulting details to empty' do
+        settlements = operation.dig('settleQuestion2', 'outcomeSettlements')
+
+        expect(settlements.map(&:keys)).to all(eq(%w[outcome settleFraction details nameAndDescription sideNames]))
+        expect(settlements.map { |s| s['outcome'] }).to eq([11, 12])
+        expect(settlements.map { |s| s['details'] }).to eq(['', ''])
+        expect(settlements.map { |s| s['settleFraction'] }).to eq(%w[1 0])
+      end
+    end
   end
 
   describe 'HIP-4 deployer L1 signature parity' do
@@ -4465,6 +4500,30 @@ RSpec.describe Hyperliquid::Exchange do
           'r' => '0xb62c470807e24691144d3298367d6a84859ae09fc6f3dbbb0ee74cb6b3ca3623',
           's' => '0x779a0ce8a1b2050a18a2ec515b91d9241b4b220541471bd8c8b795924d5aa510',
           'v' => 28
+        }
+      )
+    end
+
+    it 'matches the Python SDK for settleQuestion2' do
+      fixture_exchange.settle_question(
+        venue: 'ab',
+        question: 3,
+        name: 'template:abc',
+        description: 'expiry:20260801-1830',
+        settlements: [
+          { outcome: 11, settle_fraction: '1', name: 'template:abc-outcome', description: 'choice:A',
+            side_names: %w[Yes No] },
+          { outcome: 12, settle_fraction: '0', name: 'template:abc-outcome', description: 'choice:B',
+            side_names: %w[Yes No] }
+        ]
+      )
+
+      expect_parity(
+        '0xa0022508dc15aa2ebe91d03d30ac1300b63ed3b4dbe9981549d4a8094484c9b1',
+        {
+          'r' => '0xfb6e83de66209e4f6d90ef86a0ae87dfad2bd1ff06094d652d80410496d6d22a',
+          's' => '0x6d371abc09ea0cb51562cd07f8695bd226e2c2d6b1a7b0560c5acf2a52ed42a9',
+          'v' => 27
         }
       )
     end

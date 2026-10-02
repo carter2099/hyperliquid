@@ -727,6 +727,39 @@ status = sdk.info.user_dex_abstraction(sdk.exchange.address)
 # => { "enabled" => true }
 ```
 
+### HIP-4 Outcome Deployment
+
+For an activated outcome deployer (or a sub-deployer acting for its venue). Responses come back unmodified, so check `status`.
+
+```ruby
+venue = 'abc'
+
+# How many outcomes can this venue still deploy?
+limits = sdk.info.outcome_deployer_limits(venue)
+# => { "nDailyOutcomesRemaining" => 10, "nActiveOutcomesRemaining" => 90 }
+
+# Deploy a standalone Yes/No outcome; keywords are sorted by the SDK
+result = sdk.exchange.register_standalone_outcome_from_template(
+  venue: venue,
+  template_id: 'binaryPrice',
+  keyword_to_value: { perp: 'BTC', priceDescription: 'the Hyperliquid BTC perp trade',
+                      seconds: 90, threshold: 84_793, time: '20261002-1900' },
+  deployer_fee_scale: '1'
+)
+raise result['response'].to_s unless result['status'] == 'ok'
+
+# Settle it later: name, description and side names must match outcome_meta exactly
+outcome = sdk.info.outcome_meta['outcomes'].reverse.find { |o| o['venue'] == venue }
+sdk.exchange.settle_outcome(
+  venue: venue,
+  outcome: outcome['outcome'],
+  settle_fraction: '1', # first side (Yes) pays out in full
+  name: outcome['name'],
+  description: outcome['description'],
+  side_names: outcome['sideSpecs'].map { |s| s['name'] }
+)
+```
+
 ## WebSocket
 
 ### l2Book (Order Book)
