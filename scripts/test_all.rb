@@ -3,12 +3,22 @@
 
 # Hyperliquid Ruby SDK - Testnet Integration Tests (Runner)
 #
-# Runs all integration test scripts in order.
-# Each script can also be run individually for debugging.
+# Runs all integration test scripts in order (scripts/test_automated.rb, the
+# scheduled-run entry point, loads this file). Every script is automated-safe
+# in its default mode. Each script can also be run individually for debugging.
+#
+# Opt-in destructive/locking modes (CLI args on individual scripts, never run
+# from a runner):
+#   ruby scripts/test_10_vault.rb deposit|withdraw
+#   ruby scripts/test_12_staking.rb delegate|undelegate
+#   ruby scripts/test_16_send_to_evm_with_data.rb live
+#   ruby scripts/test_17_create_vault.rb live
 #
 # Prerequisites:
 #   - Testnet wallet with USDC balance
 #   - Get testnet funds from: https://app.hyperliquid-testnet.xyz
+#
+# Wallet preconditions: ruby scripts/testnet_wallet_check.rb [--fix]
 #
 # Usage:
 #   HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_all.rb

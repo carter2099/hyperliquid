@@ -26,13 +26,13 @@ ruby example.rb            # example usage script
 Integration scripts live in `scripts/` as standalone files (`test_NN_<name>.rb`). They require a real testnet private key and hit the live testnet API.
 
 ```bash
-HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_all.rb              # all 21
-HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_automated.rb        # CI-friendly subset (16)
+HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_all.rb              # all 24
+HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_automated.rb        # all 24 (wrapper around test_all.rb; scheduled-run entry point)
 HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_08_usd_class_transfer.rb  # single
 HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/testnet_wallet_check.rb [--fix]  # wallet preconditions report; --fix switches to standard abstraction + rebalances (never from a runner)
 ```
 
-`test_automated.rb` is the unattended runner — same as `test_all.rb` but excludes scripts that require manual testnet preconditions (e.g. `test_09_sub_account_lifecycle` needs $100k traded volume; `test_12_staking` needs HYPE balance). Some scripts use structured-rejection wire checks instead of skipping (e.g. `test_08` when the wallet is unified): a balance/volume/mode-class `err` can only be produced after the server recovered the signer to this wallet, so it proves signing end-to-end. `test_11` preflights its third-party builder's eligibility via Info and only downgrades to a warning if that builder drifts ineligible. `test_16_send_to_evm_with_data` and `test_17_create_vault` default to such zero-cost rejection wire checks; their funds-moving/locking paths are opt-in via a `live` CLI arg (`ruby scripts/test_16_send_to_evm_with_data.rb live` burns 1 USDC; `ruby scripts/test_17_create_vault.rb live` locks $100 in a new vault) and never run from a runner.
+Both runners run all 24 scripts: every script is automated-safe in its default mode, and `test_automated.rb` is a thin wrapper that loads `test_all.rb`, kept because the scheduled run invokes that path. New integration scripts are appended to `test_all.rb` only, and their default mode must be automated-safe (read-only, or rejection-only with a fail-closed guard). Destructive/locking variants are opt-in per-script CLI args, never run from a runner: `test_10_vault.rb deposit|withdraw`, `test_12_staking.rb delegate|undelegate`, `test_16_send_to_evm_with_data.rb live` (burns 1 USDC), `test_17_create_vault.rb live` (locks $100 in a new vault). Several scripts use structured-rejection wire checks (`test_08` when the wallet is unified, `test_09` volume gate, `test_12` undelegate, `test_16`, `test_17`, `test_18` portfolio-margin threshold): a balance/volume/mode-class `err` can only be produced after the server recovered the signer to this wallet, so it proves signing end-to-end. `test_11` preflights its third-party builder's eligibility via Info and only downgrades to a warning if that builder drifts ineligible.
 
 `test_integration.rb` at the project root is a thin convenience wrapper.
 
