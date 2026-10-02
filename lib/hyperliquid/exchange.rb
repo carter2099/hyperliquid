@@ -2331,8 +2331,9 @@ module Hyperliquid
       base_decimals = is_spot ? 8 : 6
       decimal_places = [base_decimals - sz_decimals, 0].max
 
-      # Round to decimal places
-      rounded = sig_figs_price.round(decimal_places)
+      # Round to decimal places like Python's round(): correctly rounded on the exact binary value, ties to
+      # even (Float#round rounds ties half-up and misrounds e.g. 2.675 -> 2.68)
+      rounded = sig_figs_price.to_r.round(decimal_places, half: :even).to_f
 
       # Format with fixed decimal places
       format("%.#{decimal_places}f", rounded)
