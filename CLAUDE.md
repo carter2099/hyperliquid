@@ -26,13 +26,13 @@ ruby example.rb            # example usage script
 Integration scripts live in `scripts/` as standalone files (`test_NN_<name>.rb`). They require a real testnet private key and hit the live testnet API.
 
 ```bash
-HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_all.rb              # all 26
-HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_automated.rb        # all 26 (wrapper around test_all.rb; scheduled-run entry point)
+HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_all.rb              # all 27
+HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_automated.rb        # all 27 (wrapper around test_all.rb; scheduled-run entry point)
 HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_08_usd_class_transfer.rb  # single
 HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/testnet_wallet_check.rb [--fix]  # wallet preconditions report; --fix switches to standard abstraction + rebalances (never from a runner)
 ```
 
-Both runners run all 26 scripts: every script is automated-safe in its default mode, and `test_automated.rb` is a thin wrapper that loads `test_all.rb`, kept because the scheduled run invokes that path. New integration scripts are appended to `test_all.rb` only, and their default mode must be automated-safe (read-only, or rejection-only with a fail-closed guard). Destructive/locking variants are opt-in per-script CLI args, never run from a runner: `test_10_vault.rb deposit|withdraw`, `test_12_staking.rb delegate|undelegate`, `test_16_send_to_evm_with_data.rb live` (burns 1 USDC), `test_17_create_vault.rb live` (locks $100 in a new vault). Several scripts use structured-rejection wire checks (`test_08` when the wallet is unified, `test_09` volume gate, `test_12` undelegate, `test_16`, `test_17`, `test_18` portfolio-margin threshold): a balance/volume/mode-class `err` can only be produced after the server recovered the signer to this wallet, so it proves signing end-to-end. `test_11` preflights its third-party builder's eligibility via Info and only downgrades to a warning if that builder drifts ineligible.
+Both runners run all 27 scripts: every script is automated-safe in its default mode, and `test_automated.rb` is a thin wrapper that loads `test_all.rb`, kept because the scheduled run invokes that path. New integration scripts are appended to `test_all.rb` only, and their default mode must be automated-safe (read-only, or rejection-only with a fail-closed guard). Destructive/locking variants are opt-in per-script CLI args, never run from a runner: `test_10_vault.rb deposit|withdraw`, `test_12_staking.rb delegate|undelegate`, `test_16_send_to_evm_with_data.rb live` (burns 1 USDC), `test_17_create_vault.rb live` (locks $100 in a new vault). Several scripts use structured-rejection wire checks (`test_08` when the wallet is unified, `test_09` volume gate, `test_12` undelegate, `test_16`, `test_17`, `test_18` portfolio-margin threshold): a balance/volume/mode-class `err` can only be produced after the server recovered the signer to this wallet, so it proves signing end-to-end. `test_11` preflights its third-party builder's eligibility via Info and only downgrades to a warning if that builder drifts ineligible.
 
 `test_integration.rb` at the project root is a thin convenience wrapper.
 
@@ -86,6 +86,8 @@ Validator-operator actions (`c_signer_*`, `c_validator_*`, `validator_l1_stream`
 Many Info methods accept a `dex:` kwarg (e.g. `meta(dex: 'foo')`, `user_state(user, dex: 'foo')`) to query a builder-deployed perp dex rather than the canonical perp market. `Info#perp_dexs` enumerates available dexes; `Info#perp_dex_limits(dex)` returns per-dex risk parameters.
 
 `Exchange#perp_deploy_*` wraps the `perpDeploy` L1 action (one variant key per method) via the private `perp_deploy_action(variant_key, payload)`; none take `vault_address:`, and `expires_after` propagates. Tuple-list variants take a `{ coin => value }` Hash that `sorted_coin_pairs` turns into `[coin, value]` pairs sorted by coin (the server requires sorted tuples). `perp_deploy_decimal` passes Strings verbatim (Python parity) and normalizes Numerics via `float_to_wire`. Nullable keys (`maxGas`, `schema`, `oracleUpdater`, …) are always sent as null, never omitted — msgpack hashes nil and absence differently. Key order is verified against live explorer echoes: explorer `userDetails` returns accepted txs, so each echoed key order is known to produce a valid signature, making it a reusable oracle for L1 key order (capped at the 300 most recent txs per user). `setFeeScale`/`setGrowthModes` are intentionally omitted (superseded by `setDeployerFees`). `scripts/test_24_perp_deploy_wire.rb` checks the wire live by sending actions to a nonexistent dex and requiring a structured server rejection (which proves signer recovery).
+
+HIP-3\* (testnet-only) venues add `Exchange#star_*` deployer/proxy operations (L1 `perpDeploy` action, `star` variant — Python-parity fixtures in `exchange_spec.rb`) and `Info#user_star_state`, whose `dexToState` is an Array of `[dex, state]` pairs despite the docs showing an object.
 
 ### Testing
 

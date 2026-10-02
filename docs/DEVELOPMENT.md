@@ -75,6 +75,7 @@ Available test scripts:
 | `test_22_outcome_deploy.rb` | HIP-4 outcome deployer actions (structured-rejection wire check) |
 | `test_23_ws_fast_asset_ctxs.rb` | Subscribe to the compressed `fastAssetCtxs` channel (read-only) and check the decoded snapshot + deltas |
 | `test_24_perp_deploy_wire.rb` | Send `perpDeploy` actions to a nonexistent dex; expect a structured rejection (proves signing) |
+| `test_25_hip3_star.rb` | Read `user_star_state`; send a HIP-3* `star` action to a live star dex; expect a structured rejection (proves signing) |
 | `test_26_spot_deploy_rejection.rb` | spotDeploy structured-rejection wire check on token 0 with a throwaway-key control (no state change) |
 | `test_27_validator_actions.rb` | Validator-operator actions (`validator_l1_stream`, `c_signer_*`, `c_validator_change_profile`, `c_validator_unregister`) — rejection-only wire check behind a fail-closed non-validator safety guard; `c_validator_register` is never sent |
 

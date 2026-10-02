@@ -5423,4 +5423,84 @@ RSpec.describe Hyperliquid::Exchange do
       expect(captured.dig('action', 'genesis')).not_to have_key('noHyperliquidity')
     end
   end
+
+  describe 'HIP-3* star operations' do
+    # Fixtures captured 2026-10-01 with hyperliquid-python-sdk 0.24.0 (eth-account 0.13.7,
+    # msgpack 1.2.3) via hyperliquid.utils.signing.action_hash / sign_l1_action, testnet (source "b").
+    # Capture script: ~/agent-state/hyperliquid-sdk-fixtures/capture_star_signatures.py
+    # Do not modify without re-capturing — they lock msgpack key order + L1 signing parity.
+    let(:fixture_signer) do
+      Hyperliquid::Signing::Signer.new(
+        private_key: '0x1111111111111111111111111111111111111111111111111111111111111111', testnet: true
+      )
+    end
+    let(:fixture_nonce) { 1_700_000_000_000 }
+    let(:star_exchange) { described_class.new(client: client, signer: fixture_signer, info: info, testnet: true) }
+    let(:proxied_user) { '0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A' } # checksummed; wire is lowercased
+    let(:star_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    before do
+      allow(star_exchange).to receive(:timestamp_ms).and_return(fixture_nonce)
+      # perp_dex_index 1 => test:BTC = 110000, test:ETH = 110001
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'perpDexs' }.to_json)
+        .to_return(status: 200, body: [nil, { 'name' => 'test' }].to_json)
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'meta', dex: 'test' }.to_json)
+        .to_return(status: 200, body: { 'universe' => [{ 'name' => 'test:BTC', 'szDecimals' => 5 },
+                                                       { 'name' => 'test:ETH', 'szDecimals' => 4 }] }.to_json)
+    end
+
+    # Asserts exact action JSON (key order included), nonce, signature parity and no vaultAddress.
+    def stub_star_exchange(action_json, sig, expires_after: nil)
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action'].to_json == action_json &&
+            body['nonce'] == fixture_nonce &&
+            body['signature'] == sig &&
+            !body.key?('vaultAddress') &&
+            body['expiresAfter'] == expires_after
+        end
+        .to_return(status: 200, body: star_response.to_json)
+    end
+
+    describe '#star_modify_approval' do
+      it 'F1: matches the Python SDK action and L1 signature' do
+        json = '{"type":"perpDeploy","star":{"dex":"test","operation":{"proxy":["0x19e7e376e7c213b7e7e7e46cc70a5dd086' \
+               'daff2a",{"modifyApproval":true}]}}}'
+        sig = { 'r' => '0x95cf659a89beb3aae2134a51117fb910d8c37fe4c580336492d95159c4fbdcb6',
+                's' => '0x590450ebc45cf7f088b09454ab65b8c3edd40bc2f608aee66328d4b3e3976561', 'v' => 28 }
+        stub_star_exchange(json, sig)
+        result = star_exchange.star_modify_approval(dex: 'test', user: proxied_user, approved: true)
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'F10: includes expiresAfter in the hash and payload when configured' do
+        expiring = described_class.new(client: client, signer: fixture_signer, info: info, testnet: true,
+                                       expires_after: 1_700_000_060_000)
+        allow(expiring).to receive(:timestamp_ms).and_return(fixture_nonce)
+        json = '{"type":"perpDeploy","star":{"dex":"test","operation":{"proxy":["0x19e7e376e7c213b7e7e7e46cc70a5dd086' \
+               'daff2a",{"modifyApproval":false}]}}}'
+        sig = { 'r' => '0x411d856436717dfe36cad765448c055b81ecc700753568bf92ee95692ec5a103',
+                's' => '0x26b96a11ca09ca8d8371c9170acd90aaa94314b4f663fd730c9e6116b7ce51e7', 'v' => 28 }
+        stub_star_exchange(json, sig, expires_after: 1_700_000_060_000)
+        result = expiring.star_modify_approval(dex: 'test', user: proxied_user, approved: false)
+        expect(result['status']).to eq('ok')
+      end
+    end
+
+    describe '#star_set_oracle' do
+      it 'F9: sorts prices by coin, sends Strings verbatim and normalizes Numerics' do
+        json = '{"type":"perpDeploy","star":{"dex":"test","operation":{"setOracle":{"oraclePxs":[["test:BTC","100000"' \
+               '],["test:ETH","4000.0"]]}}}}'
+        sig = { 'r' => '0x3c7ac8a5b5a8bcb13868a8b0fc8185c1f5e3ce9e4a8860989317c479bc10fd21',
+                's' => '0x7c7f3a8d49b79ac03313665e4d389c4f51bb6f78ca3558e2ea0069acee44b041', 'v' => 27 }
+        stub_star_exchange(json, sig)
+        result = star_exchange.star_set_oracle(dex: 'test',
+                                               oracle_pxs: { 'test:ETH' => '4000.0', 'test:BTC' => 100_000 })
+        expect(result['status']).to eq('ok')
+      end
+    end
+  end
 end

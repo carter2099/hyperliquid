@@ -53,6 +53,7 @@ SCRIPTS = [
   'test_22_outcome_deploy.rb',
   'test_23_ws_fast_asset_ctxs.rb',
   'test_24_perp_deploy_wire.rb',
+  'test_25_hip3_star.rb',
   'test_26_spot_deploy_rejection.rb',
   'test_27_validator_actions.rb'
 ].freeze

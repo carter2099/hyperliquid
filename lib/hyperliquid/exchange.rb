@@ -1982,6 +1982,27 @@ module Hyperliquid
       spot_deploy_action(:setDeployerLabel, { label: label })
     end
 
+    # HIP-3* (testnet-only) star operations — perpDeploy action, star variant
+
+    # Add (true) or remove (false) a user on a HIP-3* venue's allow-list
+    # (`perpDeploy` L1 action, star proxy modifyApproval). Testnet-only.
+    # @param dex [String] HIP-3* perp dex name
+    # @param user [String] Proxied user address (lowercased)
+    # @param approved [Boolean] true adds the user, false removes them and clears their flags
+    # @return [Hash] Exchange response
+    def star_modify_approval(dex:, user:, approved:)
+      star_proxy_action(dex, user, { modifyApproval: approved })
+    end
+
+    # Set HIP-3* spot oracle prices (`perpDeploy` L1 action, star setOracle). Testnet-only.
+    # @param dex [String] HIP-3* perp dex name
+    # @param oracle_pxs [Hash{String=>String,Numeric}] Dex-prefixed coin => price; sorted by coin.
+    #   Strings are sent verbatim, Numerics normalized via float_to_wire (perp_deploy_decimal)
+    # @return [Hash] Exchange response
+    def star_set_oracle(dex:, oracle_pxs:)
+      star_action(dex, { setOracle: { oraclePxs: sorted_coin_pairs(oracle_pxs) { |px| perp_deploy_decimal(px) } } })
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!
@@ -2327,6 +2348,16 @@ module Hyperliquid
       when Numeric then float_to_wire(value)
       else raise ArgumentError, "decimal must be String or Numeric. Got: #{value.class}"
       end
+    end
+
+    # HIP-3* star operation envelope: { type: 'perpDeploy', star: { dex:, operation: } }
+    def star_action(dex, operation)
+      perp_deploy_action(:star, { dex: dex, operation: operation })
+    end
+
+    # HIP-3* proxied user operation: operation { proxy: [user, proxy_operation] }
+    def star_proxy_action(dex, user, proxy_operation)
+      star_action(dex, { proxy: [user.downcase, proxy_operation] })
     end
 
     # Convert order type to wire format

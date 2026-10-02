@@ -482,6 +482,17 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'perpDexLimits', dex: dex })
     end
 
+    # Retrieve a user's approval state on every HIP-3* (testnet-only) venue where the user
+    # has been approved
+    # @param user [String] Wallet address
+    # @return [Hash] { "dexToState" => [[dex, state_or_nil], ...] } — an Array of
+    #   [dex name, { "isReduceOnly", "isBackstopLiquidatorDepositAllowed" }] pairs; state is nil
+    #   on venues that later removed the user. (GitBook shows dexToState as an object; the
+    #   server actually returns pairs.)
+    def user_star_state(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'userStarState', user: user })
+    end
+
     # Retrieve perp DEX status (e.g. total net deposit) for a builder-deployed dex
     # @param dex [String] Perp dex name; the empty string represents the first perp dex
     # @return [Hash] Keys: totalNetDeposit (String)

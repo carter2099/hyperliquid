@@ -119,6 +119,10 @@ Sent to the explorer RPC (`rpc.hyperliquid.xyz/explorer`, or the testnet host) i
 - `tx_details(hash)` - Transaction details by hash (66-character hex)
 - `user_details(user)` - A user's recent transactions
 
+### HIP-3* Star (testnet-only)
+
+- `user_star_state(user)` - Retrieve a user's HIP-3* (testnet-only) approval state per venue (`dexToState` as [dex, state] pairs)
+
 ## Exchange
 
 Signed actions (`POST /exchange`). Requires `Hyperliquid.new(private_key: ...)`. Unless noted, actions are L1 actions: they honour the SDK's `expires_after` and, where the signature has `vault_address:`, act for that vault or sub-account. User-signed actions (noted below) reject `expires_after`; leave it `nil` for them. Sizes and prices accept Numeric or String.
@@ -301,6 +305,13 @@ Validator-operator L1 actions. Signed by the validator (or, for `c_signer_*`, it
 - `c_validator_register(node_ip:, name:, description:, delegations_disabled:, commission_bps:, signer:, unjailed:, initial_wei:)` - Register a validator (`CValidatorAction`)
 - `c_validator_change_profile(unjailed:, node_ip: nil, name: nil, description: nil, disable_delegations: nil, commission_bps: nil, signer: nil)` - Change validator profile; `nil` fields are left unchanged
 - `c_validator_unregister` - Unregister the validator (`CValidatorAction`)
+
+### HIP-3* Star (testnet-only)
+
+Deployer/sub-deployer actions on HIP-3* venues (`perpDeploy` L1 action, `star` variant). Coins are dex-prefixed (`'mydex:BTC'`); `user`/`destination` are lowercased; `star_set_oracle` prices and `star_send_asset` amounts take String (sent verbatim) or Numeric (normalized); oracle prices are sorted by coin; `star_order` orders default to reduce-only.
+
+- `star_modify_approval(dex:, user:, approved:)` - Add (`true`) or remove (`false`) a user on the venue's allow-list (removal clears the user's flags)
+- `star_set_oracle(dex:, oracle_pxs:)` - Set the venue's spot oracle prices from `{ coin => price }`
 
 ### Client Utilities
 

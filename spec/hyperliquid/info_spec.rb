@@ -1270,6 +1270,19 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#user_star_state' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it 'requests userStarState and returns dexToState pairs unchanged' do
+      expected = { 'dexToState' => [['test', { 'isReduceOnly' => false, 'isBackstopLiquidatorDepositAllowed' => true }],
+                                    ['demo', nil]] }
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userStarState', user: user_address }.to_json)
+        .to_return(status: 200, body: expected.to_json)
+      expect(info.user_star_state(user_address)).to eq(expected)
+    end
+  end
+
   describe '#perp_dex_status' do
     it 'requests perp DEX status for a builder-deployed dex' do
       expected_response = { 'totalNetDeposit' => '12345.67' }
