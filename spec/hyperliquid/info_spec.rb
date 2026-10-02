@@ -1715,29 +1715,6 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
-  describe '#aligned_quote_token_info' do
-    let(:token) { 1328 }
-
-    around do |example|
-      previous = Warning[:deprecated]
-      Warning[:deprecated] = true
-      example.run
-    ensure
-      Warning[:deprecated] = previous
-    end
-
-    it 'emits a deprecation warning and still posts the request' do
-      stub_request(:post, info_endpoint)
-        .with(body: { type: 'alignedQuoteTokenInfo', token: token }.to_json)
-        .to_return(status: 200, body: { 'isAligned' => true }.to_json)
-
-      result = nil
-      expect { result = info.aligned_quote_token_info(token) }
-        .to output(/aligned_quote_token_info is deprecated.*removed in 2\.0\.0/).to_stderr
-      expect(result).to eq('isAligned' => true)
-    end
-  end
-
   describe '#borrow_lend_user_state' do
     let(:user_address) { '0x1234567890123456789012345678901234567890' }
 

@@ -103,7 +103,6 @@ Read-only queries (`POST /info`, or the explorer RPC for the Explorer RPC sectio
 - `spot_deploy_state(user)` - A user's spot deploy auction state
 - `spot_pair_deploy_auction_status` - Spot pair deploy auction status
 - `token_details(token_id)` - Token details by 34-character hex token id
-- `aligned_quote_token_info(token)` - Deprecated, to be removed in 2.0.0: the API no longer serves `alignedQuoteTokenInfo` (HTTP 422, raised as `Hyperliquid::ClientError`)
 
 ### Borrow/Lend (HIP-2)
 

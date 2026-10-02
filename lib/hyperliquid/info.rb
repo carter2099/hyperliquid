@@ -635,20 +635,6 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'tokenDetails', tokenId: token_id })
     end
 
-    # Get supply, rate, and pending payment information for an aligned quote token
-    # @deprecated The Hyperliquid API no longer recognizes `alignedQuoteTokenInfo`
-    #   (mainnet and testnet answer HTTP 422, raised as {Hyperliquid::ClientError}).
-    #   Will be removed in 2.0.0.
-    # @param token [Integer] Token index
-    # @return [Hash] Hash with isAligned, firstAlignedTime, evmMintedSupply,
-    #   dailyAmountOwed (array of [date, amount] tuples), predictedRate
-    def aligned_quote_token_info(token)
-      warn 'Hyperliquid::Info#aligned_quote_token_info is deprecated: the API no longer serves ' \
-           "'alignedQuoteTokenInfo' (HTTP 422); it will be removed in 2.0.0",
-           uplevel: 1, category: :deprecated
-      @client.post(Constants::INFO_ENDPOINT, { type: 'alignedQuoteTokenInfo', token: token })
-    end
-
     # ============================
     # Info: Borrow/Lend (HIP-2)
     # ============================
