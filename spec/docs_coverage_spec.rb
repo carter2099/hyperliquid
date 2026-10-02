@@ -53,18 +53,8 @@ RSpec.describe 'API documentation coverage' do
     end
   end
 
-  # Main-API subscription types. The WS-parity refactor replaces the `case` in
-  # `subscription_identifier` with the ROUTING_KEYS table; once it lands, delete the
-  # source-regex branch below.
-  ws_client = Hyperliquid::WS::Client
-  channels =
-    if ws_client.const_defined?(:ROUTING_KEYS, false)
-      ws_client.const_get(:ROUTING_KEYS, false).keys
-    else
-      File.read(File.join(root, 'lib/hyperliquid/ws/client.rb'))[/def subscription_identifier.*?\n      end\n/m]
-          .scan(/^\s+when (.+?)(?: then|$)/).flatten
-          .flat_map { |list| list.scan(/'([A-Za-z0-9]+)'/).flatten }
-    end
+  # Main-API subscription types.
+  channels = Hyperliquid::WS::Client::ROUTING_KEYS.keys
 
   it 'finds the supported main-API channels' do
     expect(channels).to include('l2Book', 'allMids')

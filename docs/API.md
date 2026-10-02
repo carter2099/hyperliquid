@@ -345,7 +345,7 @@ A client order id is 16 bytes, `0x` + 32 hex characters.
 
 - `Hyperliquid::WS::Client.new(testnet: false, max_queue_size: 1024, reconnect: true, explorer_ws_url: nil)` - Standalone client; `explorer_ws_url: nil` disables the explorer methods (the SDK passes the right URL)
 - `connect` - Open the main connection (`subscribe` calls it if needed)
-- `subscribe(subscription, &callback)` - Subscribe to a main-API channel (table below); the block gets each message's `data`. Returns a subscription id
+- `subscribe(subscription, &callback)` - Subscribe to a main-API channel (table below); the block gets each message's `data`. Returns a subscription id. Raises `Hyperliquid::WebSocketError` for an unsupported type or a subscription that conflicts with an active one on an exclusive channel (see below)
 - `subscribe_explorer_block(&)` - Stream new blocks; the block gets an Array of block summaries. Returns a subscription id
 - `subscribe_explorer_txs(&)` - Stream new transactions; the block gets an Array of transactions. Returns a subscription id
 - `unsubscribe(subscription_id)` - Remove a callback; the server unsubscribe is sent when a channel's last callback goes
@@ -366,9 +366,17 @@ A client order id is 16 bytes, `0x` + 32 hex characters.
 | `bbo` | `{ type: 'bbo', coin: 'ETH' }` | Best bid/offer for a coin |
 | `candle` | `{ type: 'candle', coin: 'ETH', interval: '1m' }` | Candle updates |
 | `orderUpdates` | `{ type: 'orderUpdates', user: '0x...' }` | A user's order status changes |
-| `userEvents` | `{ type: 'userEvents', user: '0x...' }` | A user's fills, funding, liquidations and other events |
-| `userFills` | `{ type: 'userFills', user: '0x...' }` | A user's fills |
+| `userEvents` | `{ type: 'userEvents', user: '0x...' }` | A user's fills, funding, liquidations and other events (server channel `user`) |
+| `userFills` | `{ type: 'userFills', user: '0x...' }` (optional `aggregateByTime: true`) | A user's fills; `aggregateByTime: true` merges partial fills of one order |
 | `userFundings` | `{ type: 'userFundings', user: '0x...' }` | A user's funding payments |
+| `userNonFundingLedgerUpdates` | `{ type: 'userNonFundingLedgerUpdates', user: '0x...' }` | A user's non-funding ledger updates (deposits, withdrawals, transfers, liquidations) |
+| `userTwapSliceFills` | `{ type: 'userTwapSliceFills', user: '0x...' }` | A user's TWAP slice fills |
+| `userTwapHistory` | `{ type: 'userTwapHistory', user: '0x...' }` | A user's TWAP order history |
+| `userHistoricalOrders` | `{ type: 'userHistoricalOrders', user: '0x...' }` | A user's historical orders |
+| `allDexsClearinghouseState` | `{ type: 'allDexsClearinghouseState', user: '0x...' }` | A user's perp clearinghouse state on every dex |
+| `webData3` | `{ type: 'webData3', user: '0x...' }` | Aggregate user state (`userState`, `perpDexStates`) as used by the web frontend |
+
+`orderUpdates`, `userEvents`: one user per `WS::Client` (payload carries no user); `userFills`: one `aggregateByTime` setting per user per client; conflicting subscriptions raise `WebSocketError`. Use a second `WS::Client` for another user.
 
 Candle intervals: `1m`, `3m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `8h`, `12h`, `1d`, `3d`, `1w`, `1M`
 

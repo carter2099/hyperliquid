@@ -448,11 +448,6 @@ RSpec.describe Hyperliquid::WS::Client do
       expect(client.send(:compute_identifier, 'orderUpdates', [])).to eq('orderUpdates')
     end
 
-    it 'computes userEvents identifier' do
-      data = { 'user' => '0xAbC123', 'fills' => [] }
-      expect(client.send(:compute_identifier, 'userEvents', data)).to eq('userEvents:0xabc123')
-    end
-
     it 'computes userFills identifier' do
       data = { 'user' => '0xAbC123', 'fills' => [] }
       expect(client.send(:compute_identifier, 'userFills', data)).to eq('userFills:0xabc123')
@@ -497,11 +492,6 @@ RSpec.describe Hyperliquid::WS::Client do
     it 'computes orderUpdates subscription identifier' do
       expect(client.send(:subscription_identifier, { type: 'orderUpdates', user: '0xABC' }))
         .to eq('orderUpdates')
-    end
-
-    it 'computes userEvents subscription identifier' do
-      expect(client.send(:subscription_identifier, { type: 'userEvents', user: '0xABC' }))
-        .to eq('userEvents:0xabc')
     end
 
     it 'computes userFills subscription identifier' do
@@ -580,16 +570,6 @@ RSpec.describe Hyperliquid::WS::Client do
       expect(queued[:identifier]).to eq('orderUpdates')
     end
 
-    it 'routes userEvents messages' do
-      user = '0xabc123'
-      client.subscribe({ type: 'userEvents', user: user }) { |d| d }
-      msg = { 'channel' => 'userEvents', 'data' => { 'user' => user, 'fills' => [] } }.to_json
-      client.send(:handle_message, msg)
-
-      queued = queue.pop(true)
-      expect(queued[:identifier]).to eq("userEvents:#{user}")
-    end
-
     it 'routes userFills messages' do
       user = '0xdef456'
       client.subscribe({ type: 'userFills', user: user }) { |d| d }
@@ -630,6 +610,146 @@ RSpec.describe Hyperliquid::WS::Client do
     end
   end
 
+  describe 'userEvents routing' do
+    it 'routes the server channel "user" to the userEvents identifier' do
+      expect(client.send(:compute_identifier, 'user', { 'fills' => [] })).to eq('userEvents')
+    end
+
+    it 'keys userEvents subscriptions without the user' do
+      expect(client.send(:subscription_identifier, { type: 'userEvents', user: '0xABC' })).to eq('userEvents')
+    end
+
+    it 'queues "user" channel frames under the subscribed identifier' do
+      client.instance_variable_set(:@connected, true)
+      client.instance_variable_set(:@ws, mock_ws)
+      client.subscribe({ type: 'userEvents', user: '0xABC' }, &noop)
+      client.send(:handle_message, { 'channel' => 'user', 'data' => { 'fills' => [] } }.to_json)
+
+      queued = client.instance_variable_get(:@queue).pop(true)
+      expect(queued[:identifier]).to eq('userEvents')
+      expect(client.instance_variable_get(:@subscriptions).keys).to eq([queued[:identifier]])
+    end
+  end
+
+  describe 'exclusive subscriptions' do
+    before do
+      client.instance_variable_set(:@connected, true)
+      client.instance_variable_set(:@ws, mock_ws)
+    end
+
+    it 'rejects orderUpdates for a second user without registering it' do
+      client.subscribe({ type: 'orderUpdates', user: '0xAAA' }, &noop)
+
+      expect { client.subscribe({ type: 'orderUpdates', user: '0xBBB' }, &noop) }
+        .to raise_error(Hyperliquid::WebSocketError, /orderUpdates messages do not include user/)
+      expect(client.instance_variable_get(:@subscription_msgs).size).to eq(1)
+    end
+
+    it 'allows orderUpdates for the same user regardless of case' do
+      client.subscribe({ type: 'orderUpdates', user: '0xaaa' }, &noop)
+      client.subscribe({ type: 'orderUpdates', user: '0xAAA' }, &noop)
+
+      expect(client.instance_variable_get(:@subscriptions)['orderUpdates'].size).to eq(2)
+    end
+
+    it 'rejects userEvents for a second user' do
+      client.subscribe({ type: 'userEvents', user: '0xAAA' }, &noop)
+
+      expect { client.subscribe({ type: 'userEvents', user: '0xBBB' }, &noop) }
+        .to raise_error(Hyperliquid::WebSocketError, /userEvents messages do not include user/)
+    end
+
+    it 'frees the channel for another user after unsubscribe' do
+      id = client.subscribe({ type: 'orderUpdates', user: '0xAAA' }, &noop)
+      client.unsubscribe(id)
+
+      expect { client.subscribe({ type: 'orderUpdates', user: '0xBBB' }, &noop) }.not_to raise_error
+    end
+
+    it 'allows a non-exclusive channel for two users' do
+      client.subscribe({ type: 'userFills', user: '0xAAA' }, &noop)
+
+      expect { client.subscribe({ type: 'userFills', user: '0xBBB' }, &noop) }.not_to raise_error
+    end
+
+    it 'rejects userFills for the same user with a different aggregateByTime' do
+      client.subscribe({ type: 'userFills', user: '0xAAA', aggregateByTime: true }, &noop)
+
+      expect { client.subscribe({ type: 'userFills', user: '0xAAA' }, &noop) }
+        .to raise_error(Hyperliquid::WebSocketError, /aggregateByTime/)
+    end
+
+    it 'treats an omitted aggregateByTime as false' do
+      client.subscribe({ type: 'userFills', user: '0xAAA' }, &noop)
+
+      expect { client.subscribe({ type: 'userFills', user: '0xAAA', aggregateByTime: false }, &noop) }
+        .not_to raise_error
+    end
+
+    it 'allows different aggregateByTime settings for different users' do
+      client.subscribe({ type: 'userFills', user: '0xAAA', aggregateByTime: true }, &noop)
+
+      expect { client.subscribe({ type: 'userFills', user: '0xBBB', aggregateByTime: false }, &noop) }
+        .not_to raise_error
+    end
+  end
+
+  describe 'parity channel routing' do
+    upper = '0x4EF66DF2067C588EB98896EDE3A8E80F85AFF085'
+    user = upper.downcase
+
+    # [label, subscription, server channel, message data, expected identifier]
+    [
+      [
+        'userNonFundingLedgerUpdates',
+        { type: 'userNonFundingLedgerUpdates', user: upper },
+        'userNonFundingLedgerUpdates',
+        { 'isSnapshot' => true, 'user' => user, 'nonFundingLedgerUpdates' => [] },
+        "userNonFundingLedgerUpdates:#{user}"
+      ],
+      [
+        'userTwapSliceFills',
+        { type: 'userTwapSliceFills', user: upper },
+        'userTwapSliceFills',
+        { 'user' => user, 'twapSliceFills' => [] },
+        "userTwapSliceFills:#{user}"
+      ],
+      [
+        'userTwapHistory',
+        { type: 'userTwapHistory', user: upper },
+        'userTwapHistory',
+        { 'user' => user, 'history' => [] },
+        "userTwapHistory:#{user}"
+      ],
+      [
+        'userHistoricalOrders',
+        { type: 'userHistoricalOrders', user: upper },
+        'userHistoricalOrders',
+        { 'user' => user, 'orderHistory' => [] },
+        "userHistoricalOrders:#{user}"
+      ],
+      [
+        'allDexsClearinghouseState',
+        { type: 'allDexsClearinghouseState', user: upper },
+        'allDexsClearinghouseState',
+        { 'user' => user, 'clearinghouseStates' => [] },
+        "allDexsClearinghouseState:#{user}"
+      ],
+      [
+        'webData3',
+        { type: 'webData3', user: upper },
+        'webData3',
+        { 'userState' => { 'user' => user }, 'perpDexStates' => [] },
+        "webData3:#{user}"
+      ]
+    ].each do |label, subscription, channel, data, expected|
+      it "routes #{label} subscriptions and messages to #{expected}" do
+        expect(client.send(:subscription_identifier, subscription)).to eq(expected)
+        expect(client.send(:compute_identifier, channel, data)).to eq(expected)
+      end
+    end
+  end
+
   # ── Explorer WebSocket ──────────────────────────────────────────
 
   describe 'explorer WebSocket' do
@@ -661,7 +781,6 @@ RSpec.describe Hyperliquid::WS::Client do
         expect(c.instance_variable_get(:@explorer_closing)).to be false
         expect(c.instance_variable_get(:@explorer_subscriptions)).to eq({})
         expect(c.instance_variable_get(:@explorer_subscription_msgs)).to eq({})
-        expect(c.instance_variable_get(:@explorer_next_id)).to eq(0)
         expect(c.instance_variable_get(:@explorer_pending_subscriptions)).to eq([])
       end
 
@@ -908,7 +1027,7 @@ RSpec.describe Hyperliquid::WS::Client do
           { 'channel' => 'bbo', 'data' => { 'coin' => 'SOL', 'bid' => '100' } },
           { 'channel' => 'candle', 'data' => { 's' => 'ETH', 'i' => '1h' } },
           { 'channel' => 'orderUpdates', 'data' => [] },
-          { 'channel' => 'userEvents', 'data' => { 'user' => '0xABC' } },
+          { 'channel' => 'user', 'data' => { 'fills' => [] } },
           { 'channel' => 'userFills', 'data' => { 'user' => '0xABC' } },
           { 'channel' => 'userFundings', 'data' => { 'user' => '0xABC' } }
         ]
@@ -929,8 +1048,7 @@ RSpec.describe Hyperliquid::WS::Client do
         expect(explorer_client.send(:compute_identifier, 'candle', { 's' => 'ETH', 'i' => '1h' }))
           .to eq('candle:eth:1h')
         expect(explorer_client.send(:compute_identifier, 'orderUpdates', [])).to eq('orderUpdates')
-        expect(explorer_client.send(:compute_identifier, 'userEvents', { 'user' => '0xABC' }))
-          .to eq('userEvents:0xabc')
+        expect(explorer_client.send(:compute_identifier, 'user', { 'fills' => [] })).to eq('userEvents')
         expect(explorer_client.send(:compute_identifier, 'userFills', { 'user' => '0xABC' }))
           .to eq('userFills:0xabc')
         expect(explorer_client.send(:compute_identifier, 'userFundings', { 'user' => '0xABC' }))
@@ -949,13 +1067,46 @@ RSpec.describe Hyperliquid::WS::Client do
         allow(WSLite).to receive(:connect).and_return(mock_explorer_ws)
       end
 
-      it 'subscription IDs are independent from main-API IDs' do
+      it 'subscription IDs are unique across main-API and explorer subscriptions' do
         main_id = explorer_client.subscribe({ type: 'l2Book', coin: 'ETH' }) { |_d| }
         explorer_id = explorer_client.subscribe_explorer_block { |_d| }
 
-        # Both start from 0 but are in separate namespaces
-        expect(main_id).to eq(0)
-        expect(explorer_id).to eq(0)
+        expect(explorer_id).not_to eq(main_id)
+      end
+
+      it 'unsubscribing an explorer ID leaves main-API subscriptions intact' do
+        explorer_client.instance_variable_set(:@connected, true)
+        explorer_client.instance_variable_set(:@ws, mock_ws)
+        explorer_client.instance_variable_set(:@explorer_connected, true)
+        explorer_client.instance_variable_set(:@explorer_ws, mock_explorer_ws)
+        allow(mock_ws).to receive(:send)
+        allow(mock_explorer_ws).to receive(:send)
+
+        explorer_client.subscribe({ type: 'l2Book', coin: 'ETH' }) { |_d| }
+        explorer_id = explorer_client.subscribe_explorer_block { |_d| }
+        explorer_client.unsubscribe(explorer_id)
+
+        expect(explorer_client.instance_variable_get(:@subscriptions)).to have_key('l2Book:eth')
+        expect(explorer_client.instance_variable_get(:@explorer_subscriptions)).not_to have_key('explorerBlock')
+        unsub_block = JSON.generate({ method: 'unsubscribe', subscription: { type: 'explorerBlock' } })
+        expect(mock_explorer_ws).to have_received(:send).with(unsub_block)
+        expect(mock_ws).not_to have_received(:send).with(/"method":"unsubscribe"/)
+      end
+
+      it 'unsubscribing a main-API ID leaves explorer subscriptions intact' do
+        explorer_client.instance_variable_set(:@connected, true)
+        explorer_client.instance_variable_set(:@ws, mock_ws)
+        explorer_client.instance_variable_set(:@explorer_connected, true)
+        explorer_client.instance_variable_set(:@explorer_ws, mock_explorer_ws)
+        allow(mock_ws).to receive(:send)
+        allow(mock_explorer_ws).to receive(:send)
+
+        explorer_client.subscribe_explorer_block { |_d| }
+        main_id = explorer_client.subscribe({ type: 'l2Book', coin: 'ETH' }) { |_d| }
+        explorer_client.unsubscribe(main_id)
+
+        expect(explorer_client.instance_variable_get(:@explorer_subscriptions)).to have_key('explorerBlock')
+        expect(explorer_client.instance_variable_get(:@subscriptions)).not_to have_key('l2Book:eth')
       end
 
       it 'supports multiple callbacks for the same explorer channel' do

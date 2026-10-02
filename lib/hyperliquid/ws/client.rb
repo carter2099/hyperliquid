@@ -7,6 +7,28 @@ module Hyperliquid
   module WS
     # Managed WebSocket client for subscribing to real-time data channels
     class Client
+      # Routing fields per subscription type. Identifier = [type, *field values].join(':').
+      # user/coin are downcased; dex nil => '' (server canonicalizes an omitted dex to ""); interval verbatim.
+      ROUTING_KEYS = {
+        'allMids' => [], 'orderUpdates' => [], 'userEvents' => [],
+        'l2Book' => %i[coin], 'trades' => %i[coin], 'bbo' => %i[coin],
+        'candle' => %i[coin interval],
+        'userFills' => %i[user], 'userFundings' => %i[user],
+        'userNonFundingLedgerUpdates' => %i[user], 'userTwapSliceFills' => %i[user],
+        'userTwapHistory' => %i[user], 'userHistoricalOrders' => %i[user],
+        'allDexsClearinghouseState' => %i[user], 'webData3' => %i[user]
+      }.freeze
+
+      # Server channel names that differ from the subscription type.
+      CHANNEL_ALIASES = {
+        'user' => 'userEvents'
+      }.freeze
+
+      # Payload omits this subscription field, so two subscriptions differing in it cannot be told apart.
+      EXCLUSIVE_FIELDS = {
+        'orderUpdates' => :user, 'userEvents' => :user, 'userFills' => :aggregateByTime
+      }.freeze
+
       attr_reader :dropped_message_count, :explorer_dropped_message_count
 
       def initialize(testnet: false, max_queue_size: Constants::WS_MAX_QUEUE_SIZE, reconnect: true,
@@ -49,7 +71,6 @@ module Hyperliquid
         @explorer_reconnect_attempts = 0
         @explorer_subscriptions = {}
         @explorer_subscription_msgs = {}
-        @explorer_next_id = 0
         @explorer_queue = Queue.new
         @explorer_dropped_message_count = 0
         @explorer_dispatch_thread = nil
@@ -75,6 +96,7 @@ module Hyperliquid
         sub_id = nil
 
         @mutex.synchronize do
+          ensure_exclusive!(subscription, identifier)
           sub_id = @next_id
           @next_id += 1
 
@@ -264,35 +286,64 @@ module Hyperliquid
       end
 
       def compute_identifier(channel, data)
-        case channel
-        when 'l2Book'        then "l2Book:#{data['coin'].downcase}"
-        when 'trades'        then data.is_a?(Array) && data[0] ? "trades:#{data[0]['coin'].downcase}" : nil
-        when 'bbo'           then "bbo:#{data['coin'].downcase}"
-        when 'candle'        then "candle:#{data['s'].downcase}:#{data['i']}"
-        when 'allMids'       then 'allMids'
-        when 'orderUpdates'  then 'orderUpdates'
-        when 'userEvents'    then "userEvents:#{data['user'].downcase}"
-        when 'userFills'     then "userFills:#{data['user'].downcase}"
-        when 'userFundings'  then "userFundings:#{data['user'].downcase}"
+        type = CHANNEL_ALIASES.fetch(channel, channel)
+        keys = ROUTING_KEYS[type]
+        return unless keys
+        return type if keys.empty?
+
+        fields = message_routing_fields(type, data)
+        fields && routing_identifier(type, fields)
+      end
+
+      def message_routing_fields(type, data)
+        case type
+        when 'trades'   then data.is_a?(Array) && data[0] ? { coin: data[0]['coin'] } : nil
+        when 'candle'   then { coin: data['s'], interval: data['i'] }
+        when 'webData3' then { user: data['userState']['user'] }
+        else { coin: data['coin'], user: data['user'], dex: data['dex'] }
         end
       end
 
       def subscription_identifier(subscription)
         type = sub_field(subscription, 'type')
-        case type
-        when 'l2Book'        then "l2Book:#{sub_field(subscription, 'coin').downcase}"
-        when 'trades'        then "trades:#{sub_field(subscription, 'coin').downcase}"
-        when 'bbo'           then "bbo:#{sub_field(subscription, 'coin').downcase}"
-        when 'candle'
-          "candle:#{sub_field(subscription, 'coin').downcase}:#{sub_field(subscription, 'interval')}"
-        when 'allMids'       then 'allMids'
-        when 'orderUpdates'  then 'orderUpdates'
-        when 'userEvents'    then "userEvents:#{sub_field(subscription, 'user').downcase}"
-        when 'userFills'     then "userFills:#{sub_field(subscription, 'user').downcase}"
-        when 'userFundings'  then "userFundings:#{sub_field(subscription, 'user').downcase}"
-        else
-          raise Hyperliquid::WebSocketError, "Unsupported subscription type: #{type}"
+        keys = ROUTING_KEYS[type]
+        raise Hyperliquid::WebSocketError, "Unsupported subscription type: #{type}" unless keys
+
+        routing_identifier(type, keys.to_h { |key| [key, sub_field(subscription, key.to_s)] })
+      end
+
+      def routing_identifier(type, fields)
+        parts = ROUTING_KEYS.fetch(type).map do |key|
+          value = fields[key]
+          case key
+          when :dex      then value.to_s.downcase
+          when :interval then value
+          else value.downcase
+          end
         end
+        [type, *parts].join(':')
+      end
+
+      def ensure_exclusive!(subscription, identifier)
+        type = sub_field(subscription, 'type')
+        field = EXCLUSIVE_FIELDS[type]
+        return unless field
+
+        existing = @subscription_msgs.each_value.find { |msg| msg[:identifier] == identifier }
+        return unless existing
+
+        mine = exclusive_value(subscription, field)
+        theirs = exclusive_value(existing[:subscription], field)
+        return if mine == theirs
+
+        raise Hyperliquid::WebSocketError,
+              "#{type} messages do not include #{field}; already subscribed with #{field}=#{theirs.inspect} " \
+              "on this connection (requested #{mine.inspect}). Unsubscribe first or use a separate WS::Client."
+      end
+
+      def exclusive_value(subscription, field)
+        value = sub_field(subscription, field.to_s)
+        field == :user ? value.to_s.downcase : value == true
       end
 
       def sub_field(subscription, key)
@@ -407,8 +458,8 @@ module Hyperliquid
         sub_id = nil
 
         @mutex.synchronize do
-          sub_id = @explorer_next_id
-          @explorer_next_id += 1
+          sub_id = @next_id
+          @next_id += 1
 
           @explorer_subscriptions[identifier] ||= []
           @explorer_subscriptions[identifier] << { id: sub_id, callback: callback }

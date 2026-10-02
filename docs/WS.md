@@ -32,7 +32,7 @@ Ping Thread (every 50s)
 
 ## Subscription Routing
 
-Subscriptions are keyed by an identifier string derived from the channel type and its parameters:
+Subscriptions are keyed by an identifier string derived from the subscription type and its routing fields (the `ROUTING_KEYS` table in `ws/client.rb`: identifier = `[type, *field values].join(':')`). The echo channel is the `channel` the server puts on the message when it differs from the type.
 
 | Channel | Identifier format | Example |
 |---------|-------------------|---------|
@@ -41,16 +41,26 @@ Subscriptions are keyed by an identifier string derived from the channel type an
 | `trades` | `trades:<coin>` | `trades:eth` |
 | `bbo` | `bbo:<coin>` | `bbo:eth` |
 | `candle` | `candle:<coin>:<interval>` | `candle:eth:1h` |
-| `orderUpdates` | `orderUpdates` | `orderUpdates` |
-| `userEvents` | `userEvents:<user>` | `userEvents:0xabc` |
-| `userFills` | `userFills:<user>` | `userFills:0xabc` |
+| `orderUpdates` | `orderUpdates` (exclusive: `user`) | `orderUpdates` |
+| `userEvents` | `userEvents` (echo channel `user`; exclusive: `user`) | `userEvents` |
+| `userFills` | `userFills:<user>` (exclusive: `aggregateByTime`) | `userFills:0xabc` |
 | `userFundings` | `userFundings:<user>` | `userFundings:0xabc` |
+| `userNonFundingLedgerUpdates` | `userNonFundingLedgerUpdates:<user>` | `userNonFundingLedgerUpdates:0xabc` |
+| `userTwapSliceFills` | `userTwapSliceFills:<user>` | `userTwapSliceFills:0xabc` |
+| `userTwapHistory` | `userTwapHistory:<user>` | `userTwapHistory:0xabc` |
+| `userHistoricalOrders` | `userHistoricalOrders:<user>` | `userHistoricalOrders:0xabc` |
+| `allDexsClearinghouseState` | `allDexsClearinghouseState:<user>` | `allDexsClearinghouseState:0xabc` |
+| `webData3` | `webData3:<user>` (message side: `data.userState.user`) | `webData3:0xabc` |
 | `explorerBlock` | `explorerBlock` | `explorerBlock` |
 | `explorerTxs` | `explorerTxs` | `explorerTxs` |
 
-Coins and users are lowercased. `orderUpdates` messages carry no user, so every `orderUpdates` callback receives every `orderUpdates` message on the connection. `subscribe` raises `Hyperliquid::WebSocketError` for a channel not in this table; `subscribe_explorer_*` raise `Hyperliquid::ConfigurationError` when the client has no explorer URL.
+Coins and users are lowercased; intervals are kept verbatim (`1m` and `1M` differ). `subscribe` raises `Hyperliquid::WebSocketError` for a channel not in this table; `subscribe_explorer_*` raise `Hyperliquid::ConfigurationError` when the client has no explorer URL.
 
 Multiple callbacks can be registered for the same identifier. The server unsubscribe message is only sent when the last callback for an identifier is removed.
+
+### Exclusive channels
+
+Some payloads omit a subscription field, so two subscriptions that differ only in that field cannot be told apart: `orderUpdates` and `userEvents` messages carry no user, and `userFills` messages do not echo `aggregateByTime`. On these channels a `WS::Client` holds one value of that field per identifier: a subscription that conflicts with an active one (a second user on `orderUpdates`/`userEvents`, or the same user's `userFills` with a different `aggregateByTime`; an omitted flag counts as `false`) raises `Hyperliquid::WebSocketError` without registering anything. Same-value duplicates are allowed. The value is free again once its last subscription is unsubscribed; to follow several users at once, use one `WS::Client` per user.
 
 ## Queue Overflow
 

@@ -71,6 +71,7 @@ Available test scripts:
 | `test_18_user_portfolio_margin.rb` | Enable then disable portfolio margin |
 | `test_19_spot_user.rb` | Opt out of then back into spot dusting |
 | `test_20_explorer_ws.rb` | Explorer WebSocket block stream |
+| `test_21_ws_channel_parity.rb` | Subscribe to the parity WS channels (read-only) and check each delivers its own user/dex/coin |
 | `test_22_outcome_deploy.rb` | HIP-4 outcome deployer actions (structured-rejection wire check) |
 | `test_24_perp_deploy_wire.rb` | Send `perpDeploy` actions to a nonexistent dex; expect a structured rejection (proves signing) |
 | `test_26_spot_deploy_rejection.rb` | spotDeploy structured-rejection wire check on token 0 with a throwaway-key control (no state change) |

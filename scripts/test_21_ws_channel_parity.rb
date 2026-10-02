@@ -1,0 +1,129 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Test 21: WebSocket Channel Parity
+#
+# Subscribes to every snapshot-delivering main-API channel added for TS/Python
+# parity on testnet, and checks that each callback receives a message carrying
+# its own routing fields (user / dex / coin) and nothing else. Also checks the
+# local exclusivity guard: a second user on orderUpdates raises WebSocketError.
+#
+# No private key required (read-only WebSocket, public addresses).
+#
+# Usage:
+#   ruby scripts/test_21_ws_channel_parity.rb
+
+require_relative '../lib/hyperliquid'
+
+def green(text)
+  "\e[32m#{text}\e[0m"
+end
+
+def red(text)
+  "\e[31m#{text}\e[0m"
+end
+
+# Any address works: snapshot channels deliver even for an empty account.
+ADDR = '0xdfc24b077bc1425ad1dea75bcb6f8158e10df303'
+TIMEOUT = 30
+
+# [label, subscription, routing predicate on the callback's data]
+CHECKS = [
+  ['webData3', { type: 'webData3', user: ADDR }, ->(d) { d['userState']['user'] == ADDR }],
+  ['userNonFundingLedgerUpdates', { type: 'userNonFundingLedgerUpdates', user: ADDR }, ->(d) { d['user'] == ADDR }],
+  ['userTwapSliceFills', { type: 'userTwapSliceFills', user: ADDR }, ->(d) { d['user'] == ADDR }],
+  ['userTwapHistory', { type: 'userTwapHistory', user: ADDR }, ->(d) { d['user'] == ADDR }],
+  ['userHistoricalOrders', { type: 'userHistoricalOrders', user: ADDR }, ->(d) { d['user'] == ADDR }],
+  ['allDexsClearinghouseState', { type: 'allDexsClearinghouseState', user: ADDR }, ->(d) { d['user'] == ADDR }]
+].freeze
+
+def routing_summary(data)
+  return "Array(#{data.length})" if data.is_a?(Array)
+  return data.class.to_s unless data.is_a?(Hash)
+
+  fields = %w[user dex coin].select { |k| data.key?(k) }.map { |k| "#{k}=#{data[k].inspect}" }
+  fields << "userState.user=#{data['userState']['user'].inspect}" if data['userState'].is_a?(Hash)
+  fields.empty? ? "keys=#{data.keys.first(4).join(',')}" : fields.join(' ')
+end
+
+puts
+puts '=' * 60
+puts 'TEST 21: WebSocket Channel Parity'
+puts '=' * 60
+puts
+puts 'Network: Testnet'
+puts "Subscribing to #{CHECKS.length} channels for #{ADDR}"
+puts
+
+sdk = Hyperliquid.new(testnet: true)
+received = {}
+cross_deliveries = []
+mutex = Mutex.new
+done = ConditionVariable.new
+
+sdk.ws.on(:open) { puts 'WebSocket connected.' }
+sdk.ws.on(:error) { |e| puts red("WebSocket error: #{e}") }
+
+CHECKS.each do |label, subscription, predicate|
+  sdk.ws.subscribe(subscription) do |data|
+    ok = begin
+      predicate.call(data)
+    rescue StandardError
+      false
+    end
+    mutex.synchronize do
+      if ok
+        received[label] ||= routing_summary(data)
+      else
+        cross_deliveries << "#{label}: #{routing_summary(data)}"
+      end
+      done.signal if received.size >= CHECKS.length
+    end
+  end
+end
+
+# Local guard check (no network): orderUpdates messages carry no user, so a
+# second user on the same client must be rejected.
+guard_ok = false
+sdk.ws.subscribe({ type: 'orderUpdates', user: ADDR }) { |_d| }
+begin
+  sdk.ws.subscribe({ type: 'orderUpdates', user: '0x0000000000000000000000000000000000000001' }) { |_d| }
+rescue Hyperliquid::WebSocketError => e
+  guard_ok = true
+  puts "Exclusivity guard: #{e.message}"
+  puts
+end
+
+mutex.synchronize do
+  deadline = Time.now + TIMEOUT
+  while received.size < CHECKS.length
+    remaining = deadline - Time.now
+    break if remaining <= 0
+
+    done.wait(mutex, remaining)
+  end
+end
+
+sdk.ws.close
+
+failures = []
+CHECKS.each do |label, _subscription, _predicate|
+  if received[label]
+    puts green("✓ #{label} (#{received[label]})")
+  else
+    puts red("✗ #{label} (no matching message within #{TIMEOUT}s)")
+    failures << "#{label}: no message"
+  end
+end
+puts guard_ok ? green('✓ orderUpdates exclusivity guard') : red('✗ orderUpdates exclusivity guard')
+failures << 'second-user orderUpdates subscription did not raise WebSocketError' unless guard_ok
+cross_deliveries.each { |c| failures << "cross-delivery #{c}" }
+
+puts
+if failures.empty?
+  puts green('Test 21 WebSocket channel parity passed!')
+else
+  failures.each { |f| puts red("FAIL: #{f}") }
+  puts red('Test 21 WebSocket channel parity FAILED')
+  exit 1
+end
