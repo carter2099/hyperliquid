@@ -1483,6 +1483,66 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Validator operators: register a new validator (`CValidatorAction` L1 action, register variant).
+    # Signed by the validator (owner) key. Wire keys are protocol-literal snake_case.
+    # @param node_ip [String] Validator node IP address (sent as { Ip: node_ip })
+    # @param name [String] Validator name
+    # @param description [String] Validator description
+    # @param delegations_disabled [Boolean] Whether delegations are disabled
+    # @param commission_bps [Integer] Commission in basis points
+    # @param signer [String] Signer address (lowercased)
+    # @param unjailed [Boolean] Initial jail status (true = unjailed)
+    # @param initial_wei [Integer] Initial self-stake in wei
+    # @return [Hash] Exchange response
+    def c_validator_register(node_ip:, name:, description:, delegations_disabled:, commission_bps:,
+                             signer:, unjailed:, initial_wei:)
+      c_validator_action(
+        register: {
+          profile: {
+            node_ip: { Ip: node_ip },
+            name: name,
+            description: description,
+            delegations_disabled: delegations_disabled,
+            commission_bps: Integer(commission_bps),
+            signer: signer.downcase
+          },
+          unjailed: unjailed,
+          initial_wei: Integer(initial_wei)
+        }
+      )
+    end
+
+    # Validator operators: change the validator profile (`CValidatorAction` L1 action, changeProfile variant).
+    # Every field is always sent; nil means "leave unchanged" (sent as JSON null).
+    # @param unjailed [Boolean] Desired jail status (required)
+    # @param node_ip [String, nil] New node IP (sent as { Ip: node_ip }) or nil
+    # @param name [String, nil] New name or nil
+    # @param description [String, nil] New description or nil
+    # @param disable_delegations [Boolean, nil] Enable/disable delegations, or nil
+    # @param commission_bps [Integer, nil] New commission in basis points, or nil
+    # @param signer [String, nil] New signer address (lowercased), or nil
+    # @return [Hash] Exchange response
+    def c_validator_change_profile(unjailed:, node_ip: nil, name: nil, description: nil,
+                                   disable_delegations: nil, commission_bps: nil, signer: nil)
+      c_validator_action(
+        changeProfile: {
+          node_ip: node_ip.nil? ? nil : { Ip: node_ip },
+          name: name,
+          description: description,
+          unjailed: unjailed,
+          disable_delegations: disable_delegations,
+          commission_bps: commission_bps.nil? ? nil : Integer(commission_bps),
+          signer: signer&.downcase
+        }
+      )
+    end
+
+    # Validator operators: unregister the validator (`CValidatorAction` L1 action, unregister variant).
+    # @return [Hash] Exchange response
+    def c_validator_unregister
+      c_validator_action(unregister: nil)
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!
@@ -1760,6 +1820,18 @@ module Hyperliquid
     def c_signer_action(variant)
       nonce = timestamp_ms
       action = { type: 'CSignerAction', variant => nil }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Build, sign, and post a `CValidatorAction` L1 action. `type` is always the first key.
+    # @param variant_body [Hash] Exactly one of { register: {...} }, { changeProfile: {...} }, { unregister: nil }
+    def c_validator_action(variant_body)
+      nonce = timestamp_ms
+      action = { type: 'CValidatorAction' }.merge(variant_body)
       signature = @signer.sign_l1_action(
         action, nonce,
         expires_after: @expires_after

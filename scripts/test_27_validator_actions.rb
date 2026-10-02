@@ -79,4 +79,17 @@ expect_rejection('c_signer_jail_self',
                  sdk.exchange.c_signer_jail_self,
                  'Signer invalid or inactive for current epoch')
 
+# --- CValidatorAction ---
+# change_profile sends unjailed: true with every other field nil: for any account this is at
+# worst a no-op/unjail, never a jail or rename.
+expect_rejection('c_validator_change_profile',
+                 sdk.exchange.c_validator_change_profile(unjailed: true),
+                 'Unknown validator')
+expect_rejection('c_validator_unregister',
+                 sdk.exchange.c_validator_unregister,
+                 'Action disabled on this chain')
+
+# c_validator_register is NEVER sent: it moves real stake if it ever succeeded, and the server
+# has been observed to get past identity checks for an ordinary wallet.
+
 test_passed('Test 27 validator actions')

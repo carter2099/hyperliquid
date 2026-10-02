@@ -4054,6 +4054,146 @@ RSpec.describe Hyperliquid::Exchange do
     end
   end
 
+  describe '#c_validator_register' do
+    let(:ok_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+    let(:register_args) do
+      {
+        node_ip: '1.2.3.4',
+        name: 'TestValidator',
+        description: 'A test validator',
+        delegations_disabled: true,
+        commission_bps: '500',
+        signer: '0xABCDEF1234567890ABCDEF1234567890ABCDEF12',
+        unjailed: false,
+        initial_wei: 1_000_000_000_000
+      }
+    end
+
+    it 'sends the full register body with lowercased signer and integer commission' do
+      expected = {
+        'type' => 'CValidatorAction',
+        'register' => {
+          'profile' => {
+            'node_ip' => { 'Ip' => '1.2.3.4' },
+            'name' => 'TestValidator',
+            'description' => 'A test validator',
+            'delegations_disabled' => true,
+            'commission_bps' => 500,
+            'signer' => '0xabcdef1234567890abcdef1234567890abcdef12'
+          },
+          'unjailed' => false,
+          'initial_wei' => 1_000_000_000_000
+        }
+      }
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action'] == expected &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash) &&
+            !body.key?('vaultAddress')
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.c_validator_register(**register_args)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'preserves the protocol key order' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          register = JSON.parse(req.body)['action']['register']
+          register.keys == %w[profile unjailed initial_wei] &&
+            register['profile'].keys == %w[node_ip name description delegations_disabled commission_bps signer]
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.c_validator_register(**register_args)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'raises TypeError for a nil commission_bps without sending a request' do
+      expect { exchange.c_validator_register(**register_args, commission_bps: nil) }.to raise_error(TypeError)
+      expect(WebMock).not_to have_requested(:post, exchange_endpoint)
+    end
+  end
+
+  describe '#c_validator_change_profile' do
+    let(:ok_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends every changeProfile key as null when only unjailed is given' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          change = body['action']['changeProfile']
+          body['action']['type'] == 'CValidatorAction' &&
+            change == { 'node_ip' => nil, 'name' => nil, 'description' => nil, 'unjailed' => true,
+                        'disable_delegations' => nil, 'commission_bps' => nil, 'signer' => nil } &&
+            change.keys == %w[node_ip name description unjailed disable_delegations commission_bps signer]
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.c_validator_change_profile(unjailed: true)
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'wraps node_ip, lowercases signer, and keeps disable_delegations false' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          change = JSON.parse(req.body)['action']['changeProfile']
+          change == { 'node_ip' => { 'Ip' => '5.6.7.8' }, 'name' => 'Renamed', 'description' => 'Updated',
+                      'unjailed' => false, 'disable_delegations' => false, 'commission_bps' => 250,
+                      'signer' => '0xabcdef1234567890abcdef1234567890abcdef12' }
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.c_validator_change_profile(
+        unjailed: false,
+        node_ip: '5.6.7.8',
+        name: 'Renamed',
+        description: 'Updated',
+        disable_delegations: false,
+        commission_bps: 250,
+        signer: '0xABCDEF1234567890ABCDEF1234567890ABCDEF12'
+      )
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'omits vaultAddress and propagates expires_after' do
+      exchange.expires_after = 9_999_999_999_999
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['expiresAfter'] == 9_999_999_999_999 &&
+            !body.key?('vaultAddress') &&
+            body.dig('action', 'type') == 'CValidatorAction'
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.c_validator_change_profile(unjailed: true)
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#c_validator_unregister' do
+    let(:ok_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends CValidatorAction with unregister: null' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action'] == { 'type' => 'CValidatorAction', 'unregister' => nil } &&
+            body['action'].key?('unregister') &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.c_validator_unregister
+      expect(result['status']).to eq('ok')
+    end
+  end
+
   # Python SDK parity for validator-operator L1 actions. Fixtures captured 2026-10-01 from
   # hyperliquid-python-sdk 0.24.0 (2fdb18f95176) via
   # ~/agent-state/hyperliquid-sdk-fixtures/capture_validator_action_signatures.py. Do not edit
@@ -4143,6 +4283,110 @@ RSpec.describe Hyperliquid::Exchange do
         'r' => '0x265235480f198a868b3ca097917cc1a8a902096c7a225713e4c3966da8700f91',
         's' => '0x5aed84098873d2504cd1150dd4972e8a38cc7387d083c6e759cd670a55dc35c8',
         'v' => 28
+      )
+    end
+
+    it 'F5: c_validator_register matches Python' do
+      body = posted_body(fixture_exchange) do
+        fixture_exchange.c_validator_register(
+          node_ip: '1.2.3.4',
+          name: 'TestValidator',
+          description: 'A test validator',
+          delegations_disabled: true,
+          commission_bps: 500,
+          signer: '0x0000000000000000000000000000000000000001',
+          unjailed: false,
+          initial_wei: 1_000_000_000_000
+        )
+      end
+      action = {
+        type: 'CValidatorAction',
+        register: {
+          profile: {
+            node_ip: { Ip: '1.2.3.4' },
+            name: 'TestValidator',
+            description: 'A test validator',
+            delegations_disabled: true,
+            commission_bps: 500,
+            signer: '0x0000000000000000000000000000000000000001'
+          },
+          unjailed: false,
+          initial_wei: 1_000_000_000_000
+        }
+      }
+
+      expect(Hyperliquid::Signing::Signer.compute_action_hash(action, fixture_nonce))
+        .to eq('0x23490d4261f0a67161cd534501ceb5cddd4d864024135f8284dd8e19cf76ee20')
+      expect(body['signature']).to eq(
+        'r' => '0x2c988761b731b76b503f970ace714fef407aa84768718ea4f15f57753c77ffc4',
+        's' => '0x3bb5850fb6ee1434ba20adf4167eab76b1c2bb63d10460ba9ecf492032aca935',
+        'v' => 28
+      )
+    end
+
+    it 'F6: c_validator_change_profile(unjailed: true) matches Python' do
+      body = posted_body(fixture_exchange) { fixture_exchange.c_validator_change_profile(unjailed: true) }
+      action = {
+        type: 'CValidatorAction',
+        changeProfile: {
+          node_ip: nil, name: nil, description: nil, unjailed: true,
+          disable_delegations: nil, commission_bps: nil, signer: nil
+        }
+      }
+
+      expect(Hyperliquid::Signing::Signer.compute_action_hash(action, fixture_nonce))
+        .to eq('0x9e82e281cd117741a7460587acfe417c1979675c1e4d7c160f354d1412a381f7')
+      expect(body['signature']).to eq(
+        'r' => '0xc27ad22c714d5d3d2163d724e2a594bc4104d502faa14c1440e91fa094327c78',
+        's' => '0x582643edd1702f7dd797e0e161316d9e2a72c4edeb571d74305320e2f8664581',
+        'v' => 28
+      )
+    end
+
+    it 'F7: c_validator_change_profile with every field matches Python' do
+      body = posted_body(fixture_exchange) do
+        fixture_exchange.c_validator_change_profile(
+          node_ip: '5.6.7.8',
+          name: 'Renamed',
+          description: 'Updated description',
+          unjailed: false,
+          disable_delegations: false,
+          commission_bps: 250,
+          signer: '0x0000000000000000000000000000000000000002'
+        )
+      end
+      action = {
+        type: 'CValidatorAction',
+        changeProfile: {
+          node_ip: { Ip: '5.6.7.8' },
+          name: 'Renamed',
+          description: 'Updated description',
+          unjailed: false,
+          disable_delegations: false,
+          commission_bps: 250,
+          signer: '0x0000000000000000000000000000000000000002'
+        }
+      }
+
+      expect(Hyperliquid::Signing::Signer.compute_action_hash(action, fixture_nonce))
+        .to eq('0x687692ddcfcdfbc7d6b39869cbcb2496f7e15d46b9b94d00a3a07674fdb78884')
+      expect(body['signature']).to eq(
+        'r' => '0x9daa6980f55bf354b3cd59b3bdff6e92c9b8214de92a1b3d354e78bcd2e71ebd',
+        's' => '0x3ecc2898ac4282048782421e6280d23a9f542bfa801e04b8967ec36285538467',
+        'v' => 28
+      )
+    end
+
+    it 'F8: c_validator_unregister matches Python' do
+      body = posted_body(fixture_exchange) { fixture_exchange.c_validator_unregister }
+
+      expect(Hyperliquid::Signing::Signer.compute_action_hash({ type: 'CValidatorAction', unregister: nil },
+                                                              fixture_nonce))
+        .to eq('0xbf75857de4da4a5ed6204cb335f3296fb39cc2dbe99173ec405d1e8dde50d0b9')
+      expect(body['signature']).to eq(
+        'r' => '0x1903aac6497bcc35e8613971842c085665c04fe94d64cafb7b8293db39034de4',
+        's' => '0x041b7ff234441bba63fa5eb994c2f78499c475e5cb40126607244942adc3b798',
+        'v' => 27
       )
     end
 

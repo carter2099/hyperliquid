@@ -246,6 +246,9 @@ Validator-operator L1 actions. Signed by the validator (or, for `c_signer_*`, it
 - `c_signer_jail_self` - Jail the signer's own validator (`CSignerAction`)
 - `c_signer_unjail_self` - Unjail the signer's own validator (`CSignerAction`)
 - `validator_l1_stream(risk_free_rate:)` - Validator vote on the aligned-quote-asset risk-free rate (e.g. `'0.04'` for 4%)
+- `c_validator_register(node_ip:, name:, description:, delegations_disabled:, commission_bps:, signer:, unjailed:, initial_wei:)` - Register a validator (`CValidatorAction`)
+- `c_validator_change_profile(unjailed:, node_ip: nil, name: nil, description: nil, disable_delegations: nil, commission_bps: nil, signer: nil)` - Change validator profile; `nil` fields are left unchanged
+- `c_validator_unregister` - Unregister the validator (`CValidatorAction`)
 
 ### Client Utilities
 

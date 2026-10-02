@@ -70,6 +70,8 @@ User-signed actions (`usd_send`, `withdraw_from_bridge`, `send_to_evm_with_data`
 
 Multi-sig actions (`Exchange#multi_sig`) wrap any inner action with N co-signer signatures. The submitter's outer signature uses `MULTI_SIG_TYPES` over `{hyperliquidChain, multiSigActionHash, nonce}`; the `multiSigActionHash` is `Signer.compute_action_hash` of the multi-sig envelope (with `:type` stripped). Co-signer signing is exposed via `Signing::MultiSig.sign_as_co_signer_l1` (for L1 inner actions — signs `[multi_sig_user, outer_signer, action]` via phantom-agent) and `Signing::MultiSig.sign_as_co_signer_user_signed` (enriches the inner action's typed-data spec with `payloadMultiSigUser`+`outerSigner` address fields). Both mirror the Python SDK byte-for-byte; specs include fixture-based parity tests captured against `eth_account`+`msgpack`. Co-signature *collection* is the caller's responsibility — the SDK does not coordinate signing rooms.
 
+Validator-operator actions (`c_signer_*`, `c_validator_*`, `validator_l1_stream`) are L1 actions. `CValidatorAction` uses protocol-literal snake_case wire keys (`node_ip: { Ip: … }`, `commission_bps`, `delegations_disabled` vs `disable_delegations`, `initial_wei`) and sends every nullable `changeProfile` field as JSON null rather than omitting it — key order, null-vs-omit, and int types are part of the action hash; parity fixtures in `exchange_spec.rb` lock them.
+
 ### Numeric Conversion
 
 - **`float_to_wire`** (in Exchange): converts to string with 8-decimal precision, validates rounding tolerance (`1e-12`), normalizes trailing zeros. No scientific notation.
