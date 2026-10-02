@@ -1423,6 +1423,44 @@ module Hyperliquid
       outcome_deploy_action(venue, { registerStandaloneOutcomeFromTemplate: instance })
     end
 
+    # HIP-4: deploy a question plus its named outcomes in one action
+    # (`outcomeDeploy` L1 action, registerQuestionFromTemplate operation). The protocol
+    # also creates the question's fallback outcome.
+    # @param venue [String] Deployer venue
+    # @param template_id [String] Question template id
+    # @param keyword_to_value [Hash, Array] Question template keyword values (sorted by the SDK)
+    # @param deployer_fee_scale [String, Numeric] Decimal in [0, 10], applies to every outcome of the question
+    # @param named_outcomes [Array<Hash>] Each `{ template_id:, keyword_to_value: }`; order preserved
+    # @return [Hash] Exchange response
+    def register_question_from_template(venue:, template_id:, keyword_to_value:, deployer_fee_scale:, named_outcomes:)
+      outcome_deploy_action(
+        venue,
+        { registerQuestionFromTemplate: {
+          questionTemplateInstance: outcome_template_instance(template_id, keyword_to_value, deployer_fee_scale),
+          namedOutcomeTemplateInstances: named_outcomes.map do |named|
+            outcome_template_instance(named.fetch(:template_id), named.fetch(:keyword_to_value))
+          end
+        } }
+      )
+    end
+
+    # HIP-4: add one named outcome to a live template-deployed question
+    # (`outcomeDeploy` L1 action, registerAndAssociateNamedOutcomeFromTemplate operation).
+    # @param venue [String] Deployer venue
+    # @param question [Integer] Question identifier
+    # @param template_id [String] Question-outcome template id (parent must be the question's template)
+    # @param keyword_to_value [Hash, Array] Template keyword values (sorted by the SDK)
+    # @return [Hash] Exchange response
+    def register_and_associate_named_outcome_from_template(venue:, question:, template_id:, keyword_to_value:)
+      outcome_deploy_action(
+        venue,
+        { registerAndAssociateNamedOutcomeFromTemplate: {
+          question: question.to_i,
+          namedOutcomeTemplateInstance: outcome_template_instance(template_id, keyword_to_value)
+        } }
+      )
+    end
+
     # HIP-4: settle one outcome of the venue (`outcomeDeploy` L1 action, settleOutcome operation).
     # `name`, `description` and `side_names` must exactly match the outcome (copy them from
     # Info#outcome_meta: name, description, sideSpecs[].name).
@@ -1438,6 +1476,23 @@ module Hyperliquid
       settlement = outcome_settlement(outcome: outcome, settle_fraction: settle_fraction, name: name,
                                       description: description, side_names: side_names, details: details)
       outcome_deploy_action(venue, { settleOutcome: settlement })
+    end
+
+    # HIP-4: grant or revoke sub-deployer permissions per operation
+    # (`outcomeDeploy` L1 action, setSubDeployers operation).
+    # @param venue [String] Deployer venue
+    # @param changes [Array<Hash>] Each `{ variant:, user:, allowed: }` where variant is the camelCase
+    #   wire name (registerStandaloneOutcomeFromTemplate, registerQuestionFromTemplate,
+    #   registerAndAssociateNamedOutcomeFromTemplate, settleOutcome, or settleQuestion — which
+    #   authorizes settle_question); user is lowercased; order preserved
+    # @return [Hash] Exchange response
+    def set_outcome_sub_deployers(venue:, changes:)
+      outcome_deploy_action(
+        venue,
+        { setSubDeployers: changes.map do |change|
+          { variant: change.fetch(:variant).to_s, user: change.fetch(:user).downcase, allowed: change.fetch(:allowed) }
+        end }
+      )
     end
 
     # Finalize the link between a HyperCore spot token and an ERC-20 contract on

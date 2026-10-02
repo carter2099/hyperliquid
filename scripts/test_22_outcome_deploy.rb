@@ -91,4 +91,21 @@ probe('settle_outcome') do
   exchange.settle_outcome(venue: venue, settle_fraction: '0', **settle_inputs)
 end
 
+probe('register_question_from_template') do
+  exchange.register_question_from_template(
+    venue: venue, template_id: 'x', keyword_to_value: {}, deployer_fee_scale: '0',
+    named_outcomes: [{ template_id: 'y', keyword_to_value: {} }]
+  )
+end
+
+probe('register_and_associate_named_outcome_from_template') do
+  exchange.register_and_associate_named_outcome_from_template(
+    venue: venue, question: 0, template_id: 'y', keyword_to_value: {}
+  )
+end
+
+probe('set_outcome_sub_deployers') do
+  exchange.set_outcome_sub_deployers(venue: venue, changes: [{ variant: 'settleOutcome', user: signer, allowed: false }])
+end
+
 test_passed('Test 22 outcome deploy')

@@ -4238,6 +4238,64 @@ RSpec.describe Hyperliquid::Exchange do
         expect(body.dig('action', 'operation', 'settleOutcome', 'outcome')).to eq(7)
       end
     end
+
+    describe '#register_question_from_template' do
+      it 'sends named instances without a fee scale, in caller order, each with sorted keywords' do
+        exchange.register_question_from_template(
+          venue: 'ab',
+          template_id: 'q',
+          keyword_to_value: { 'z' => 1, 'a' => 2 },
+          deployer_fee_scale: 0.5,
+          named_outcomes: [
+            { template_id: 'q-outcome', keyword_to_value: { 'choice' => 'B', 'arm' => 'x' } },
+            { template_id: 'q-outcome', keyword_to_value: { 'choice' => 'A' } }
+          ]
+        )
+
+        op = body.dig('action', 'operation', 'registerQuestionFromTemplate')
+        expect(op.keys).to eq(%w[questionTemplateInstance namedOutcomeTemplateInstances])
+        expect(op['questionTemplateInstance']).to eq(
+          'id' => 'q', 'keywordToValue' => [%w[a 2], %w[z 1]], 'deployerFeeScale' => '0.5'
+        )
+        named = op['namedOutcomeTemplateInstances']
+        expect(named.none? { |inst| inst.key?('deployerFeeScale') }).to be(true)
+        expect(named.map { |inst| inst['keywordToValue'] }).to eq([[%w[arm x], %w[choice B]], [%w[choice A]]])
+      end
+    end
+
+    describe '#register_and_associate_named_outcome_from_template' do
+      it 'sends an Integer question and an instance with only id and keywordToValue' do
+        exchange.register_and_associate_named_outcome_from_template(
+          venue: 'ab', question: '3', template_id: 'q-outcome', keyword_to_value: { 'choice' => 'C' }
+        )
+
+        op = body.dig('action', 'operation', 'registerAndAssociateNamedOutcomeFromTemplate')
+        expect(op['question']).to eq(3)
+        expect(op['namedOutcomeTemplateInstance'].keys).to eq(%w[id keywordToValue])
+      end
+    end
+
+    describe '#set_outcome_sub_deployers' do
+      it 'lowercases users, stringifies variants, and keeps caller order' do
+        exchange.set_outcome_sub_deployers(
+          venue: 'ab',
+          changes: [
+            { variant: :settleQuestion, user: '0x00000000000000000000000000000000000000AB', allowed: true },
+            { variant: 'registerQuestionFromTemplate', user: '0x00000000000000000000000000000000000000cd',
+              allowed: false }
+          ]
+        )
+
+        expect(body.dig('action', 'operation', 'setSubDeployers')).to eq(
+          [
+            { 'variant' => 'settleQuestion', 'user' => '0x00000000000000000000000000000000000000ab',
+              'allowed' => true },
+            { 'variant' => 'registerQuestionFromTemplate', 'user' => '0x00000000000000000000000000000000000000cd',
+              'allowed' => false }
+          ]
+        )
+      end
+    end
   end
 
   describe 'HIP-4 deployer L1 signature parity' do
@@ -4347,6 +4405,67 @@ RSpec.describe Hyperliquid::Exchange do
           'v' => 28
         },
         expires_after: 1_700_000_060_000
+      )
+    end
+
+    it 'matches the Python SDK for registerQuestionFromTemplate' do
+      fixture_exchange.register_question_from_template(
+        venue: 'ab',
+        template_id: 'abc',
+        keyword_to_value: { 'expiry' => '20260801-1830' },
+        deployer_fee_scale: '1',
+        named_outcomes: [
+          { template_id: 'abc-outcome', keyword_to_value: { 'choice' => 'A' } },
+          { template_id: 'abc-outcome', keyword_to_value: { 'choice' => 'B' } },
+          { template_id: 'abc-other', keyword_to_value: {} }
+        ]
+      )
+
+      expect_parity(
+        '0x889b7e71f3f06da88a74356b9b52444386c7510e36c385182b9ef3e6e349afa1',
+        {
+          'r' => '0xb38fbd449bd3d5099e867a58b71f4c3c0cfb5b0e37ce2df64e8cc0e9569a0862',
+          's' => '0x78b246c0577de60e58d797c8374003cd251d985da97f2c287e060b629970cafb',
+          'v' => 28
+        }
+      )
+    end
+
+    it 'matches the Python SDK for registerAndAssociateNamedOutcomeFromTemplate' do
+      fixture_exchange.register_and_associate_named_outcome_from_template(
+        venue: 'ab',
+        question: 3,
+        template_id: 'abc-outcome',
+        keyword_to_value: { 'choice' => 'C' }
+      )
+
+      expect_parity(
+        '0xc25d0d6850dc5de58e7bdde78b509f31d4bf747550b98bbeaada76a0f80d02e3',
+        {
+          'r' => '0xa21f568f1051d7a92b8c95748a0e7f2e60271762889f9530f486af7ef3a5c54e',
+          's' => '0x5f696891a0961a358d091ad10061a347bcd6579fb13586586ae8180fc1d84c05',
+          'v' => 28
+        }
+      )
+    end
+
+    it 'matches the Python SDK for setSubDeployers (mixed-case user, Symbol variant)' do
+      fixture_exchange.set_outcome_sub_deployers(
+        venue: 'ab',
+        changes: [
+          { variant: 'registerStandaloneOutcomeFromTemplate', user: '0x0000000000000000000000000000000000000ABC',
+            allowed: true },
+          { variant: :settleQuestion, user: '0x0000000000000000000000000000000000000abc', allowed: false }
+        ]
+      )
+
+      expect_parity(
+        '0xa7304fc7105de0a6cf0a20f07c48fc873b1847839ee1c52f2cbc60f0fab7ff15',
+        {
+          'r' => '0xb62c470807e24691144d3298367d6a84859ae09fc6f3dbbb0ee74cb6b3ca3623',
+          's' => '0x779a0ce8a1b2050a18a2ec515b91d9241b4b220541471bd8c8b795924d5aa510',
+          'v' => 28
+        }
       )
     end
   end

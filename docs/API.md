@@ -254,7 +254,10 @@ Deployer actions for HIP-4 outcome venues. `keyword_to_value` takes a Hash or an
 - `activate_outcome_deployer(venue_name:)` - Activate this wallet as an outcome deployer and claim `venue_name` (2-4 lowercase letters); locks stake and reserves the venue permanently
 - `deactivate_outcome_deployer` - Permanently deactivate this wallet as an outcome deployer (needs the minimum staking duration elapsed and no active outcomes)
 - `register_standalone_outcome_from_template(venue:, template_id:, keyword_to_value:, deployer_fee_scale:)` - Deploy a standalone Yes/No outcome from a template; `deployer_fee_scale` is a decimal in [0, 10]
+- `register_question_from_template(venue:, template_id:, keyword_to_value:, deployer_fee_scale:, named_outcomes:)` - Deploy a question and its named outcomes; `named_outcomes` is an Array of `{ template_id:, keyword_to_value: }` (order kept); the fee scale applies to every outcome of the question
+- `register_and_associate_named_outcome_from_template(venue:, question:, template_id:, keyword_to_value:)` - Add one named outcome to a live template-deployed question
 - `settle_outcome(venue:, outcome:, settle_fraction:, name:, description:, side_names:, details: '')` - Settle one outcome; `settle_fraction` is the first side's payout in [0, 1]; `side_names` is the two side names
+- `set_outcome_sub_deployers(venue:, changes:)` - Grant or revoke sub-deployer permissions; `changes` is an Array of `{ variant:, user:, allowed: }` with the camelCase operation name (`'settleQuestion'` authorizes `settle_question`); `user` is lowercased, order kept
 
 ### Tokens and HyperEVM
 
