@@ -5,6 +5,11 @@
 #
 # Default: read-only report (abstraction, balances, open positions/orders,
 # staking, builder eligibility). Exit 0.
+# --assert: read-only gate check used by scripts/test_all.rb before and after the
+#         suite. Prints one `VIOLATION:` line per problem (open order, non-zero
+#         position, non-standard abstraction, portfolio margin on, spot USDC
+#         available < $40, perp withdrawable < $60) and exits 1; otherwise prints
+#         `WALLET ASSERT: OK` and exits 0.
 # --fix:  close leftover positions/orders, switch a unified wallet to standard
 #         ('disabled') abstraction, and rebalance USDC so perp >= $60 withdrawable
 #         and spot >= $40 available. Never run from a runner.
@@ -12,7 +17,7 @@
 #         beyond what was already safe), 1 on an unexpected API result.
 #
 # Usage:
-#   HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/testnet_wallet_check.rb [--fix]
+#   HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/testnet_wallet_check.rb [--assert | --fix]
 
 require_relative 'test_helpers'
 
@@ -22,6 +27,11 @@ BUILDER = '0xe019d6167E7e324aEd003d94098496b6d986aB05' # keep in sync with test_
 PERP_TARGET = 60
 SPOT_TARGET = 40
 MIN_TOTAL = PERP_TARGET + SPOT_TARGET
+# --fix tops a short side up to target + headroom (when the other side can spare it):
+# gate trading fees erode perp by cents per run, and topping up to exactly the
+# target made the next pre-flight --assert fail (observed: perp $59.93).
+# PERP_TARGET + HEADROOM must stay < 100 (see PERP_TARGET).
+REBALANCE_HEADROOM = 10
 STANDARD_MODES = %w[disabled default].freeze
 
 def snapshot(sdk, addr)
@@ -56,6 +66,37 @@ def targets_met?(snap)
   STANDARD_MODES.include?(snap[:abstraction]) &&
     snap[:perp_withdrawable] >= PERP_TARGET &&
     snap[:spot_usdc_avail] >= SPOT_TARGET
+end
+
+def violations(snap)
+  found = snap[:orders].map do |o|
+    "open order #{o['coin']} oid=#{o['oid']} #{o['side']} #{o['sz']} @ #{o['limitPx']}"
+  end
+  found.concat(snap[:positions].map { |p| "open position #{p['coin']} szi=#{p['szi']} entryPx=#{p['entryPx']}" })
+  if snap[:abstraction] == 'portfolioMargin'
+    found << 'portfolio margin is on'
+  elsif !STANDARD_MODES.include?(snap[:abstraction])
+    found << "abstraction #{snap[:abstraction].inspect} is not standard (#{STANDARD_MODES.join('/')})"
+  end
+  if snap[:spot_usdc_avail] < SPOT_TARGET
+    found << "spot USDC available #{money(snap[:spot_usdc_avail])} < #{money(SPOT_TARGET)}"
+  end
+  if snap[:perp_withdrawable] < PERP_TARGET
+    found << "perp withdrawable #{money(snap[:perp_withdrawable])} < #{money(PERP_TARGET)}"
+  end
+  found
+end
+
+def assert_wallet(snap)
+  found = violations(snap)
+  if found.empty?
+    puts 'WALLET ASSERT: OK'
+    exit 0
+  end
+
+  found.each { |v| puts "VIOLATION: #{v}" }
+  puts "WALLET ASSERT: FAIL (#{found.length} violation(s)) - #{FIX_HINT}"
+  exit 1
 end
 
 def report(sdk, addr, snap)
@@ -136,15 +177,25 @@ def underfunded_after_switch(snap)
   exit 2
 end
 
+# Transfer amount that lifts `short` to target + headroom while `other` keeps its own
+# target, falling back to the bare minimum; nil when even that does not fit.
+def top_up_amount(short, short_target, other, other_target)
+  [short_target + REBALANCE_HEADROOM, short_target].each do |goal|
+    need = (goal - short).ceil
+    return need if other - need >= other_target
+  end
+  nil
+end
+
 def rebalance(sdk, addr, snap)
   if snap[:perp_withdrawable] < PERP_TARGET
-    need = (PERP_TARGET - snap[:perp_withdrawable]).ceil
-    underfunded_after_switch(snap) unless snap[:spot_usdc_avail] - need >= SPOT_TARGET
+    need = top_up_amount(snap[:perp_withdrawable], PERP_TARGET, snap[:spot_usdc_avail], SPOT_TARGET)
+    underfunded_after_switch(snap) unless need
     puts "Transferring $#{need} spot -> perp..."
     require_ok(sdk.exchange.usd_class_transfer(amount: need.to_s, to_perp: true), 'usd_class_transfer')
   elsif snap[:spot_usdc_avail] < SPOT_TARGET
-    need = (SPOT_TARGET - snap[:spot_usdc_avail]).ceil
-    underfunded_after_switch(snap) unless snap[:perp_withdrawable] - need >= PERP_TARGET
+    need = top_up_amount(snap[:spot_usdc_avail], SPOT_TARGET, snap[:perp_withdrawable], PERP_TARGET)
+    underfunded_after_switch(snap) unless need
     puts "Transferring $#{need} perp -> spot..."
     require_ok(sdk.exchange.usd_class_transfer(amount: need.to_s, to_perp: false), 'usd_class_transfer')
   else
@@ -156,11 +207,15 @@ def rebalance(sdk, addr, snap)
 end
 
 fix = ARGV.include?('--fix')
+assert = ARGV.include?('--assert')
+abort red('--assert and --fix are mutually exclusive') if fix && assert
+
 sdk = build_sdk
 addr = sdk.exchange.address
-separator("TESTNET WALLET CHECK#{fix ? ' --fix' : ''}")
-
 snap = snapshot(sdk, addr)
+assert_wallet(snap) if assert
+
+separator("TESTNET WALLET CHECK#{fix ? ' --fix' : ''}")
 report(sdk, addr, snap)
 exit 0 unless fix
 
