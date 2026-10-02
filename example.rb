@@ -5,7 +5,7 @@ require_relative 'lib/hyperliquid'
 
 # Example usage of the Hyperliquid Ruby SDK
 
-puts 'Hyperliquid Ruby SDK v0.4.0 - API Examples'
+puts "Hyperliquid Ruby SDK v#{Hyperliquid::VERSION} - API Examples"
 puts '=' * 50
 
 # =============================================================================
