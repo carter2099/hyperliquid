@@ -1,15 +1,71 @@
 # frozen_string_literal: true
 
+require 'spec_helper'
 require 'zlib'
+
+# Stands in for WSLite::Client: records the handlers WS::Client registers in its
+# establish_*_connection block and the frames it sends, so specs can drive socket events.
+class FakeWSLiteSocket
+  Message = Struct.new(:data)
+
+  attr_reader :url, :sent
+
+  def initialize(url)
+    @url = url
+    @handlers = {}
+    @sent = []
+    @closed = false
+  end
+
+  def on(event, &handler)
+    @handlers[event] = handler
+  end
+
+  def send(data)
+    @sent << data
+  end
+
+  def sent_json
+    @sent.map { |frame| JSON.parse(frame) }
+  end
+
+  # Client-initiated close: ws_lite emits its internal :__close, then :close.
+  def close
+    return if @closed
+
+    @closed = true
+    emit(:__close)
+    emit(:close)
+  end
+
+  # Server-initiated close / network drop: ws_lite 1.0.1 emits only :__close (its read thread
+  # kills itself before emitting :close).
+  def drop!
+    @closed = true
+    emit(:__close)
+  end
+
+  def emit(event, arg = nil)
+    @handlers.fetch(event).call(arg)
+  end
+
+  # Like ws_lite's read loop: an exception raised by the :message handler is re-emitted as :error.
+  def receive(text)
+    emit(:message, Message.new(text))
+  rescue StandardError => e
+    emit(:error, e)
+  end
+end
 
 RSpec.describe Hyperliquid::WS::Client do
   let(:client) { described_class.new(testnet: false) }
   let(:testnet_client) { described_class.new(testnet: true) }
   let(:noop) { proc { |_d| } }
+  let(:created_clients) { [] }
 
   # Mock WebSocket object
   let(:mock_ws) do
-    ws = instance_double('WSLite::Client')
+    ws = instance_double(WSLite::Client)
     allow(ws).to receive(:send)
     allow(ws).to receive(:close)
     allow(ws).to receive(:on)
@@ -18,25 +74,26 @@ RSpec.describe Hyperliquid::WS::Client do
 
   before do
     allow(WSLite).to receive(:connect).and_return(mock_ws)
+    allow(described_class).to receive(:new).and_wrap_original do |original, *args, **kwargs|
+      original.call(*args, **kwargs).tap { |c| created_clients << c }
+    end
   end
 
+  # Stops the dispatch/ping threads any example started.
+  after { created_clients.each(&:close) }
+
   describe '#initialize' do
-    it 'creates client with mainnet URL by default' do
-      c = described_class.new
-      expect(c).not_to be_connected
-    end
-
-    it 'creates client with testnet URL when testnet: true' do
-      c = described_class.new(testnet: true)
-      expect(c).not_to be_connected
-    end
-
     it 'starts disconnected' do
       expect(client).not_to be_connected
     end
 
-    it 'defaults to max queue size of 1024' do
+    it 'defaults to a 1024-message queue, dropping the 1025th' do
+      1024.times { |i| client.send(:enqueue_message, 'l2Book:eth', { 'seq' => i }) }
       expect(client.dropped_message_count).to eq(0)
+
+      expect { client.send(:enqueue_message, 'l2Book:eth', { 'seq' => 1024 }) }
+        .to output(/Queue full \(1024\)/).to_stderr
+      expect(client.dropped_message_count).to eq(1)
     end
   end
 
@@ -195,7 +252,7 @@ RSpec.describe Hyperliquid::WS::Client do
         client.send(:enqueue_message, 'l2Book:eth', { 'seq' => i })
       end
 
-      sleep 0.1
+      wait_until { received.size == 3 }
 
       expect(received).to eq([0, 1, 2])
 
@@ -258,7 +315,7 @@ RSpec.describe Hyperliquid::WS::Client do
       client.send(:start_dispatch_thread)
       client.send(:enqueue_message, 'l2Book:eth', { 'coin' => 'ETH' })
 
-      sleep 0.1
+      wait_until { received1.any? && received2.any? }
 
       expect(received1).to eq([{ 'coin' => 'ETH' }])
       expect(received2).to eq([{ 'coin' => 'ETH' }])
@@ -279,7 +336,7 @@ RSpec.describe Hyperliquid::WS::Client do
       client.send(:start_dispatch_thread)
       client.send(:enqueue_message, 'l2Book:eth', { 'ok' => true })
 
-      sleep 0.1
+      wait_until { received.any? }
 
       expect(received).to eq([{ 'ok' => true }])
 
@@ -292,83 +349,24 @@ RSpec.describe Hyperliquid::WS::Client do
     it 'ping thread sends ping periodically' do
       client.instance_variable_set(:@connected, true)
       client.instance_variable_set(:@ws, mock_ws)
-
-      stub_const('Hyperliquid::Constants::WS_PING_INTERVAL', 0.05)
-
-      ping_msg = JSON.generate({ method: 'ping' })
-      expect(mock_ws).to receive(:send).with(ping_msg).at_least(:once)
+      stub_const('Hyperliquid::Constants::WS_PING_INTERVAL', 0.01)
+      sent = Queue.new
+      allow(mock_ws).to receive(:send) { |frame| sent << frame }
 
       client.send(:start_ping_thread)
-      sleep 0.15
 
-      client.instance_variable_set(:@closing, true)
-      client.instance_variable_get(:@ping_thread)&.kill
-    end
-  end
-
-  describe 'reconnection' do
-    it 'replays subscriptions on reconnect' do
-      client.instance_variable_set(:@connected, true)
-      client.instance_variable_set(:@ws, mock_ws)
-      allow(mock_ws).to receive(:send)
-
-      client.subscribe({ type: 'l2Book', coin: 'ETH' }, &noop)
-
-      sub_msg = JSON.generate({ method: 'subscribe', subscription: { type: 'l2Book', coin: 'ETH' } })
-      expect(mock_ws).to receive(:send).with(sub_msg)
-
-      client.send(:handle_open)
-    end
-  end
-
-  describe 'stale connection guard' do
-    it 'ignores handle_close from a superseded connection' do
-      client.instance_variable_set(:@connected, true)
-      client.instance_variable_set(:@connection_id, 2)
-
-      # Simulate a stale callback from connection_id=1
-      expect(client.send(:stale_connection?, 1)).to be true
-      expect(client.send(:stale_connection?, 2)).to be false
-    end
-
-    it 'does not set connected=false when stale close fires' do
-      client.instance_variable_set(:@connected, true)
-      client.instance_variable_set(:@connection_id, 2)
-
-      # A stale close should not affect the current connection state
-      # (The guard is in the closure, so we test via stale_connection? directly)
-      expect(client.send(:stale_connection?, 1)).to be true
-      expect(client).to be_connected
-    end
-
-    it 'increments connection_id on each establish_connection call' do
-      initial_id = client.instance_variable_get(:@connection_id)
-
-      client.send(:establish_connection)
-      expect(client.instance_variable_get(:@connection_id)).to eq(initial_id + 1)
-
-      client.send(:establish_connection)
-      expect(client.instance_variable_get(:@connection_id)).to eq(initial_id + 2)
+      expect([sent.pop(timeout: 2), sent.pop(timeout: 2)]).to eq(['{"method":"ping"}'] * 2)
     end
   end
 
   describe 'lifecycle' do
-    it 'connected? reflects connection state' do
-      expect(client).not_to be_connected
-
-      client.instance_variable_set(:@connected, true)
-      expect(client).to be_connected
-
-      client.instance_variable_set(:@connected, false)
-      expect(client).not_to be_connected
-    end
-
     it 'close stops threads and disconnects' do
       client.instance_variable_set(:@connected, true)
       client.instance_variable_set(:@ws, mock_ws)
 
       client.send(:start_dispatch_thread)
       client.send(:start_ping_thread)
+      threads = [client.instance_variable_get(:@dispatch_thread), client.instance_variable_get(:@ping_thread)]
 
       expect(mock_ws).to receive(:close)
 
@@ -376,15 +374,14 @@ RSpec.describe Hyperliquid::WS::Client do
 
       expect(client).not_to be_connected
       expect(client.instance_variable_get(:@ws)).to be_nil
-      expect(client.instance_variable_get(:@ping_thread)).to be_nil
-      expect(client.instance_variable_get(:@dispatch_thread)).to be_nil
+      expect(threads.map { |t| t.join(2) && t.alive? }).to eq([false, false])
     end
 
     it 'on registers lifecycle callbacks' do
       opened = false
       client.on(:open) { opened = true }
 
-      client.send(:handle_open)
+      client.send(:handle_open, mock_ws)
       expect(opened).to be true
     end
 
@@ -404,24 +401,6 @@ RSpec.describe Hyperliquid::WS::Client do
       err = StandardError.new('test error')
       client.send(:handle_error, err)
       expect(error_received).to eq(err)
-    end
-  end
-
-  describe 'queued subscriptions flushed on connect' do
-    it 'sends queued subscriptions when connection opens' do
-      client.subscribe({ type: 'l2Book', coin: 'ETH' }, &noop)
-
-      pending = client.instance_variable_get(:@pending_subscriptions)
-      expect(pending.length).to eq(1)
-
-      client.instance_variable_set(:@ws, mock_ws)
-
-      sub_msg = JSON.generate({ method: 'subscribe', subscription: { type: 'l2Book', coin: 'ETH' } })
-      expect(mock_ws).to receive(:send).with(sub_msg)
-
-      client.send(:handle_open)
-
-      expect(client.instance_variable_get(:@pending_subscriptions)).to be_empty
     end
   end
 
@@ -1019,7 +998,7 @@ RSpec.describe Hyperliquid::WS::Client do
       client.send(:start_dispatch_thread)
 
       client.send(:handle_message, frame(docs_payload))
-      sleep 0.1
+      wait_until { received.any? }
 
       expect(received).to eq([docs_decoded])
       queue.close
@@ -1038,37 +1017,11 @@ RSpec.describe Hyperliquid::WS::Client do
     end
 
     let(:mock_explorer_ws) do
-      ws = instance_double('WSLite::Client')
+      ws = instance_double(WSLite::Client)
       allow(ws).to receive(:send)
       allow(ws).to receive(:close)
       allow(ws).to receive(:on)
       ws
-    end
-
-    describe 'initialization' do
-      it 'stores explorer_ws_url when provided' do
-        c = described_class.new(explorer_ws_url: 'wss://rpc.hyperliquid.xyz/ws')
-        expect(c.instance_variable_get(:@explorer_ws_url)).to eq('wss://rpc.hyperliquid.xyz/ws')
-      end
-
-      it 'initializes explorer ivars to nil/false/empty' do
-        c = described_class.new(explorer_ws_url: 'wss://rpc.hyperliquid.xyz/ws')
-        expect(c.instance_variable_get(:@explorer_ws)).to be_nil
-        expect(c.instance_variable_get(:@explorer_connected)).to be false
-        expect(c.instance_variable_get(:@explorer_closing)).to be false
-        expect(c.instance_variable_get(:@explorer_subscriptions)).to eq({})
-        expect(c.instance_variable_get(:@explorer_subscription_msgs)).to eq({})
-        expect(c.instance_variable_get(:@explorer_pending_subscriptions)).to eq([])
-      end
-
-      it 'defaults explorer_ws_url to nil when not provided' do
-        c = described_class.new
-        expect(c.instance_variable_get(:@explorer_ws_url)).to be_nil
-      end
-
-      it 'explorer_dropped_message_count starts at 0' do
-        expect(explorer_client.explorer_dropped_message_count).to eq(0)
-      end
     end
 
     describe '#subscribe_explorer_block' do
@@ -1093,13 +1046,6 @@ RSpec.describe Hyperliquid::WS::Client do
       it 'auto-connects explorer WS when not connected' do
         expect(WSLite).to receive(:connect).with('wss://rpc.hyperliquid.xyz/ws').and_return(mock_explorer_ws)
         explorer_client.subscribe_explorer_block { |_d| }
-      end
-
-      it 'queues subscription when not yet connected' do
-        allow(WSLite).to receive(:connect).and_return(mock_explorer_ws)
-        explorer_client.subscribe_explorer_block { |_d| }
-        pending = explorer_client.instance_variable_get(:@explorer_pending_subscriptions)
-        expect(pending).to include({ type: 'explorerBlock' })
       end
 
       it 'sends subscribe message when already connected' do
@@ -1467,7 +1413,7 @@ RSpec.describe Hyperliquid::WS::Client do
           explorer_client.send(:enqueue_explorer_message, 'explorerBlock', { 'height' => i })
         end
 
-        sleep 0.1
+        wait_until { received.size == 3 }
 
         expect(received).to eq([0, 1, 2])
 
@@ -1485,7 +1431,7 @@ RSpec.describe Hyperliquid::WS::Client do
         explorer_client.send(:start_explorer_dispatch_thread)
         explorer_client.send(:enqueue_explorer_message, 'explorerBlock', { 'ok' => true })
 
-        sleep 0.1
+        wait_until { received.any? }
 
         expect(received).to eq([{ 'ok' => true }])
 
@@ -1504,7 +1450,7 @@ RSpec.describe Hyperliquid::WS::Client do
         explorer_client.send(:start_explorer_dispatch_thread)
         explorer_client.send(:enqueue_explorer_message, 'explorerBlock', { 'height' => 1 })
 
-        sleep 0.1
+        wait_until { received1.any? && received2.any? }
 
         expect(received1).to eq([{ 'height' => 1 }])
         expect(received2).to eq([{ 'height' => 1 }])
@@ -1518,80 +1464,17 @@ RSpec.describe Hyperliquid::WS::Client do
       it 'ping thread sends ping periodically' do
         explorer_client.instance_variable_set(:@explorer_connected, true)
         explorer_client.instance_variable_set(:@explorer_ws, mock_explorer_ws)
-
-        stub_const('Hyperliquid::Constants::WS_PING_INTERVAL', 0.05)
-
-        ping_msg = JSON.generate({ method: 'ping' })
-        expect(mock_explorer_ws).to receive(:send).with(ping_msg).at_least(:once)
+        stub_const('Hyperliquid::Constants::WS_PING_INTERVAL', 0.01)
+        sent = Queue.new
+        allow(mock_explorer_ws).to receive(:send) { |frame| sent << frame }
 
         explorer_client.send(:start_explorer_ping_thread)
-        sleep 0.15
 
-        explorer_client.instance_variable_set(:@explorer_closing, true)
-        explorer_client.instance_variable_get(:@explorer_ping_thread)&.kill
-      end
-    end
-
-    describe 'explorer reconnection' do
-      it 'replays explorer subscriptions on reconnect' do
-        explorer_client.instance_variable_set(:@explorer_ws, mock_explorer_ws)
-        allow(mock_explorer_ws).to receive(:send)
-
-        explorer_client.subscribe_explorer_block { |_d| }
-
-        sub_msg = JSON.generate({ method: 'subscribe', subscription: { type: 'explorerBlock' } })
-        expect(mock_explorer_ws).to receive(:send).with(sub_msg)
-
-        explorer_client.send(:handle_explorer_open)
-      end
-
-      it 'stale explorer connection guard works' do
-        explorer_client.instance_variable_set(:@explorer_connection_id, 2)
-
-        expect(explorer_client.send(:stale_explorer_connection?, 1)).to be true
-        expect(explorer_client.send(:stale_explorer_connection?, 2)).to be false
-      end
-
-      it 'increments explorer_connection_id on each establish call' do
-        allow(WSLite).to receive(:connect).and_return(mock_explorer_ws)
-
-        initial_id = explorer_client.instance_variable_get(:@explorer_connection_id)
-
-        explorer_client.send(:establish_explorer_connection)
-        expect(explorer_client.instance_variable_get(:@explorer_connection_id)).to eq(initial_id + 1)
-
-        explorer_client.send(:establish_explorer_connection)
-        expect(explorer_client.instance_variable_get(:@explorer_connection_id)).to eq(initial_id + 2)
-      end
-
-      it 'handle_explorer_close triggers reconnect when not closing' do
-        explorer_client.instance_variable_set(:@explorer_connected, true)
-        allow(Thread).to receive(:new).and_call_original
-
-        expect(Thread).to receive(:new).and_return(Thread.new { nil })
-        explorer_client.send(:handle_explorer_close, nil)
-      end
-
-      it 'handle_explorer_close does not reconnect when closing' do
-        explorer_client.instance_variable_set(:@explorer_connected, true)
-        explorer_client.instance_variable_set(:@explorer_closing, true)
-
-        expect(Thread).not_to receive(:new)
-        explorer_client.send(:handle_explorer_close, nil)
+        expect([sent.pop(timeout: 2), sent.pop(timeout: 2)]).to eq(['{"method":"ping"}'] * 2)
       end
     end
 
     describe 'explorer lifecycle' do
-      it 'explorer_connected? reflects connection state' do
-        expect(explorer_client).not_to be_explorer_connected
-
-        explorer_client.instance_variable_set(:@explorer_connected, true)
-        expect(explorer_client).to be_explorer_connected
-
-        explorer_client.instance_variable_set(:@explorer_connected, false)
-        expect(explorer_client).not_to be_explorer_connected
-      end
-
       it 'close tears down both connections' do
         explorer_client.instance_variable_set(:@connected, true)
         explorer_client.instance_variable_set(:@ws, mock_ws)
@@ -1609,7 +1492,7 @@ RSpec.describe Hyperliquid::WS::Client do
         expect(explorer_client.instance_variable_get(:@explorer_ws)).to be_nil
       end
 
-      it 'close kills both ping threads and both dispatch threads' do
+      it 'close stops both ping threads and both dispatch threads' do
         explorer_client.instance_variable_set(:@ws, mock_ws)
         explorer_client.instance_variable_set(:@explorer_ws, mock_explorer_ws)
 
@@ -1617,40 +1500,264 @@ RSpec.describe Hyperliquid::WS::Client do
         explorer_client.send(:start_ping_thread)
         explorer_client.send(:start_explorer_dispatch_thread)
         explorer_client.send(:start_explorer_ping_thread)
+        threads = %i[@dispatch_thread @ping_thread @explorer_dispatch_thread @explorer_ping_thread]
+                  .map { |ivar| explorer_client.instance_variable_get(ivar) }
 
         explorer_client.close
 
-        expect(explorer_client.instance_variable_get(:@ping_thread)).to be_nil
-        expect(explorer_client.instance_variable_get(:@explorer_ping_thread)).to be_nil
-        expect(explorer_client.instance_variable_get(:@dispatch_thread)).to be_nil
-        expect(explorer_client.instance_variable_get(:@explorer_dispatch_thread)).to be_nil
+        expect(threads.map { |t| t.join(2) && t.alive? }).to eq([false] * 4)
       end
+    end
+  end
 
-      it '@explorer_closing prevents spurious reconnect' do
-        explorer_client.instance_variable_set(:@explorer_connected, true)
-        explorer_client.close
+  # ── Socket lifecycle, driven through a fake ws_lite socket ──────
 
-        expect(explorer_client.instance_variable_get(:@explorer_closing)).to be true
+  describe 'socket lifecycle' do
+    let(:sockets) { [] }
+    let(:backoff_delays) { [] }
+    let(:backoff_gate) { Queue.new }
+    let(:eth_book) { { 'type' => 'l2Book', 'coin' => 'ETH' } }
+    let(:eth_frame) { { channel: 'l2Book', data: { coin: 'ETH', levels: [] } }.to_json }
+
+    def subscribe_frame(subscription)
+      { 'method' => 'subscribe', 'subscription' => subscription }
+    end
+
+    # Backoff sleeps are recorded and return at once (or block on `gate`); the ping sleep stays real.
+    def stub_backoff(target, gate: nil)
+      allow(target).to receive(:sleep).and_wrap_original do |original, seconds|
+        next original.call(seconds) if seconds == Hyperliquid::Constants::WS_PING_INTERVAL
+
+        backoff_delays << seconds
+        gate&.pop
       end
     end
 
-    describe 'explorer queued subscriptions flushed on connect' do
-      it 'sends queued explorer subscriptions when connection opens' do
-        allow(WSLite).to receive(:connect).and_return(mock_explorer_ws)
+    def capture_reconnect_threads(target, method_name)
+      threads = []
+      allow(target).to receive(method_name).and_wrap_original do |original|
+        original.call.tap { |thread| threads << thread }
+      end
+      threads
+    end
 
-        explorer_client.subscribe_explorer_block { |_d| }
+    before do
+      @refusals = 0
+      allow(WSLite).to receive(:connect) do |url, &block|
+        if @refusals.positive?
+          @refusals -= 1
+          raise Errno::ECONNREFUSED
+        end
 
-        pending = explorer_client.instance_variable_get(:@explorer_pending_subscriptions)
-        expect(pending.length).to eq(1)
+        FakeWSLiteSocket.new(url).tap do |socket|
+          block.call(socket)
+          sockets << socket
+        end
+      end
+    end
 
-        explorer_client.instance_variable_set(:@explorer_ws, mock_explorer_ws)
+    after { backoff_gate.close }
 
-        sub_msg = JSON.generate({ method: 'subscribe', subscription: { type: 'explorerBlock' } })
-        expect(mock_explorer_ws).to receive(:send).with(sub_msg)
+    it 'connects to the mainnet and testnet API WebSocket URLs' do
+      client.connect
+      testnet_client.connect
 
-        explorer_client.send(:handle_explorer_open)
+      expect(sockets.map(&:url)).to eq(%w[wss://api.hyperliquid.xyz/ws wss://api.hyperliquid-testnet.xyz/ws])
+    end
 
-        expect(explorer_client.instance_variable_get(:@explorer_pending_subscriptions)).to be_empty
+    it 'connects the SDK explorer streams to the per-network RPC WebSocket URLs' do
+      Hyperliquid.new.ws.subscribe_explorer_block(&noop)
+      Hyperliquid.new(testnet: true).ws.subscribe_explorer_txs(&noop)
+
+      expect(sockets.map(&:url)).to eq(%w[wss://rpc.hyperliquid.xyz/ws wss://rpc.hyperliquid-testnet.xyz/ws])
+    end
+
+    it 'sends each live subscription exactly once when the socket opens' do
+      client.subscribe({ type: 'l2Book', coin: 'ETH' }, &noop)
+      client.subscribe({ type: 'l2Book', coin: 'ETH' }, &noop)
+      trades_id = client.subscribe({ type: 'trades', coin: 'BTC' }, &noop)
+      client.subscribe({ type: 'allMids' }, &noop)
+      client.unsubscribe(trades_id)
+      expect(sockets.size).to eq(1)
+      expect(sockets[0].sent).to be_empty
+
+      sockets[0].emit(:open)
+
+      expect(sockets[0].sent_json).to eq([subscribe_frame(eth_book), subscribe_frame({ 'type' => 'allMids' })])
+      expect(client).to be_connected
+    end
+
+    it 'reconnects after a drop and replays subscriptions on the new socket' do
+      stub_backoff(client)
+      received = Queue.new
+      client.subscribe({ type: 'l2Book', coin: 'ETH' }) { |d| received << d }
+      sockets[0].emit(:open)
+
+      sockets[0].drop!
+      expect(client).not_to be_connected
+      wait_until { sockets.size == 2 }
+      sockets[1].emit(:open)
+
+      expect(client).to be_connected
+      expect(sockets[1].sent_json).to eq([subscribe_frame(eth_book)])
+      sockets[1].receive(eth_frame)
+      expect(received.pop(timeout: 2)).to eq({ 'coin' => 'ETH', 'levels' => [] })
+    end
+
+    it 'backs off 1, 2, 4, 8, 16, then 30 s while reconnects fail, and resets after an open' do
+      stub_backoff(client)
+      client.connect
+      sockets[0].emit(:open)
+      @refusals = 7
+
+      expect do
+        sockets[0].drop!
+        wait_until { sockets.size == 2 }
+      end.to output(/\A(?:\[Hyperliquid::WS\] Reconnect failed: Connection refused\n){7}\z/).to_stderr
+      expect(backoff_delays).to eq([1, 2, 4, 8, 16, 30, 30, 30])
+
+      sockets[1].emit(:open)
+      backoff_delays.clear
+      sockets[1].drop!
+      wait_until { sockets.size == 3 }
+      expect(backoff_delays).to eq([1])
+    end
+
+    it 'ignores a late close from a superseded socket' do
+      closes = 0
+      client.on(:close) { closes += 1 }
+      stub_backoff(client)
+      client.connect
+      sockets[0].emit(:open)
+      sockets[0].drop!
+      wait_until { sockets.size == 2 }
+      sockets[1].emit(:open)
+
+      sockets[0].emit(:close)
+
+      expect(client).to be_connected
+      expect(closes).to eq(1)
+      expect(sockets.size).to eq(2)
+    end
+
+    it 'fires on(:close) once when the client closes the socket' do
+      closes = 0
+      client.on(:close) { closes += 1 }
+      client.connect
+      sockets[0].emit(:open)
+
+      client.close
+
+      expect(closes).to eq(1)
+      expect(client).not_to be_connected
+    end
+
+    it 'stops reconnecting when closed during backoff' do
+      stub_backoff(client, gate: backoff_gate)
+      threads = capture_reconnect_threads(client, :attempt_reconnect)
+      client.connect
+      sockets[0].emit(:open)
+      sockets[0].drop!
+      wait_until { backoff_delays.any? }
+
+      client.close
+      backoff_gate << :wake
+
+      expect(threads.fetch(0).join(2)).to be_truthy
+      expect(sockets.size).to eq(1)
+    end
+
+    it 'does not let a backoff thread from before close open a second socket after connect' do
+      stub_backoff(client, gate: backoff_gate)
+      threads = capture_reconnect_threads(client, :attempt_reconnect)
+      client.connect
+      sockets[0].emit(:open)
+      sockets[0].drop!
+      wait_until { backoff_delays.any? }
+
+      client.close
+      client.connect
+      backoff_gate << :wake
+
+      expect(threads.fetch(0).join(2)).to be_truthy
+      expect(sockets.size).to eq(2)
+    end
+
+    it 'delivers messages again after close and a new subscribe' do
+      received = Queue.new
+      client.subscribe({ type: 'l2Book', coin: 'BTC' }, &noop)
+      sockets[0].emit(:open)
+      client.close
+
+      client.subscribe({ type: 'l2Book', coin: 'ETH' }) { |d| received << d }
+      sockets[1].emit(:open)
+      sockets[1].receive(eth_frame)
+
+      expect(sockets[1].sent_json).to include(subscribe_frame(eth_book))
+      expect(received.pop(timeout: 2)).to eq({ 'coin' => 'ETH', 'levels' => [] })
+    end
+
+    it 'drops a frame that races close without reporting an error' do
+      errors = []
+      client.on(:error) { |e| errors << e }
+      client.subscribe({ type: 'l2Book', coin: 'ETH' }, &noop)
+      socket = sockets[0]
+      socket.emit(:open)
+      # The socket thread reads one more frame after close has shut the queue, before the socket closes.
+      allow(socket).to receive(:close).and_wrap_original do |original|
+        socket.receive(eth_frame)
+        original.call
+      end
+
+      client.close
+
+      expect(errors).to eq([])
+    end
+
+    describe 'explorer socket' do
+      let(:explorer_client) { described_class.new(explorer_ws_url: 'wss://explorer.test/ws') }
+      let(:block_sub) { subscribe_frame({ 'type' => 'explorerBlock' }) }
+      let(:txs_sub) { subscribe_frame({ 'type' => 'explorerTxs' }) }
+      let(:blocks) { [{ 'blockTime' => 1, 'hash' => '0xa', 'height' => 7, 'numTxs' => 0, 'proposer' => '0x1' }] }
+
+      it 'subscribes once on open, and reconnects and replays after a drop' do
+        stub_backoff(explorer_client)
+        received = Queue.new
+        explorer_client.subscribe_explorer_block { |d| received << d }
+        explorer_client.subscribe_explorer_txs(&noop)
+        sockets[0].emit(:open)
+        expect(sockets[0].sent_json).to eq([block_sub, txs_sub])
+
+        sockets[0].drop!
+        wait_until { sockets.size == 2 }
+        sockets[1].emit(:open)
+
+        expect(backoff_delays).to eq([1])
+        expect(explorer_client).to be_explorer_connected
+        expect(sockets[1].sent_json).to eq([block_sub, txs_sub])
+        sockets[1].receive(blocks.to_json)
+        expect(received.pop(timeout: 2)).to eq(blocks)
+      end
+
+      it 'cancels backoff on close, and a later subscribe gets a working socket' do
+        stub_backoff(explorer_client, gate: backoff_gate)
+        threads = capture_reconnect_threads(explorer_client, :attempt_explorer_reconnect)
+        explorer_client.subscribe_explorer_block(&noop)
+        sockets[0].emit(:open)
+        sockets[0].drop!
+        wait_until { backoff_delays.any? }
+
+        explorer_client.close
+        received = Queue.new
+        explorer_client.subscribe_explorer_txs { |d| received << d }
+        backoff_gate << :wake
+
+        expect(threads.fetch(0).join(2)).to be_truthy
+        expect(sockets.size).to eq(2)
+        sockets[1].emit(:open)
+        txs = [{ 'action' => {}, 'block' => 1, 'error' => nil, 'hash' => '0xb', 'time' => 1, 'user' => '0x2' }]
+        sockets[1].receive(txs.to_json)
+        expect(received.pop(timeout: 2)).to eq(txs)
       end
     end
   end

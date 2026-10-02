@@ -66,10 +66,11 @@ module Hyperliquid
         @closing = false
         @dispatch_thread = nil
         @ping_thread = nil
-        @pending_subscriptions = []
         @lifecycle_callbacks = {}
         @reconnect_attempts = 0
+        @reconnect_generation = 0
         @connection_id = 0
+        @closed_connection_id = nil
       end
 
       def init_explorer_ws_state(explorer_ws_url)
@@ -78,14 +79,15 @@ module Hyperliquid
         @explorer_connected = false
         @explorer_closing = false
         @explorer_connection_id = 0
+        @explorer_closed_connection_id = nil
         @explorer_reconnect_attempts = 0
+        @explorer_reconnect_generation = 0
         @explorer_subscriptions = {}
         @explorer_subscription_msgs = {}
         @explorer_queue = Queue.new
         @explorer_dropped_message_count = 0
         @explorer_dispatch_thread = nil
         @explorer_ping_thread = nil
-        @explorer_pending_subscriptions = []
       end
 
       public
@@ -93,6 +95,9 @@ module Hyperliquid
       def connect
         @closing = false
         @reconnect_attempts = 0
+        # Supersedes any backoff thread still sleeping from before (e.g. close, then connect).
+        @reconnect_generation += 1
+        @queue = Queue.new if @queue.closed?
         establish_connection
         start_dispatch_thread
         start_ping_thread
@@ -118,8 +123,7 @@ module Hyperliquid
         if @connected
           send_subscribe(subscription)
         else
-          @mutex.synchronize { @pending_subscriptions << subscription }
-          connect unless @ws
+          connect unless @ws # handle_open sends every registered subscription
         end
 
         sub_id
@@ -139,6 +143,7 @@ module Hyperliquid
         subscribe_explorer({ type: 'explorerTxs' }, 'explorerTxs', &)
       end
 
+      # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def unsubscribe(subscription_id)
         sub_msg = nil
         should_send = false
@@ -173,20 +178,23 @@ module Hyperliquid
           send_unsubscribe(sub_msg[:subscription])
         end
       end
+      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
       def close
         @closing = true
         @connected = false
         @explorer_closing = true
         @explorer_connected = false
+        @reconnect_generation += 1
+        @explorer_reconnect_generation += 1
 
         @ping_thread&.kill
         @ping_thread = nil
         @explorer_ping_thread&.kill
         @explorer_ping_thread = nil
 
-        @queue&.close if @queue.respond_to?(:close)
-        @explorer_queue&.close if @explorer_queue.respond_to?(:close)
+        @queue.close
+        @explorer_queue.close
 
         @dispatch_thread&.join(5)
         @dispatch_thread = nil
@@ -223,7 +231,7 @@ module Hyperliquid
           ws.on :open do
             next if client.send(:stale_connection?, active_id)
 
-            client.send(:handle_open)
+            client.send(:handle_open, ws)
           end
 
           ws.on :message do |msg|
@@ -238,11 +246,10 @@ module Hyperliquid
             client.send(:handle_error, e)
           end
 
-          ws.on :close do |e|
-            next if client.send(:stale_connection?, active_id)
-
-            client.send(:handle_close, e)
-          end
+          # ws_lite 1.0.x emits its internal :__close for every close, but on a server-initiated
+          # close its read thread kills itself before emitting :close. Listen to both.
+          ws.on(:__close) { |e| client.send(:handle_socket_close, active_id, e) }
+          ws.on(:close) { |e| client.send(:handle_socket_close, active_id, e) }
         end
       end
 
@@ -250,14 +257,25 @@ module Hyperliquid
         id != @connection_id
       end
 
-      def handle_open
+      # Handles each live connection's close once, whichever close event reports it first.
+      def handle_socket_close(id, event)
+        return if stale_connection?(id) || @closed_connection_id == id
+
+        @closed_connection_id = id
+        handle_close(event)
+      end
+
+      # Takes the socket from the :open event: on reconnect the read thread can emit :open before
+      # establish_connection has assigned @ws, and the replayed subscriptions must go to this socket.
+      def handle_open(socket)
+        @ws = socket
         @connected = true
         @reconnect_attempts = 0
-        flush_pending_subscriptions
         replay_subscriptions
         @lifecycle_callbacks[:open]&.call
       end
 
+      # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def handle_message(raw)
         return if raw.nil? || raw.empty?
 
@@ -281,6 +299,7 @@ module Hyperliquid
 
         enqueue_message(identifier, payload)
       end
+      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
       # fastAssetCtxs frames carry `data` as base64(raw DEFLATE, RFC 1951) of a UTF-8 JSON
       # document. Returns the parsed JSON, or nil (after warning) when the payload cannot be
@@ -399,6 +418,8 @@ module Hyperliquid
           end
         end
         @queue.push({ identifier: identifier, data: data })
+      rescue ClosedQueueError
+        nil # close raced an in-flight frame; drop it instead of raising into the socket thread
       end
 
       def start_dispatch_thread
@@ -437,16 +458,6 @@ module Hyperliquid
         @ping_thread.report_on_exception = false
       end
 
-      def flush_pending_subscriptions
-        pending = @mutex.synchronize do
-          subs = @pending_subscriptions.dup
-          @pending_subscriptions.clear
-          subs
-        end
-
-        pending.each { |sub| send_subscribe(sub) }
-      end
-
       def send_subscribe(subscription)
         send_json({ method: 'subscribe', subscription: subscription })
       end
@@ -462,15 +473,16 @@ module Hyperliquid
       end
 
       def attempt_reconnect
+        generation = @reconnect_generation
         Thread.new do
           loop do
-            break if @closing
+            break if reconnect_cancelled?(generation)
 
             delay = [2**@reconnect_attempts, 30].min
             @reconnect_attempts += 1
             sleep delay
 
-            break if @closing
+            break if reconnect_cancelled?(generation)
 
             begin
               establish_connection
@@ -480,6 +492,11 @@ module Hyperliquid
             end
           end
         end
+      end
+
+      # True once close or a later connect has superseded the backoff loop started at `generation`.
+      def reconnect_cancelled?(generation)
+        @closing || generation != @reconnect_generation
       end
 
       def replay_subscriptions
@@ -506,13 +523,20 @@ module Hyperliquid
         if @explorer_connected
           send_explorer_subscribe(subscription)
         else
-          @mutex.synchronize { @explorer_pending_subscriptions << subscription }
-          establish_explorer_connection unless @explorer_ws
-          start_explorer_dispatch_thread unless @explorer_dispatch_thread
-          start_explorer_ping_thread unless @explorer_ping_thread
+          connect_explorer unless @explorer_ws # handle_explorer_open sends every registered subscription
         end
 
         sub_id
+      end
+
+      def connect_explorer
+        @explorer_closing = false
+        @explorer_reconnect_attempts = 0
+        @explorer_reconnect_generation += 1
+        @explorer_queue = Queue.new if @explorer_queue.closed?
+        establish_explorer_connection
+        start_explorer_dispatch_thread
+        start_explorer_ping_thread
       end
 
       def establish_explorer_connection
@@ -525,7 +549,7 @@ module Hyperliquid
           ws.on :open do
             next if client.send(:stale_explorer_connection?, active_id)
 
-            client.send(:handle_explorer_open)
+            client.send(:handle_explorer_open, ws)
           end
 
           ws.on :message do |msg|
@@ -540,11 +564,9 @@ module Hyperliquid
             client.send(:handle_explorer_error, e)
           end
 
-          ws.on :close do |e|
-            next if client.send(:stale_explorer_connection?, active_id)
-
-            client.send(:handle_explorer_close, e)
-          end
+          # See establish_connection: ws_lite 1.0.x may report a close only as :__close.
+          ws.on(:__close) { |e| client.send(:handle_explorer_socket_close, active_id, e) }
+          ws.on(:close) { |e| client.send(:handle_explorer_socket_close, active_id, e) }
         end
       end
 
@@ -552,13 +574,21 @@ module Hyperliquid
         id != @explorer_connection_id
       end
 
-      def handle_explorer_open
+      def handle_explorer_socket_close(id, event)
+        return if stale_explorer_connection?(id) || @explorer_closed_connection_id == id
+
+        @explorer_closed_connection_id = id
+        handle_explorer_close(event)
+      end
+
+      def handle_explorer_open(socket)
+        @explorer_ws = socket
         @explorer_connected = true
         @explorer_reconnect_attempts = 0
-        flush_explorer_pending_subscriptions
         replay_explorer_subscriptions
       end
 
+      # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def handle_explorer_message(raw)
         return if raw.nil? || raw.empty?
         return if raw.start_with?('Websocket connection established')
@@ -584,7 +614,9 @@ module Hyperliquid
 
         enqueue_explorer_message(identifier, data)
       end
+      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
+      # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def identify_explorer_array(data)
         first = data.first
         return unless first.is_a?(Hash)
@@ -602,6 +634,7 @@ module Hyperliquid
         warn '[Hyperliquid::WS] Unknown explorer WS array shape'
         nil
       end
+      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
       def handle_explorer_error(error)
         warn "[Hyperliquid::WS] Explorer WS error: #{error.message}"
@@ -626,6 +659,8 @@ module Hyperliquid
           end
         end
         @explorer_queue.push({ identifier: identifier, data: data })
+      rescue ClosedQueueError
+        nil # close raced an in-flight frame; drop it instead of raising into the socket thread
       end
 
       def start_explorer_dispatch_thread
@@ -664,16 +699,6 @@ module Hyperliquid
         @explorer_ping_thread.report_on_exception = false
       end
 
-      def flush_explorer_pending_subscriptions
-        pending = @mutex.synchronize do
-          subs = @explorer_pending_subscriptions.dup
-          @explorer_pending_subscriptions.clear
-          subs
-        end
-
-        pending.each { |sub| send_explorer_subscribe(sub) }
-      end
-
       def send_explorer_subscribe(subscription)
         send_explorer_json({ method: 'subscribe', subscription: subscription })
       end
@@ -689,15 +714,16 @@ module Hyperliquid
       end
 
       def attempt_explorer_reconnect
+        generation = @explorer_reconnect_generation
         Thread.new do
           loop do
-            break if @explorer_closing
+            break if explorer_reconnect_cancelled?(generation)
 
             delay = [2**@explorer_reconnect_attempts, 30].min
             @explorer_reconnect_attempts += 1
             sleep delay
 
-            break if @explorer_closing
+            break if explorer_reconnect_cancelled?(generation)
 
             begin
               establish_explorer_connection
@@ -707,6 +733,10 @@ module Hyperliquid
             end
           end
         end
+      end
+
+      def explorer_reconnect_cancelled?(generation)
+        @explorer_closing || generation != @explorer_reconnect_generation
       end
 
       def replay_explorer_subscriptions
