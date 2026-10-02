@@ -143,7 +143,7 @@ module Hyperliquid
         subscribe_explorer({ type: 'explorerTxs' }, 'explorerTxs', &)
       end
 
-      # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:disable-next Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def unsubscribe(subscription_id)
         sub_msg = nil
         should_send = false
@@ -178,7 +178,6 @@ module Hyperliquid
           send_unsubscribe(sub_msg[:subscription])
         end
       end
-      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
       def close
         @closing = true
@@ -275,7 +274,7 @@ module Hyperliquid
         @lifecycle_callbacks[:open]&.call
       end
 
-      # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:disable-next Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def handle_message(raw)
         return if raw.nil? || raw.empty?
 
@@ -299,7 +298,6 @@ module Hyperliquid
 
         enqueue_message(identifier, payload)
       end
-      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
       # fastAssetCtxs frames carry `data` as base64(raw DEFLATE, RFC 1951) of a UTF-8 JSON
       # document. Returns the parsed JSON, or nil (after warning) when the payload cannot be
@@ -588,7 +586,7 @@ module Hyperliquid
         replay_explorer_subscriptions
       end
 
-      # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:disable-next Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def handle_explorer_message(raw)
         return if raw.nil? || raw.empty?
         return if raw.start_with?('Websocket connection established')
@@ -614,9 +612,8 @@ module Hyperliquid
 
         enqueue_explorer_message(identifier, data)
       end
-      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
-      # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:disable-next Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def identify_explorer_array(data)
         first = data.first
         return unless first.is_a?(Hash)
@@ -634,7 +631,6 @@ module Hyperliquid
         warn '[Hyperliquid::WS] Unknown explorer WS array shape'
         nil
       end
-      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
       def handle_explorer_error(error)
         warn "[Hyperliquid::WS] Explorer WS error: #{error.message}"

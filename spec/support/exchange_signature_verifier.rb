@@ -73,7 +73,7 @@ class ExchangeSignatureVerifier
     # @return [Array<String>] one message per /exchange request whose signature does not verify
     def failures
       failures = []
-      WebMock::RequestRegistry.instance.requested_signatures.each do |request, _count|
+      WebMock::RequestRegistry.instance.requested_signatures.each_key do |request|
         next unless request.method == :post && request.uri.path.end_with?('/exchange')
 
         problem = verify_request(request.body)

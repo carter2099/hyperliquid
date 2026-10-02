@@ -164,7 +164,7 @@ RSpec.describe 'SDK call surface of scripts, example.rb and docs' do
     scanners << scanner
   end
 
-  Dir[File.join(root, 'scripts/*.rb')].sort.each do |path|
+  Dir[File.join(root, 'scripts/*.rb')].each do |path|
     scan.call("scripts/#{File.basename(path)}", [[File.read(path), 1]])
   end
 
@@ -174,7 +174,7 @@ RSpec.describe 'SDK call surface of scripts, example.rb and docs' do
   commented = example.lines.map { |l| l.start_with?('#   ') ? l.delete_prefix('# ') : "\n" }.join
   scan.call('example.rb (commented block)', [[commented, 1]])
 
-  ([File.join(root, 'README.md')] + Dir[File.join(root, 'docs/*.md')].sort).each do |path|
+  ([File.join(root, 'README.md')] + Dir[File.join(root, 'docs/*.md')]).each do |path|
     fences = []
     File.read(path).scan(/^```ruby\n(.*?)^```/m) do
       body = Regexp.last_match(1)

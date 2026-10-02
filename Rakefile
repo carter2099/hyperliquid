@@ -83,7 +83,7 @@ RuboCop::RakeTask.new
 # Explicit file paths bypass AllCops/Exclude (which keeps scripts/ out of the main task),
 # so scripts get Lint + Security only. Do not add --force-exclusion.
 RuboCop::RakeTask.new('rubocop:scripts') do |t|
-  t.patterns = Dir['scripts/**/*.rb'].sort + %w[example.rb]
+  t.patterns = Dir['scripts/**/*.rb'] + %w[example.rb]
   t.options = %w[--only Lint,Security]
 end
 Rake::Task['rubocop:scripts'].clear_comments

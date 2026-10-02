@@ -12,6 +12,7 @@ module WaitUntil
       if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
         raise "wait_until timed out after #{timeout}s#{": #{message}" if message}"
       end
+
       sleep interval
     end
   end
