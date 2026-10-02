@@ -2014,6 +2014,51 @@ module Hyperliquid
       star_proxy_action(dex, user, { setReduceOnly: reduce_only })
     end
 
+    # Cancel a user's resting orders on a HIP-3* venue
+    # (`perpDeploy` L1 action, star proxy cancel). Testnet-only.
+    # @param dex [String] HIP-3* perp dex name
+    # @param user [String] Proxied user address (lowercased)
+    # @param cancels [Array<Hash>] Array of { coin:, oid: } (the user's resting orders)
+    # @return [Hash] Exchange response
+    def star_cancel(dex:, user:, cancels:)
+      cancel_wires = cancels.map { |c| { a: asset_index(c[:coin]), o: c[:oid] } }
+      star_proxy_action(dex, user, { cancel: { cancels: cancel_wires } })
+    end
+
+    # Cancel all of a user's orders and TWAPs on a HIP-3* venue, optionally per coin
+    # (`perpDeploy` L1 action, star proxy cancelAll). Testnet-only.
+    # @param dex [String] HIP-3* perp dex name
+    # @param user [String] Proxied user address (lowercased)
+    # @param coins [Array<String>, nil] Coins to cancel orders/TWAPs for (1-10); nil cancels all (sends null)
+    # @return [Hash] Exchange response
+    def star_cancel_all(dex:, user:, coins: nil)
+      assets = coins&.map { |coin| asset_index(coin) }
+      star_proxy_action(dex, user, { cancelAll: { assets: assets } })
+    end
+
+    # Place orders on behalf of a user on a HIP-3* venue
+    # (`perpDeploy` L1 action, star proxy order). Testnet-only.
+    # @param dex [String] HIP-3* perp dex name
+    # @param user [String] Proxied user address (lowercased)
+    # @param orders [Array<Hash>] bulk_orders-shaped hashes (:coin, :is_buy, :size, :limit_px,
+    #   :order_type, :reduce_only, :cloid); :reduce_only defaults to true (server requires reduce-only)
+    # @param grouping [String] Order grouping (default "na")
+    # @return [Hash] Exchange response
+    def star_order(dex:, user:, orders:, grouping: 'na')
+      order_wires = orders.map do |o|
+        build_order_wire(
+          coin: o[:coin],
+          is_buy: o[:is_buy],
+          size: o[:size],
+          limit_px: o[:limit_px],
+          order_type: o[:order_type] || { limit: { tif: 'Gtc' } },
+          reduce_only: o.fetch(:reduce_only, true),
+          cloid: o[:cloid]
+        )
+      end
+      star_proxy_action(dex, user, { order: { orders: order_wires, grouping: grouping } })
+    end
+
     # Send collateral from a user to another address on the same HIP-3* venue
     # (`perpDeploy` L1 action, star proxy sendAsset). Testnet-only.
     # @param dex [String] HIP-3* perp dex name

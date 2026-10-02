@@ -3,11 +3,12 @@
 
 # Test 25: HIP-3* star operations (testnet-only, structured rejection)
 #
-# Reads Info#user_star_state for the wallet, then sends a HIP-3* `star` operation
+# Reads Info#user_star_state for the wallet, then sends HIP-3* `star` operations
 # (`perpDeploy` L1 action, star variant) to a live star dex. The wallet is not a deployer
-# or sub-deployer of any star dex, so the server rejects the action, but only after it has
-# recovered the signer. "Invalid perp deployer or sub-deployer" proves the action hash, key
-# order, and types are correct. "User or API Wallet ... does not exist" means the signature
+# or sub-deployer of any star dex, so the server rejects each action, but only after it has
+# recovered the signer. "Invalid perp deployer or sub-deployer" (or, for proxy operations
+# on the unapproved wallet, "User requires approval") proves the action hash, key order,
+# and types are correct. "User or API Wallet ... does not exist" means the signature
 # recovered to a random address (SDK hash bug); an HTTP 422 deserialize error means a
 # malformed shape.
 #
@@ -19,6 +20,7 @@
 require_relative 'test_helpers'
 
 DEPLOYER_REJECTION = 'Invalid perp deployer or sub-deployer'
+APPROVAL_REJECTION = 'User requires approval'
 
 sdk = build_sdk
 separator('TEST 25: HIP-3* star (testnet-only)')
@@ -71,6 +73,13 @@ end
 
 check_star('star_modify_approval', [DEPLOYER_REJECTION]) do
   sdk.exchange.star_modify_approval(dex: dex, user: sdk.exchange.address, approved: true)
+end
+
+# Exercises asset_index on a live star dex plus the nested asset-list wire
+universe = sdk.info.meta(dex: dex)['universe'].map { |asset| asset['name'] }
+cancel_coin = universe.include?("#{dex}:BTC") ? "#{dex}:BTC" : universe.first
+check_star("star_cancel_all (#{cancel_coin})", [DEPLOYER_REJECTION, APPROVAL_REJECTION]) do
+  sdk.exchange.star_cancel_all(dex: dex, user: sdk.exchange.address, coins: [cancel_coin])
 end
 
 test_passed('Test 25 HIP-3* star')

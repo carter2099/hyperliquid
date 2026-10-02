@@ -5514,6 +5514,92 @@ RSpec.describe Hyperliquid::Exchange do
       end
     end
 
+    describe '#star_cancel' do
+      it 'F4: resolves coins to asset ids and passes oids through' do
+        json = '{"type":"perpDeploy","star":{"dex":"test","operation":{"proxy":["0x19e7e376e7c213b7e7e7e46cc70a5dd086' \
+               'daff2a",{"cancel":{"cancels":[{"a":110000,"o":12345}]}}]}}}'
+        sig = { 'r' => '0x4c5bc18e5bebbe61c010d91034a7fc6bebd230efb55a17cddb187628a0671edc',
+                's' => '0x4283a2ce1d59acd82f7aa36ba13de6fbb1d5867077db7a4d8b3cdd9e8ab64b8c', 'v' => 27 }
+        stub_star_exchange(json, sig)
+        result = star_exchange.star_cancel(dex: 'test', user: proxied_user,
+                                           cancels: [{ coin: 'test:BTC', oid: 12_345 }])
+        expect(result['status']).to eq('ok')
+      end
+    end
+
+    describe '#star_cancel_all' do
+      it 'F5: sends assets null when coins is nil' do
+        json = '{"type":"perpDeploy","star":{"dex":"test","operation":{"proxy":["0x19e7e376e7c213b7e7e7e46cc70a5dd086' \
+               'daff2a",{"cancelAll":{"assets":null}}]}}}'
+        sig = { 'r' => '0x59631998868b83d45bdad899d30c1fa136921b7e364335920a7dfbef351a2887',
+                's' => '0x3ff4298202b9e863307f5e3b9efbe20f673c03d603b02d314c2b3496cf8a0250', 'v' => 28 }
+        stub_star_exchange(json, sig)
+        result = star_exchange.star_cancel_all(dex: 'test', user: proxied_user)
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'F6: resolves coins to asset ids' do
+        json = '{"type":"perpDeploy","star":{"dex":"test","operation":{"proxy":["0x19e7e376e7c213b7e7e7e46cc70a5dd086' \
+               'daff2a",{"cancelAll":{"assets":[110000,110001]}}]}}}'
+        sig = { 'r' => '0x53fc86793bb76c9bc43442586fe8f8c6c1dfb7533becdd57f18b8d8ad4927306',
+                's' => '0x58153a15253f5db61ad1ab9db5288c58a38be68141ff6eaa2cf3aaad6dba8f62', 'v' => 27 }
+        stub_star_exchange(json, sig)
+        result = star_exchange.star_cancel_all(dex: 'test', user: proxied_user, coins: %w[test:BTC test:ETH])
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'raises ArgumentError for an unknown coin without posting to /exchange' do
+        expect do
+          star_exchange.star_cancel_all(dex: 'test', user: proxied_user, coins: ['test:NOPE'])
+        end.to raise_error(ArgumentError, /Unknown asset/)
+        expect(a_request(:post, exchange_endpoint)).not_to have_been_made
+      end
+    end
+
+    describe '#star_order' do
+      it 'F7: builds the standard order wire with reduce-only defaulting to true' do
+        json = '{"type":"perpDeploy","star":{"dex":"test","operation":{"proxy":["0x19e7e376e7c213b7e7e7e46cc70a5dd086' \
+               'daff2a",{"order":{"orders":[{"a":110000,"b":false,"p":"95000","s":"0.01","r":true,"t":{"limit":' \
+               '{"tif":"Gtc"}}}],"grouping":"na"}}]}}}'
+        sig = { 'r' => '0x67f0dbe21cdd862071175124dad22ecf10a388ff04ae4837291a4ba6ec90012f',
+                's' => '0x7d1f4b0ef8845db1123e27bb8bcf9dc4e9020a8977133383d43b7a54433038a8', 'v' => 27 }
+        stub_star_exchange(json, sig)
+        result = star_exchange.star_order(dex: 'test', user: proxied_user,
+                                          orders: [{ coin: 'test:BTC', is_buy: false, size: '0.01',
+                                                     limit_px: '95000' }])
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'sends an explicit reduce_only: false unchanged' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            order = JSON.parse(req.body).dig('action', 'star', 'operation', 'proxy', 1, 'order', 'orders', 0)
+            order['r'] == false
+          end
+          .to_return(status: 200, body: star_response.to_json)
+
+        result = star_exchange.star_order(dex: 'test', user: proxied_user,
+                                          orders: [{ coin: 'test:BTC', is_buy: false, size: '0.01',
+                                                     limit_px: '95000', reduce_only: false }])
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'passes cloid through as "c" and grouping verbatim' do
+        cloid = '0x00000000000000000000000000000001'
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            order_op = JSON.parse(req.body).dig('action', 'star', 'operation', 'proxy', 1, 'order')
+            order_op['orders'][0]['c'] == cloid && order_op['grouping'] == 'normalTpsl'
+          end
+          .to_return(status: 200, body: star_response.to_json)
+
+        result = star_exchange.star_order(dex: 'test', user: proxied_user, grouping: 'normalTpsl',
+                                          orders: [{ coin: 'test:BTC', is_buy: false, size: '0.01',
+                                                     limit_px: '95000', cloid: cloid }])
+        expect(result['status']).to eq('ok')
+      end
+    end
+
     describe '#star_send_asset' do
       it 'F8: lowercases the destination and sends a String amount verbatim' do
         json = '{"type":"perpDeploy","star":{"dex":"test","operation":{"proxy":["0x19e7e376e7c213b7e7e7e46cc70a5dd086' \

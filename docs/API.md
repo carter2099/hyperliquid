@@ -313,6 +313,9 @@ Deployer/sub-deployer actions on HIP-3* venues (`perpDeploy` L1 action, `star` v
 - `star_modify_approval(dex:, user:, approved:)` - Add (`true`) or remove (`false`) a user on the venue's allow-list (removal clears the user's flags)
 - `star_modify_backstop_liquidator_approval(dex:, user:, allowed:)` - Allow (`true`) or disallow (`false`) a user to deposit to/withdraw from the venue's backstop liquidator
 - `star_set_reduce_only(dex:, user:, reduce_only:)` - Restrict (`true`) or unrestrict (`false`) an approved user to reducing positions on the venue
+- `star_cancel(dex:, user:, cancels:)` - Cancel the user's resting orders; `cancels` is an Array of `{ coin:, oid: }`
+- `star_cancel_all(dex:, user:, coins: nil)` - Cancel the user's orders and TWAPs on 1-10 `coins`, or on every coin when `coins` is `nil`
+- `star_order(dex:, user:, orders:, grouping: 'na')` - Place orders for the user; `orders` take the `bulk_orders` hash shape (`:coin, :is_buy, :size, :limit_px, :order_type, :reduce_only, :cloid`) with `:reduce_only` defaulting to `true`
 - `star_send_asset(dex:, user:, destination:, amount:)` - Send `amount` of collateral from `user` to `destination` on the same venue
 - `star_set_oracle(dex:, oracle_pxs:)` - Set the venue's spot oracle prices from `{ coin => price }`
 
