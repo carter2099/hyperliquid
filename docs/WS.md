@@ -58,6 +58,10 @@ Subscriptions are keyed by an identifier string derived from the subscription ty
 | `notification` | `notification` (exclusive: `user`) | `notification` |
 | `activeAssetCtx` | `activeAssetCtx:<coin>` (spot coins echo as channel `activeSpotAssetCtx`) | `activeAssetCtx:xyz:xyz100` |
 | `activeAssetData` | `activeAssetData:<user>:<coin>` | `activeAssetData:0xabc:btc` |
+| `assetCtxs` | `assetCtxs:<dex>` (`dex` `""` for the main dex) | `assetCtxs:xyz` |
+| `allDexsAssetCtxs` | `allDexsAssetCtxs` | `allDexsAssetCtxs` |
+| `spotAssetCtxs` | `spotAssetCtxs` (data is an Array) | `spotAssetCtxs` |
+| `outcomeMetaUpdates` | `outcomeMetaUpdates` | `outcomeMetaUpdates` |
 | `explorerBlock` | `explorerBlock` | `explorerBlock` |
 | `explorerTxs` | `explorerTxs` | `explorerTxs` |
 

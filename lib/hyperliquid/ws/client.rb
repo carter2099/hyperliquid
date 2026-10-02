@@ -12,6 +12,7 @@ module Hyperliquid
       ROUTING_KEYS = {
         'allMids' => [], 'orderUpdates' => [], 'userEvents' => [],
         'notification' => [],
+        'allDexsAssetCtxs' => [], 'outcomeMetaUpdates' => [], 'spotAssetCtxs' => [],
         'l2Book' => %i[coin], 'trades' => %i[coin], 'bbo' => %i[coin],
         'activeAssetCtx' => %i[coin],
         'candle' => %i[coin interval],
@@ -21,7 +22,8 @@ module Hyperliquid
         'allDexsClearinghouseState' => %i[user], 'webData3' => %i[user],
         'spotState' => %i[user],
         'clearinghouseState' => %i[user dex], 'openOrders' => %i[user dex], 'twapStates' => %i[user dex],
-        'activeAssetData' => %i[user coin]
+        'activeAssetData' => %i[user coin],
+        'assetCtxs' => %i[dex]
       }.freeze
 
       # Server channel names that differ from the subscription type.

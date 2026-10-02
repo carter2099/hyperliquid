@@ -382,6 +382,10 @@ A client order id is 16 bytes, `0x` + 32 hex characters.
 | `notification` | `{ type: 'notification', user: '0x...' }` | A user's notifications (event-driven, no snapshot) |
 | `activeAssetCtx` | `{ type: 'activeAssetCtx', coin: 'BTC' }` (perp, HIP-3 `'xyz:XYZ100'`, or spot `'@107'`/`'PURR/USDC'`) | One asset's context (mark/oracle/mid price, funding, open interest, volume) |
 | `activeAssetData` | `{ type: 'activeAssetData', user: '0x...', coin: 'BTC' }` | A user's leverage, max trade sizes and available-to-trade for one perp coin |
+| `assetCtxs` | `{ type: 'assetCtxs' }` (optional `dex: 'xyz'`; omit for the main dex) | Asset contexts of every perp on one dex (`dex`, `ctxs`) |
+| `allDexsAssetCtxs` | `{ type: 'allDexsAssetCtxs' }` | Perp asset contexts for every dex (`ctxs`: Array of `[dex, ctxs]`) |
+| `spotAssetCtxs` | `{ type: 'spotAssetCtxs' }` | Asset contexts of every spot pair (the data is an Array) |
+| `outcomeMetaUpdates` | `{ type: 'outcomeMetaUpdates' }` | HIP-4 outcome metadata changes (event-driven, no snapshot; `updates`) |
 
 `orderUpdates`, `userEvents`, `notification`: one user per `WS::Client` (payload carries no user); `spotState`/`userFills`: one `ignorePortfolioMargin`/`aggregateByTime` setting per user per client; conflicting subscriptions raise `WebSocketError`. Use a second `WS::Client` for another user. Spot coins on `activeAssetCtx` arrive on channel `activeSpotAssetCtx` and are routed transparently; `{ type: 'activeSpotAssetCtx' }` is not a subscription type.
 

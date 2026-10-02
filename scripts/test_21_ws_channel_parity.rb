@@ -44,7 +44,11 @@ CHECKS = [
   ['activeAssetData BTC', { type: 'activeAssetData', user: ADDR, coin: 'BTC' },
    ->(d) { d['coin'] == 'BTC' && d['user'] == ADDR }],
   ['activeAssetCtx BTC', { type: 'activeAssetCtx', coin: 'BTC' }, ->(d) { d['coin'] == 'BTC' }],
-  ['activeAssetCtx PURR/USDC', { type: 'activeAssetCtx', coin: 'PURR/USDC' }, ->(d) { d['coin'] == 'PURR/USDC' }]
+  ['activeAssetCtx PURR/USDC', { type: 'activeAssetCtx', coin: 'PURR/USDC' }, ->(d) { d['coin'] == 'PURR/USDC' }],
+  ['assetCtxs (main dex)', { type: 'assetCtxs' }, ->(d) { d['dex'] == '' }],
+  ['assetCtxs (xyz)', { type: 'assetCtxs', dex: 'xyz' }, ->(d) { d['dex'] == 'xyz' }],
+  ['allDexsAssetCtxs', { type: 'allDexsAssetCtxs' }, ->(d) { d['ctxs'].is_a?(Array) }],
+  ['spotAssetCtxs', { type: 'spotAssetCtxs' }, ->(d) { d.is_a?(Array) }]
 ].freeze
 
 def routing_summary(data)

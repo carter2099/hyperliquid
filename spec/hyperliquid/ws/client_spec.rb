@@ -839,6 +839,41 @@ RSpec.describe Hyperliquid::WS::Client do
         'activeAssetData',
         { 'user' => user, 'coin' => 'BTC', 'leverage' => {} },
         "activeAssetData:#{user}:btc"
+      ],
+      [
+        'assetCtxs (no dex)',
+        { type: 'assetCtxs' },
+        'assetCtxs',
+        { 'dex' => '', 'ctxs' => [] },
+        'assetCtxs:'
+      ],
+      [
+        'assetCtxs (dex xyz)',
+        { type: 'assetCtxs', dex: 'xyz' },
+        'assetCtxs',
+        { 'dex' => 'xyz', 'ctxs' => [] },
+        'assetCtxs:xyz'
+      ],
+      [
+        'allDexsAssetCtxs',
+        { type: 'allDexsAssetCtxs' },
+        'allDexsAssetCtxs',
+        { 'ctxs' => [] },
+        'allDexsAssetCtxs'
+      ],
+      [
+        'spotAssetCtxs (Array payload)',
+        { type: 'spotAssetCtxs' },
+        'spotAssetCtxs',
+        [{ 'coin' => 'PURR/USDC' }],
+        'spotAssetCtxs'
+      ],
+      [
+        'outcomeMetaUpdates',
+        { type: 'outcomeMetaUpdates' },
+        'outcomeMetaUpdates',
+        { 'updates' => [] },
+        'outcomeMetaUpdates'
       ]
     ].each do |label, subscription, channel, data, expected|
       it "routes #{label} subscriptions and messages to #{expected}" do
