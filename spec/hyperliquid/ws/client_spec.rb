@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'zlib'
+
 RSpec.describe Hyperliquid::WS::Client do
   let(:client) { described_class.new(testnet: false) }
   let(:testnet_client) { described_class.new(testnet: true) }
@@ -905,6 +907,123 @@ RSpec.describe Hyperliquid::WS::Client do
     it 'keeps activeAssetData for one user on two coins apart' do
       expect(client.send(:subscription_identifier, { type: 'activeAssetData', user: upper, coin: 'BTC' }))
         .not_to eq(client.send(:subscription_identifier, { type: 'activeAssetData', user: upper, coin: 'ETH' }))
+    end
+  end
+
+  describe 'fastAssetCtxs (base64 + raw DEFLATE channel)' do
+    let(:queue) { client.instance_variable_get(:@queue) }
+    # Official example from the GitBook WS subscriptions page (fastAssetCtxs, "Example to test your implementation").
+    let(:docs_payload) { 'q1ZyCnFWsqpWyk0syg6oULJSsjQ3NTDQM1Wq1VFyDfFAkTI2MzXQMwJLVVRWWfmFuTiiyBuamOoZKdXWAgA=' }
+    let(:docs_decoded) do
+      { 'BTC' => { 'markPx' => '97500.5' }, 'ETH' => { 'markPx' => '3650.25' }, 'xyz:NVDA' => { 'markPx' => '145.2' } }
+    end
+
+    def raw_deflate_base64(json)
+      deflater = Zlib::Deflate.new(Zlib::DEFAULT_COMPRESSION, -Zlib::MAX_WBITS)
+      compressed = deflater.deflate(json, Zlib::FINISH)
+      deflater.close
+      [compressed].pack('m0')
+    end
+
+    def frame(data)
+      { 'channel' => 'fastAssetCtxs', 'data' => data }.to_json
+    end
+
+    before do
+      client.instance_variable_set(:@connected, true)
+      client.instance_variable_set(:@ws, mock_ws)
+      client.subscribe({ type: 'fastAssetCtxs' }) { |_d| }
+    end
+
+    it 'uses a parameterless identifier for subscribe and for incoming frames' do
+      expect(client.send(:subscription_identifier, { type: 'fastAssetCtxs' })).to eq('fastAssetCtxs')
+      expect(client.send(:subscription_identifier, { 'type' => 'fastAssetCtxs' })).to eq('fastAssetCtxs')
+      expect(client.send(:compute_identifier, 'fastAssetCtxs', {})).to eq('fastAssetCtxs')
+    end
+
+    it 'sends the subscription verbatim' do
+      expect(mock_ws).to have_received(:send)
+        .with('{"method":"subscribe","subscription":{"type":"fastAssetCtxs"}}')
+    end
+
+    it 'decodes the documented example payload into a coin-keyed Hash' do
+      client.send(:handle_message, frame(docs_payload))
+
+      queued = queue.pop(true)
+      expect(queued[:identifier]).to eq('fastAssetCtxs')
+      expect(queued[:data]).to eq(docs_decoded)
+    end
+
+    it 'decodes a real captured testnet update frame, preserving omitted fields' do
+      raw = File.read(File.expand_path('../../fixtures/ws/fast_asset_ctxs_update.json', __dir__))
+      client.send(:handle_message, raw)
+
+      data = queue.pop(true)[:data]
+      expect(data.size).to eq(65)
+      expect(data['AAVE']).to eq({ 'midPx' => '167.87' })
+      expect(data['bart:BTC']).to eq({ 'markPx' => '88297.0' })
+      expect(data['CHIP']).to eq({ 'midPx' => '0.041527' })
+      expect(data.values).to all(satisfy { |ctx| !ctx.empty? && (ctx.keys - %w[markPx midPx]).empty? })
+    end
+
+    it 'keeps a null midPx as nil and decodes UTF-8 keys' do
+      client.send(:handle_message, frame(raw_deflate_base64('{"BTC":{"markPx":"1","midPx":null},"€X":{"midPx":"2"}}')))
+
+      data = queue.pop(true)[:data]
+      expect(data).to eq({ 'BTC' => { 'markPx' => '1', 'midPx' => nil }, '€X' => { 'midPx' => '2' } })
+      expect(data.keys.last.encoding).to eq(Encoding::UTF_8)
+    end
+
+    it 'drops and warns on invalid base64 without raising' do
+      expect { client.send(:handle_message, frame('not base64!')) }
+        .to output(/Failed to decode compressed message: ArgumentError/).to_stderr
+      expect(queue).to be_empty
+    end
+
+    it 'rejects zlib-wrapped (RFC 1950) data: the channel is raw DEFLATE only' do
+      wrapped = [Zlib::Deflate.deflate('{"BTC":{"markPx":"1"}}')].pack('m0')
+      expect { client.send(:handle_message, frame(wrapped)) }
+        .to output(/Failed to decode compressed message: Zlib::DataError/).to_stderr
+      expect(queue).to be_empty
+    end
+
+    it 'drops and warns on a truncated DEFLATE stream' do
+      truncated = [docs_payload.unpack1('m0')[0, 20]].pack('m0')
+      expect { client.send(:handle_message, frame(truncated)) }
+        .to output(/Failed to decode compressed message: Zlib::BufError: truncated DEFLATE stream/).to_stderr
+      expect(queue).to be_empty
+    end
+
+    it 'drops and warns when the inflated bytes are not JSON' do
+      expect { client.send(:handle_message, frame(raw_deflate_base64('not json'))) }
+        .to output(/Failed to decode compressed message: JSON::ParserError/).to_stderr
+      expect(queue).to be_empty
+    end
+
+    it 'drops and warns when data is not a String' do
+      expect { client.send(:handle_message, { 'channel' => 'fastAssetCtxs', 'data' => { 'BTC' => {} } }.to_json) }
+        .to output(/Failed to decode compressed message: expected String, got Hash/).to_stderr
+      expect(queue).to be_empty
+    end
+
+    it 'keeps processing frames after a bad one' do
+      expect { client.send(:handle_message, frame('%%%')) }.to output.to_stderr
+      client.send(:handle_message, frame(docs_payload))
+
+      expect(queue.pop(true)[:data]).to eq(docs_decoded)
+    end
+
+    it 'delivers the decoded Hash to callbacks on the dispatch thread' do
+      received = []
+      client.subscribe({ type: 'fastAssetCtxs' }) { |d| received << d }
+      client.send(:start_dispatch_thread)
+
+      client.send(:handle_message, frame(docs_payload))
+      sleep 0.1
+
+      expect(received).to eq([docs_decoded])
+      queue.close
+      client.instance_variable_get(:@dispatch_thread)&.join(1)
     end
   end
 

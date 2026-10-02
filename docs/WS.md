@@ -26,7 +26,7 @@ Ping Thread (every 50s)
 
 1. A raw frame arrives on the read thread.
 2. Non-JSON frames (e.g. `"Websocket connection established."`) and `pong` replies are discarded.
-3. A routing identifier is computed: from the `channel` and `data` of a main-API envelope (e.g. `l2Book:eth`), or, for an explorer array, from the fields of its first element (`blockTime`, `hash`, `height`, `numTxs`, `proposer` → `explorerBlock`; `action`, `block`, `error`, `hash`, `time`, `user` → `explorerTxs`). Messages without an identifier are dropped.
+3. For the compressed `fastAssetCtxs` channel, `data` (base64 + raw DEFLATE JSON) is decoded on the read thread first. A frame that fails to decode is dropped with a `Failed to decode compressed message` warning. Then a routing identifier is computed: from the `channel` and `data` of a main-API envelope (e.g. `l2Book:eth`), or, for an explorer array, from the fields of its first element (`blockTime`, `hash`, `height`, `numTxs`, `proposer` → `explorerBlock`; `action`, `block`, `error`, `hash`, `time`, `user` → `explorerTxs`). Messages without an identifier are dropped.
 4. The message is pushed onto the connection's bounded queue. If the queue is full, the message is dropped and a warning is printed.
 5. The dispatch thread pops the message, looks up callbacks by identifier, and calls each one with the message's `data` (main API) or the whole array (explorer).
 
@@ -62,6 +62,7 @@ Subscriptions are keyed by an identifier string derived from the subscription ty
 | `allDexsAssetCtxs` | `allDexsAssetCtxs` | `allDexsAssetCtxs` |
 | `spotAssetCtxs` | `spotAssetCtxs` (data is an Array) | `spotAssetCtxs` |
 | `outcomeMetaUpdates` | `outcomeMetaUpdates` | `outcomeMetaUpdates` |
+| `fastAssetCtxs` | `fastAssetCtxs` (the one channel whose `data` is decoded before routing) | `fastAssetCtxs` |
 | `explorerBlock` | `explorerBlock` | `explorerBlock` |
 | `explorerTxs` | `explorerTxs` | `explorerTxs` |
 
@@ -72,6 +73,20 @@ Multiple callbacks can be registered for the same identifier. The server unsubsc
 ### Exclusive channels
 
 Some payloads omit a subscription field, so two subscriptions that differ only in that field cannot be told apart: `orderUpdates`, `userEvents` and `notification` messages carry no user, and `userFills`/`spotState` messages do not echo `aggregateByTime`/`ignorePortfolioMargin`. On these channels a `WS::Client` holds one value of that field per identifier: a subscription that conflicts with an active one (a second user on `orderUpdates`/`userEvents`/`notification`, or the same user's `userFills`/`spotState` with a different flag; an omitted flag counts as `false`) raises `Hyperliquid::WebSocketError` without registering anything. Same-value duplicates are allowed. The value is free again once its last subscription is unsubscribed; to follow several users at once, use one `WS::Client` per user.
+
+## Snapshot + delta channels
+
+`fastAssetCtxs` sends a full snapshot (every coin's `markPx`/`midPx`) as its first frame; later frames (about one per second) contain only the coins and fields that changed. Keep a cache and merge each frame into it:
+
+```ruby
+cache = {}
+sdk.ws.subscribe({ type: 'fastAssetCtxs' }) do |ctxs|
+  cache.merge!(ctxs) { |_coin, old, new| old.merge(new) }
+end
+```
+
+- A callback added while the subscription is already active gets only deltas: the server sends no second snapshot for a duplicate subscribe.
+- A dropped frame (watch `dropped_message_count`, or the decode warning) leaves the cache stale until the next snapshot. A snapshot arrives after a reconnect, or after unsubscribing every callback and subscribing again.
 
 ## Queue Overflow
 

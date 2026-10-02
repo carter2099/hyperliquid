@@ -2,6 +2,7 @@
 
 require 'ws_lite'
 require 'json'
+require 'zlib'
 
 module Hyperliquid
   module WS
@@ -12,7 +13,7 @@ module Hyperliquid
       ROUTING_KEYS = {
         'allMids' => [], 'orderUpdates' => [], 'userEvents' => [],
         'notification' => [],
-        'allDexsAssetCtxs' => [], 'outcomeMetaUpdates' => [], 'spotAssetCtxs' => [],
+        'allDexsAssetCtxs' => [], 'outcomeMetaUpdates' => [], 'spotAssetCtxs' => [], 'fastAssetCtxs' => [],
         'l2Book' => %i[coin], 'trades' => %i[coin], 'bbo' => %i[coin],
         'activeAssetCtx' => %i[coin],
         'candle' => %i[coin interval],
@@ -269,10 +270,37 @@ module Hyperliquid
         return if channel == 'pong'
         return unless channel
 
-        identifier = compute_identifier(channel, data['data'])
+        payload = data['data']
+        if channel == 'fastAssetCtxs'
+          payload = decode_compressed_payload(payload)
+          return if payload.nil?
+        end
+
+        identifier = compute_identifier(channel, payload)
         return unless identifier
 
-        enqueue_message(identifier, data['data'])
+        enqueue_message(identifier, payload)
+      end
+
+      # fastAssetCtxs frames carry `data` as base64(raw DEFLATE, RFC 1951) of a UTF-8 JSON
+      # document. Returns the parsed JSON, or nil (after warning) when the payload cannot be
+      # decoded so a bad frame is dropped without raising into the ws_lite read thread.
+      def decode_compressed_payload(encoded)
+        unless encoded.is_a?(String)
+          warn "[Hyperliquid::WS] Failed to decode compressed message: expected String, got #{encoded.class}"
+          return nil
+        end
+
+        inflater = Zlib::Inflate.new(-Zlib::MAX_WBITS)
+        json = inflater.inflate(encoded.unpack1('m0'))
+        raise Zlib::BufError, 'truncated DEFLATE stream' unless inflater.finished?
+
+        JSON.parse(json.force_encoding(Encoding::UTF_8))
+      rescue ArgumentError, Zlib::Error, JSON::ParserError => e
+        warn "[Hyperliquid::WS] Failed to decode compressed message: #{e.class}: #{e.message}"
+        nil
+      ensure
+        inflater&.close
       end
 
       def handle_error(error)

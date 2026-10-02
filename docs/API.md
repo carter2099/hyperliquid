@@ -386,6 +386,7 @@ A client order id is 16 bytes, `0x` + 32 hex characters.
 | `allDexsAssetCtxs` | `{ type: 'allDexsAssetCtxs' }` | Perp asset contexts for every dex (`ctxs`: Array of `[dex, ctxs]`) |
 | `spotAssetCtxs` | `{ type: 'spotAssetCtxs' }` | Asset contexts of every spot pair (the data is an Array) |
 | `outcomeMetaUpdates` | `{ type: 'outcomeMetaUpdates' }` | HIP-4 outcome metadata changes (event-driven, no snapshot; `updates`) |
+| `fastAssetCtxs` | `{ type: 'fastAssetCtxs' }` | Mark/mid prices for all assets (all dexes); first message is a full snapshot, later messages only changed coins/fields. Decoded from base64 + raw DEFLATE automatically |
 
 `orderUpdates`, `userEvents`, `notification`: one user per `WS::Client` (payload carries no user); `spotState`/`userFills`: one `ignorePortfolioMargin`/`aggregateByTime` setting per user per client; conflicting subscriptions raise `WebSocketError`. Use a second `WS::Client` for another user. Spot coins on `activeAssetCtx` arrive on channel `activeSpotAssetCtx` and are routed transparently; `{ type: 'activeSpotAssetCtx' }` is not a subscription type.
 

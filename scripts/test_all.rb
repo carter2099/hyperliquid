@@ -51,6 +51,7 @@ SCRIPTS = [
   'test_20_explorer_ws.rb',
   'test_21_ws_channel_parity.rb',
   'test_22_outcome_deploy.rb',
+  'test_23_ws_fast_asset_ctxs.rb',
   'test_24_perp_deploy_wire.rb',
   'test_26_spot_deploy_rejection.rb',
   'test_27_validator_actions.rb'

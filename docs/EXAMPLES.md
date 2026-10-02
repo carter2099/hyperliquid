@@ -904,6 +904,23 @@ sleep 10
 sdk.ws.close
 ```
 
+### fastAssetCtxs (mark/mid prices, compressed)
+
+```ruby
+sdk = Hyperliquid.new(testnet: true)
+cache = {}
+
+# First frame: snapshot of every coin. Later frames: only changed coins/fields.
+# Frames arrive base64 + raw DEFLATE; the SDK decodes them before the callback.
+sdk.ws.subscribe({ type: 'fastAssetCtxs' }) do |ctxs|
+  cache.merge!(ctxs) { |_coin, old, new| old.merge(new) }
+  puts "BTC mark=#{cache.dig('BTC', 'markPx')} mid=#{cache.dig('BTC', 'midPx')} (#{cache.size} coins)"
+end
+
+sleep 10
+sdk.ws.close
+```
+
 ### Multiple Subscriptions
 
 ```ruby
