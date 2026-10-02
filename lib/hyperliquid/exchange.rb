@@ -1947,6 +1947,41 @@ module Hyperliquid
       spot_deploy_action(:disableQuoteToken, { token: Integer(token) })
     end
 
+    # Request linking a Core spot token to an ERC-20 on HyperEVM (`spotDeploy.requestEvmContract`, L1);
+    # finalize with #finalize_evm_contract.
+    # @param token [Integer] Token index
+    # @param address [String] ERC-20 contract address (lowercased)
+    # @param evm_extra_wei_decimals [Integer] EVM wei decimals minus Core wei decimals, in [-2, 18]
+    # @return [Hash] Exchange response
+    def spot_deploy_request_evm_contract(token:, address:, evm_extra_wei_decimals:)
+      request = {
+        token: Integer(token),
+        address: address.downcase,
+        evmExtraWeiDecimals: Integer(evm_extra_wei_decimals)
+      }
+      spot_deploy_action(:requestEvmContract, request)
+    end
+
+    # Set the token annotation (`spotDeploy.setTokenAnnotation`, L1). Changeable at most once per day.
+    # @param token [Integer] Token index
+    # @param category [String] Category
+    # @param description [String] Description
+    # @param keywords [Array<String>] Keywords
+    # @param display_name [String, nil] Display name; nil is sent as JSON null
+    # @return [Hash] Exchange response
+    def spot_deploy_set_token_annotation(token:, category:, description:, keywords:, display_name: nil)
+      annotation = { category: category, description: description, displayName: display_name, keywords: keywords }
+      spot_deploy_action(:setTokenAnnotation, { token: Integer(token), annotation: annotation })
+    end
+
+    # Set the deployer label (`spotDeploy.setDeployerLabel`, L1).
+    # Settable once per deployer; 2-4 lowercase chars, unique across deployers and perp dexs.
+    # @param label [String] Label
+    # @return [Hash] Exchange response
+    def spot_deploy_set_deployer_label(label:)
+      spot_deploy_action(:setDeployerLabel, { label: label })
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!

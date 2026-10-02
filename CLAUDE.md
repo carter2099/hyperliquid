@@ -64,7 +64,7 @@ The signing chain in `lib/hyperliquid/signing/` must exactly match the official 
 2. **Phantom agent**: `{ source: 'a'|'b', connectionId: action_hash }` (`a`=mainnet, `b`=testnet)
 3. **EIP-712 signature** over phantom agent with Exchange domain (chain ID 1337)
 
-Any change to signing must maintain parity with the Python SDK or transactions will be rejected by the exchange. Explorer `userDetails` echoes submitted action JSON verbatim — use it to confirm live wire shapes of docs-only actions (e.g. spot-deploy aligned-quote variants send `[token]`, not the documented `{token}`).
+Any change to signing must maintain parity with the Python SDK or transactions will be rejected by the exchange. Explorer `userDetails` echoes submitted action JSON verbatim — use it to confirm live wire shapes of docs-only actions. Caveat: spot-deploy aligned-quote txs echo as `[token]`, yet `/exchange` rejected both `[token]` and the documented `{token}` with HTTP 422 "Failed to deserialize" (testnet, 2026-10-02), so those two variants are not shipped.
 
 HIP-4 deployer actions (`activateOutcomeDeployer` enum and `outcomeDeploy {type, venue, operation}`) are L1; key order is pinned by Python-SDK parity fixtures; `keywordToValue` pairs are sorted by the SDK, `setSubDeployers`/named-outcome lists keep caller order.
 

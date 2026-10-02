@@ -280,6 +280,9 @@ All are L1 `spotDeploy` actions; `expires_after` is honored; no `vault_address`.
 - `spot_deploy_revoke_freeze_privilege(token:)` - Permanently give up the freeze privilege
 - `spot_deploy_enable_quote_token(token:)` - Make the token a permissionless quote token (irreversible)
 - `spot_deploy_disable_quote_token(token:)` - Disable the token as a quote token
+- `spot_deploy_request_evm_contract(token:, address:, evm_extra_wei_decimals:)` - Request an ERC-20 link; finish with `finalize_evm_contract`
+- `spot_deploy_set_token_annotation(token:, category:, description:, keywords:, display_name: nil)` - Set the token annotation (once per day)
+- `spot_deploy_set_deployer_label(label:)` - Set the deployer label (once per deployer)
 
 ### Rate Limits and Nonces
 

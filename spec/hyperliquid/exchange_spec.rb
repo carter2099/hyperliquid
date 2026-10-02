@@ -5188,7 +5188,21 @@ RSpec.describe Hyperliquid::Exchange do
                         { token: 1234, user: '0xAbCdEf0000000000000000000000000000000002', freeze: true }],
       'revoke_freeze_privilege' => [:spot_deploy_revoke_freeze_privilege, { token: 1234 }],
       'enable_quote_token' => [:spot_deploy_enable_quote_token, { token: 1234 }],
-      'disable_quote_token' => [:spot_deploy_disable_quote_token, { token: 1234 }]
+      'disable_quote_token' => [:spot_deploy_disable_quote_token, { token: 1234 }],
+      # SP3 rows
+      'request_evm_contract' => [:spot_deploy_request_evm_contract,
+                                 { token: 1234, address: '0x8cDE56336E289c028C8f7CF5c20283fF02272182',
+                                   evm_extra_wei_decimals: 13 }],
+      'request_evm_contract_negative' => [:spot_deploy_request_evm_contract,
+                                          { token: 1234, address: '0x8cDE56336E289c028C8f7CF5c20283fF02272182',
+                                            evm_extra_wei_decimals: -2 }],
+      'set_token_annotation' => [:spot_deploy_set_token_annotation,
+                                 { token: 1234, category: 'meme', description: 'A test token',
+                                   display_name: 'TEST', keywords: %w[test cat] }],
+      'set_token_annotation_null_display_name' => [:spot_deploy_set_token_annotation,
+                                                   { token: 1234, category: 'meme', description: 'A test token',
+                                                     keywords: [] }],
+      'set_deployer_label' => [:spot_deploy_set_deployer_label, { label: 'abc' }]
     }
 
     expected = {
@@ -5307,6 +5321,46 @@ RSpec.describe Hyperliquid::Exchange do
         r: '0xe0b9b27d470e83e67016c0359ef977341e1d81cfdacf800bfa775f5232c8742a',
         s: '0x27127967f19aa50d6912b9e9a564df776930dc4e64d0f4e826dfac35824820a8',
         v: 27
+      },
+      # SP3 rows
+      'request_evm_contract' => {
+        json: '{"type":"spotDeploy","requestEvmContract":{"token":1234,"address":"0x8cde56336e289c028c8f7cf5c20283ff' \
+              '02272182","evmExtraWeiDecimals":13}}',
+        hash: '0xfd8253328af590ce3694bc7d4552d53a0d77581c9b8e48807aae24c528ad4a5a',
+        r: '0x45c26e0de474081718cee61cc843eb4d6a04796c429b4142083fe1a85245fd02',
+        s: '0x52eccebc0620dddd142a197aa96e7b7ae3121285a0e7dc93c8eeb36eb2c9abfd',
+        v: 28
+      },
+      'request_evm_contract_negative' => {
+        json: '{"type":"spotDeploy","requestEvmContract":{"token":1234,"address":"0x8cde56336e289c028c8f7cf5c20283ff' \
+              '02272182","evmExtraWeiDecimals":-2}}',
+        hash: '0x198ac7499a382cf80a6f83614e2cb9a9a4f4f95e5a7bf8d15ab76703983bffaf',
+        r: '0x75e8e74fae1329c29d435fd578b3dc2a8f75fd2dd0f706c2e65399d0010a676d',
+        s: '0x50da6176963939cb80346d47ea2e8e7f3434d96686444c6c176f2524ffa69ff9',
+        v: 27
+      },
+      'set_token_annotation' => {
+        json: '{"type":"spotDeploy","setTokenAnnotation":{"token":1234,"annotation":{"category":"meme","description"' \
+              ':"A test token","displayName":"TEST","keywords":["test","cat"]}}}',
+        hash: '0xbab2804e63547a696740992f58511054016c39894eab85b945724274c156ff37',
+        r: '0xd568b74dbe05065b82c09468c5d6d1fa4d2a5175a34fca287d6baa6e8646597c',
+        s: '0x2c6de4a2a249164e8ad3a2dd0f39bfa614d0eb36de180a11c441b10ee82ffb73',
+        v: 27
+      },
+      'set_token_annotation_null_display_name' => {
+        json: '{"type":"spotDeploy","setTokenAnnotation":{"token":1234,"annotation":{"category":"meme","description"' \
+              ':"A test token","displayName":null,"keywords":[]}}}',
+        hash: '0x607395de09155539a372235c3b7783641b86a446591fc4746a08f12b9d454369',
+        r: '0x2d25130427ab206a23cfb8117acc95c5a625401b3a51cd14952023b20b5701a1',
+        s: '0x42e9706b21942fc4b1d9a3b14ca630afcfbc2821e4e64e772144256fc2a566a1',
+        v: 27
+      },
+      'set_deployer_label' => {
+        json: '{"type":"spotDeploy","setDeployerLabel":{"label":"abc"}}',
+        hash: '0x9596962fb3a0bb12dfa2a13cbd8a4fbe2b8138aabb6b86a8bd4a40e0095d6b3e',
+        r: '0x3eaa5dbdd860cf149374c1eaaba69e60e7ee757710edcc38f46976ee225eee1f',
+        s: '0x18bfd034a0480355c46a731d3a3f0284cc150412da1df7cebb97764c983d24a4',
+        v: 28
       }
     }
 

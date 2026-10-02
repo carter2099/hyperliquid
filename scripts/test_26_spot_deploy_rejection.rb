@@ -26,12 +26,11 @@ PROBES = [
                                 blacklist_users: [['0x0000000000000000000000000000000000000001', false]] }],
   # SP2
   [:spot_deploy_set_deployer_trading_fee_share, { token: 0, share: '100%' }],
-  [:spot_deploy_freeze_user, { token: 0, user: '0x0000000000000000000000000000000000000001', freeze: false }]
-  # SP3: append
-  #   [:spot_deploy_enable_aligned_quote_token, { token: 0 }],
-  #   [:spot_deploy_request_evm_contract, { token: 0, address: '0x0000000000000000000000000000000000000001',
-  #                                         evm_extra_wei_decimals: 0 }],
-  #   [:spot_deploy_set_token_annotation, { token: 0, category: 'test', description: 'sdk probe', keywords: [] }]
+  [:spot_deploy_freeze_user, { token: 0, user: '0x0000000000000000000000000000000000000001', freeze: false }],
+  # SP3
+  [:spot_deploy_request_evm_contract, { token: 0, address: '0x0000000000000000000000000000000000000001',
+                                        evm_extra_wei_decimals: 0 }],
+  [:spot_deploy_set_token_annotation, { token: 0, category: 'test', description: 'sdk probe', keywords: [] }]
 ].freeze
 
 # Returns [status, text]; status is 'ok', 'err', or 'raised' (HTTP error, e.g. 422 deserialize failure).
