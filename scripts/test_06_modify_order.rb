@@ -7,6 +7,7 @@
 # then cancel it and confirm it left open_orders.
 # `ensure` cancels this script's own orders if any are still open.
 
+require 'bigdecimal'
 require_relative 'test_helpers'
 
 TEST_NAME = 'Test 6 Modify Order'
@@ -72,12 +73,17 @@ rescue StandardError => e
   fail!("Cleanup error (#{e.class}): #{e.message}")
 end
 
+# Exact decimal comparison of a wire price string against the requested price.
+def same_price?(wire_px, expected_px)
+  BigDecimal(wire_px.to_s) == BigDecimal(expected_px.to_s)
+end
+
 # Polls open_orders for this coin's order at limit_px (oid must equal new_oid when the
 # modify response reported one). Returns the order Hash or nil.
 def await_modified(sdk, limit_px, new_oid, attempts: 5)
   attempts.times do |i|
     order = sdk.info.open_orders(sdk.exchange.address).find do |o|
-      o['coin'] == PERP_COIN && o['limitPx'].to_f == limit_px.to_f && (new_oid.nil? || o['oid'] == new_oid)
+      o['coin'] == PERP_COIN && same_price?(o['limitPx'], limit_px) && (new_oid.nil? || o['oid'] == new_oid)
     end
     return order if order
 

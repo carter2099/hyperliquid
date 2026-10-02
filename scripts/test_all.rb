@@ -35,6 +35,7 @@
 require 'fileutils'
 require 'json'
 require 'rbconfig'
+require 'io/wait'
 require 'time'
 
 # 'test_NN_name.rb' => 'reason' for scripts deliberately excluded from the gate.
@@ -190,7 +191,7 @@ def run_child(args, deadline)
     if eof
       sleep 0.1 # pipe closed; waiting for the process to exit (or be killed)
     else
-      ready = IO.select([reader], nil, nil, 0.5)
+      ready = reader.wait_readable(0.5)
       if ready
         begin
           filter << reader.read_nonblock(65_536)

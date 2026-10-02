@@ -127,6 +127,14 @@ RSpec.describe Hyperliquid::Cloid do
     end
   end
 
+  describe '#inspect' do
+    it 'shows the raw 0x-hex id, also when nested in other inspected values' do
+      cloid = described_class.from_int(42)
+      expect(cloid.inspect).to eq('0x0000000000000000000000000000002a')
+      expect([cloid].inspect).to eq('[0x0000000000000000000000000000002a]')
+    end
+  end
+
   describe '#==' do
     it 'returns true for equal cloids' do
       cloid1 = described_class.from_int(42)

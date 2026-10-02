@@ -55,10 +55,18 @@ module CallSurfaceCheck
     # `<anything>.info` / `.exchange` / `.ws` with no arguments, or `Hyperliquid::X.new(...)`.
     def instance_owner(node)
       return unless node.is_a?(Prism::CallNode)
-      return ACCESSORS[node.name] if node.receiver && node.arguments.nil? && ACCESSORS.key?(node.name)
+      return ACCESSORS[node.name] if accessor_call?(node)
 
-      klass = node.name == :new && node.receiver && hyperliquid_constant(node.receiver)
+      klass = constructed_class(node)
       klass if ACCESSORS.value?(klass)
+    end
+
+    def accessor_call?(node)
+      node.receiver && node.arguments.nil? && ACCESSORS.key?(node.name)
+    end
+
+    def constructed_class(node)
+      node.name == :new && node.receiver && hyperliquid_constant(node.receiver)
     end
 
     def hyperliquid_constant(node)

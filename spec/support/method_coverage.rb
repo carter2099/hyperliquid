@@ -42,12 +42,24 @@ module MethodCoverage
   # True only when nothing narrowed the run: every spec file loaded, every loaded example selected,
   # no --only-failures / --dry-run, and the run was not aborted (e.g. --fail-fast).
   def full_suite_run?(config, world)
-    return false if config.dry_run? || config.only_failures? || world.wants_to_quit || world.rspec_is_quitting
+    !run_narrowed?(config) && !run_aborted?(world) && all_spec_files_loaded?(config) && all_examples_selected?(world)
+  end
 
-    # RSpec's default pattern, anchored at spec/ (`rake spec` passes it as a cwd-relative --pattern).
+  def run_narrowed?(config)
+    config.dry_run? || config.only_failures?
+  end
+
+  def run_aborted?(world)
+    world.wants_to_quit || world.rspec_is_quitting
+  end
+
+  # RSpec's default pattern, anchored at spec/ (`rake spec` passes it as a cwd-relative --pattern).
+  def all_spec_files_loaded?(config)
     all_files = Dir.glob(File.join(SPEC_DIR, '**{,/*/**}/*_spec.rb')).map { |f| File.expand_path(f) }.uniq.sort
-    return false unless config.files_to_run.map { |f| File.expand_path(f) }.uniq.sort == all_files
+    config.files_to_run.map { |f| File.expand_path(f) }.uniq.sort == all_files
+  end
 
+  def all_examples_selected?(world)
     declared = world.example_groups.flat_map(&:descendants).sum { |group| group.examples.size }
     declared == world.example_count
   end

@@ -200,7 +200,8 @@ RSpec.describe Hyperliquid::Client do
       expect(sleeps[1]).to be_between(1.0, 1.25)
     end
 
-    it 'never retries /exchange, even on a retryable status' do
+    it 'never retries /exchange, even on a retryable status',
+       skip_signature_verification: 'raw Client POST without a signed action; tests retry policy only' do
       stub_request(:post, exchange_url).to_return(status: 503, body: '{}')
 
       expect { retry_client.post('/exchange', { action: { type: 'noop' } }) }.to raise_error(Hyperliquid::ServerError)
@@ -208,7 +209,8 @@ RSpec.describe Hyperliquid::Client do
       expect(sleeps).to be_empty
     end
 
-    it 'never retries /exchange on a connection failure' do
+    it 'never retries /exchange on a connection failure',
+       skip_signature_verification: 'raw Client POST without a signed action; tests retry policy only' do
       stub_request(:post, exchange_url).to_raise(Faraday::ConnectionFailed.new('reset'))
 
       expect { retry_client.post('/exchange', { action: { type: 'noop' } }) }.to raise_error(Hyperliquid::NetworkError)
