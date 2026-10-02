@@ -29,9 +29,10 @@ Integration scripts live in `scripts/` as standalone files (`test_NN_<name>.rb`)
 HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_all.rb              # all 20
 HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_automated.rb        # CI-friendly subset (14)
 HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_08_usd_class_transfer.rb  # single
+HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/testnet_wallet_check.rb [--fix]  # wallet preconditions report; --fix switches to standard abstraction + rebalances (never from a runner)
 ```
 
-`test_automated.rb` is the unattended runner — same as `test_all.rb` but excludes scripts that require manual testnet preconditions (e.g. `test_09_sub_account_lifecycle` needs $100k traded volume; `test_12_staking` needs HYPE balance). Some included tests (e.g. `test_08`, `test_11`) are also coded to skip-with-warning when known testnet preconditions aren't met, so the suite stays green on a stable wallet.
+`test_automated.rb` is the unattended runner — same as `test_all.rb` but excludes scripts that require manual testnet preconditions (e.g. `test_09_sub_account_lifecycle` needs $100k traded volume; `test_12_staking` needs HYPE balance). Some scripts use structured-rejection wire checks instead of skipping (e.g. `test_08` when the wallet is unified): a balance/volume/mode-class `err` can only be produced after the server recovered the signer to this wallet, so it proves signing end-to-end. `test_11` preflights its third-party builder's eligibility via Info and only downgrades to a warning if that builder drifts ineligible.
 
 `test_integration.rb` at the project root is a thin convenience wrapper.
 

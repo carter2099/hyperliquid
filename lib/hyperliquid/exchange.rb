@@ -712,7 +712,8 @@ module Hyperliquid
     # Set the abstraction mode for a user (`userSetAbstraction` user-signed action).
     # The `user` address is lowercased to match the Python SDK and protocol expectations.
     # @param user [String] Wallet address whose abstraction is being set
-    # @param abstraction [String] One of 'u' (unified), 'p' (portfolio margin), 'i' (isolated/disabled)
+    # @param abstraction [String] One of 'unifiedAccount', 'portfolioMargin', 'disabled'
+    #   (long form; the L1 agentSetAbstraction uses 'u'/'p'/'i')
     # @return [Hash] Exchange response
     def user_set_abstraction(user:, abstraction:)
       nonce = timestamp_ms

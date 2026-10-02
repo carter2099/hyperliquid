@@ -2297,13 +2297,13 @@ RSpec.describe Hyperliquid::Exchange do
             action['signatureChainId'] == '0x66eee' &&
             action['hyperliquidChain'] == 'Testnet' &&
             action['user'] == mixed_case_user.downcase &&
-            action['abstraction'] == 'u' &&
+            action['abstraction'] == 'unifiedAccount' &&
             action['nonce'].is_a?(Integer) &&
             body['signature'].is_a?(Hash)
         end
         .to_return(status: 200, body: abstraction_response.to_json)
 
-      result = exchange.user_set_abstraction(user: mixed_case_user, abstraction: 'u')
+      result = exchange.user_set_abstraction(user: mixed_case_user, abstraction: 'unifiedAccount')
       expect(result['status']).to eq('ok')
     end
 
@@ -2311,13 +2311,13 @@ RSpec.describe Hyperliquid::Exchange do
       stub_request(:post, exchange_endpoint)
         .with do |req|
           body = JSON.parse(req.body)
-          body['action']['abstraction'] == 'p'
+          body['action']['abstraction'] == 'portfolioMargin'
         end
         .to_return(status: 200, body: abstraction_response.to_json)
 
       result = exchange.user_set_abstraction(
         user: '0x1111111111111111111111111111111111111111',
-        abstraction: 'p'
+        abstraction: 'portfolioMargin'
       )
       expect(result['status']).to eq('ok')
     end
@@ -2333,7 +2333,7 @@ RSpec.describe Hyperliquid::Exchange do
 
       result = exchange.user_set_abstraction(
         user: '0x1111111111111111111111111111111111111111',
-        abstraction: 'i'
+        abstraction: 'disabled'
       )
       expect(result['status']).to eq('ok')
     end
