@@ -1,5 +1,45 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [2.0.0] - 2026-10-02
+
+### Breaking
+
+- `Exchange#activate_outcome_deployer` now takes `venue_name:` and sends the protocol's `activate: { venueName }` form. The previous `is_deactivate:` keyword sent a shape the exchange never accepted and has been removed; use the new `Exchange#deactivate_outcome_deployer` to deactivate.
+- `Info#aligned_quote_token_info` has been removed. The API stopped serving `alignedQuoteTokenInfo` (mainnet and testnet return HTTP 422), so every call already failed.
+- `WS::Client#subscribe` raises `Hyperliquid::WebSocketError` for a subscription that conflicts with an active one on a channel whose messages do not say which subscription they belong to: a second user on `orderUpdates`, `userEvents` or `notification`, or a second `aggregateByTime` (`userFills`) / `ignorePortfolioMargin` (`spotState`) value for the same user. Previously both callbacks silently received each other's messages.
+- `Hyperliquid.new(private_key:)` and `Signing::Signer` raise `ArgumentError` unless the key is 64 hex characters, optionally `0x`-prefixed. Empty strings and malformed keys are no longer accepted (the error never echoes the key).
+
+### Added
+
+- HIP-3 perp deployer actions (`perpDeploy`): `perp_deploy_register_asset`, `perp_deploy_register_asset2`, `perp_deploy_set_oracle`, `perp_deploy_set_funding_multipliers`, `perp_deploy_set_funding_interest_rates`, `perp_deploy_set_funding_clamps`, `perp_deploy_halt_trading`, `perp_deploy_insert_margin_table`, `perp_deploy_set_margin_table_ids`, `perp_deploy_set_margin_modes`, `perp_deploy_set_open_interest_caps`, `perp_deploy_set_fee_recipient`, `perp_deploy_set_deployer_fees`, `perp_deploy_set_sub_deployers`, `perp_deploy_set_perp_annotation`, `perp_deploy_disable_dex`.
+- HIP-3\* star operations (testnet): `star_modify_approval`, `star_modify_backstop_liquidator_approval`, `star_set_reduce_only`, `star_cancel`, `star_cancel_all`, `star_order`, `star_send_asset`, `star_set_oracle`, and `Info#user_star_state`.
+- HIP-1/HIP-2 spot deployer actions (`spotDeploy`): `spot_deploy_register_token`, `spot_deploy_user_genesis` (with `blacklist_users:`), `spot_deploy_genesis`, `spot_deploy_register_spot`, `spot_deploy_register_hyperliquidity`, `spot_deploy_set_deployer_trading_fee_share`, `spot_deploy_enable_freeze_privilege`, `spot_deploy_freeze_user`, `spot_deploy_revoke_freeze_privilege`, `spot_deploy_enable_quote_token`, `spot_deploy_disable_quote_token`, `spot_deploy_request_evm_contract`, `spot_deploy_set_token_annotation`, `spot_deploy_set_deployer_label`.
+- HIP-4 outcome deployer actions: `deactivate_outcome_deployer`, `register_standalone_outcome_from_template`, `register_question_from_template`, `register_and_associate_named_outcome_from_template`, `settle_outcome`, `settle_question`, `set_outcome_sub_deployers`; and `Info#outcome_deployer_limits`.
+- Validator-operator actions: `c_signer_jail_self`, `c_signer_unjail_self`, `c_validator_register`, `c_validator_change_profile`, `c_validator_unregister`, `validator_l1_stream`.
+- `Exchange#trailing_stop`.
+- 18 WebSocket channels: `userNonFundingLedgerUpdates`, `userTwapSliceFills`, `userTwapHistory`, `userHistoricalOrders`, `allDexsClearinghouseState`, `webData3`, `clearinghouseState`, `openOrders`, `twapStates`, `spotState`, `notification`, `activeAssetCtx` (spot updates arrive on `activeSpotAssetCtx` and are routed transparently), `activeAssetData`, `assetCtxs`, `allDexsAssetCtxs`, `spotAssetCtxs`, `outcomeMetaUpdates`, and `fastAssetCtxs` (base64 + raw-DEFLATE frames are decoded before the callback).
+- All new actions support `expires_after` and match the official Python SDK's signatures byte for byte where Python has the action.
+
+### Fixed
+
+- `create_sub_account`, `sub_account_transfer`, `sub_account_spot_transfer`, `vault_transfer` and `set_referrer` now include `expires_after` in the signed hash; with `expires_after` set they were previously rejected or attributed to the wrong signer.
+- Spot `market_order`/`market_close` read each pair's size decimals from its base token (the API never sends `szDecimals` on spotMeta pairs), so spot slippage prices now match the Python SDK.
+- Market-order slippage prices round ties to even on the exact binary value, like the Python SDK (some prices came out one tick higher).
+- `retry_enabled: true` now retries `/info` and explorer reads on 429/502/503/504, connection failures and timeouts (it previously retried nothing); `/exchange` is never retried. The `timeout:` option now also limits how long the SDK waits for a response.
+- `WS::Client` reconnects with backoff when the server closes the connection (previously subscriptions silently stopped), `close` no longer reports a spurious "queue closed" error, subscribing after `close` delivers messages again, a pending reconnect no longer opens a second connection after `close` + `connect`, and each subscription is sent once on open.
+- WebSocket subscription ids are unique across the main-API and explorer connections (`unsubscribe(id)` could remove the wrong subscription), and `userEvents` subscriptions now receive events (the server sends them on channel `user`).
+- Documentation for `Exchange#user_set_abstraction` (takes `unifiedAccount` / `portfolioMargin` / `disabled`) and `Exchange#schedule_cancel` (`time: nil` removes the scheduled cancel).
+
+### Changed
+
+- The gem declares `bigdecimal` (>= 3.1) as a runtime dependency; it was already required at load time.
+- The packaged gem contains only `lib/`, `docs/`, `README.md`, `CHANGELOG.md`, `LICENSE.txt` and `SECURITY.md`, every file world-readable (1.9.2 shipped `version.rb`, `CHANGELOG.md` and `CLAUDE.md` as owner-only).
+- `docs/API.md` lists every public method with full signatures and `docs/WS.md` covers both WebSocket transports and every channel.
+
+### Security
+
+- `Signing::Signer`, `Exchange` and the SDK object redact `inspect`/`to_s` to address and network, so private keys cannot appear in logs or exception messages.
+
 ## [1.9.2] - 2026-09-29
 
 ### Security
