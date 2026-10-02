@@ -375,8 +375,15 @@ A client order id is 16 bytes, `0x` + 32 hex characters.
 | `userHistoricalOrders` | `{ type: 'userHistoricalOrders', user: '0x...' }` | A user's historical orders |
 | `allDexsClearinghouseState` | `{ type: 'allDexsClearinghouseState', user: '0x...' }` | A user's perp clearinghouse state on every dex |
 | `webData3` | `{ type: 'webData3', user: '0x...' }` | Aggregate user state (`userState`, `perpDexStates`) as used by the web frontend |
+| `clearinghouseState` | `{ type: 'clearinghouseState', user: '0x...' }` (optional `dex: 'xyz'`; omit for the main dex) | A user's perp clearinghouse state (positions, margin) on one dex |
+| `openOrders` | `{ type: 'openOrders', user: '0x...' }` (optional `dex: 'xyz'`; omit for the main dex) | A user's open orders on one dex |
+| `twapStates` | `{ type: 'twapStates', user: '0x...' }` (optional `dex: 'xyz'`; omit for the main dex) | A user's active TWAP orders on one dex |
+| `spotState` | `{ type: 'spotState', user: '0x...' }` (optional `ignorePortfolioMargin: true`) | A user's spot balances |
+| `notification` | `{ type: 'notification', user: '0x...' }` | A user's notifications (event-driven, no snapshot) |
+| `activeAssetCtx` | `{ type: 'activeAssetCtx', coin: 'BTC' }` (perp, HIP-3 `'xyz:XYZ100'`, or spot `'@107'`/`'PURR/USDC'`) | One asset's context (mark/oracle/mid price, funding, open interest, volume) |
+| `activeAssetData` | `{ type: 'activeAssetData', user: '0x...', coin: 'BTC' }` | A user's leverage, max trade sizes and available-to-trade for one perp coin |
 
-`orderUpdates`, `userEvents`: one user per `WS::Client` (payload carries no user); `userFills`: one `aggregateByTime` setting per user per client; conflicting subscriptions raise `WebSocketError`. Use a second `WS::Client` for another user.
+`orderUpdates`, `userEvents`, `notification`: one user per `WS::Client` (payload carries no user); `spotState`/`userFills`: one `ignorePortfolioMargin`/`aggregateByTime` setting per user per client; conflicting subscriptions raise `WebSocketError`. Use a second `WS::Client` for another user. Spot coins on `activeAssetCtx` arrive on channel `activeSpotAssetCtx` and are routed transparently; `{ type: 'activeSpotAssetCtx' }` is not a subscription type.
 
 Candle intervals: `1m`, `3m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `8h`, `12h`, `1d`, `3d`, `1w`, `1M`
 

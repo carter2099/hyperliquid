@@ -867,6 +867,43 @@ sleep 60
 sdk.ws.close
 ```
 
+### clearinghouseState (per dex)
+
+```ruby
+sdk = Hyperliquid.new(testnet: true)
+user = '0x...'
+
+# Main dex (omit dex:) and a HIP-3 dex are separate subscriptions
+sdk.ws.subscribe({ type: 'clearinghouseState', user: user }) do |data|
+  puts "main dex account value: #{data['clearinghouseState']['marginSummary']['accountValue']}"
+end
+
+sdk.ws.subscribe({ type: 'clearinghouseState', user: user, dex: 'xyz' }) do |data|
+  puts "#{data['dex']} positions: #{data['clearinghouseState']['assetPositions'].length}"
+end
+
+sleep 10
+sdk.ws.close
+```
+
+### activeAssetCtx (Asset Context)
+
+```ruby
+sdk = Hyperliquid.new(testnet: true)
+
+# Perp, HIP-3 ('xyz:XYZ100') or spot ('PURR/USDC', '@107') coins
+sdk.ws.subscribe({ type: 'activeAssetCtx', coin: 'BTC' }) do |data|
+  puts "#{data['coin']} mark=#{data['ctx']['markPx']} funding=#{data['ctx']['funding']}"
+end
+
+sdk.ws.subscribe({ type: 'activeAssetCtx', coin: 'PURR/USDC' }) do |data|
+  puts "#{data['coin']} mark=#{data['ctx']['markPx']}"
+end
+
+sleep 10
+sdk.ws.close
+```
+
 ### Multiple Subscriptions
 
 ```ruby

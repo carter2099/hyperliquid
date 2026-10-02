@@ -51,16 +51,23 @@ Subscriptions are keyed by an identifier string derived from the subscription ty
 | `userHistoricalOrders` | `userHistoricalOrders:<user>` | `userHistoricalOrders:0xabc` |
 | `allDexsClearinghouseState` | `allDexsClearinghouseState:<user>` | `allDexsClearinghouseState:0xabc` |
 | `webData3` | `webData3:<user>` (message side: `data.userState.user`) | `webData3:0xabc` |
+| `clearinghouseState` | `clearinghouseState:<user>:<dex>` (`dex` `""` for the main dex) | `clearinghouseState:0xabc:xyz` |
+| `openOrders` | `openOrders:<user>:<dex>` | `openOrders:0xabc:` |
+| `twapStates` | `twapStates:<user>:<dex>` | `twapStates:0xabc:xyz` |
+| `spotState` | `spotState:<user>` (exclusive: `ignorePortfolioMargin`) | `spotState:0xabc` |
+| `notification` | `notification` (exclusive: `user`) | `notification` |
+| `activeAssetCtx` | `activeAssetCtx:<coin>` (spot coins echo as channel `activeSpotAssetCtx`) | `activeAssetCtx:xyz:xyz100` |
+| `activeAssetData` | `activeAssetData:<user>:<coin>` | `activeAssetData:0xabc:btc` |
 | `explorerBlock` | `explorerBlock` | `explorerBlock` |
 | `explorerTxs` | `explorerTxs` | `explorerTxs` |
 
-Coins and users are lowercased; intervals are kept verbatim (`1m` and `1M` differ). `subscribe` raises `Hyperliquid::WebSocketError` for a channel not in this table; `subscribe_explorer_*` raise `Hyperliquid::ConfigurationError` when the client has no explorer URL.
+Coins and users are lowercased; intervals are kept verbatim (`1m` and `1M` differ). The user comes before coin/dex in multi-field identifiers because HIP-3 coins contain a colon (`xyz:XYZ100`). An omitted `dex` and `dex: ""` are the same subscription (the server canonicalizes an omitted dex to `""`), so both get the identifier ending in `:`. Server echo channels that differ from the subscription type are mapped back before routing: `user` → `userEvents`, `activeSpotAssetCtx` → `activeAssetCtx`. `subscribe` raises `Hyperliquid::WebSocketError` for a channel not in this table (including `activeSpotAssetCtx`, which is only an echo channel); `subscribe_explorer_*` raise `Hyperliquid::ConfigurationError` when the client has no explorer URL.
 
 Multiple callbacks can be registered for the same identifier. The server unsubscribe message is only sent when the last callback for an identifier is removed.
 
 ### Exclusive channels
 
-Some payloads omit a subscription field, so two subscriptions that differ only in that field cannot be told apart: `orderUpdates` and `userEvents` messages carry no user, and `userFills` messages do not echo `aggregateByTime`. On these channels a `WS::Client` holds one value of that field per identifier: a subscription that conflicts with an active one (a second user on `orderUpdates`/`userEvents`, or the same user's `userFills` with a different `aggregateByTime`; an omitted flag counts as `false`) raises `Hyperliquid::WebSocketError` without registering anything. Same-value duplicates are allowed. The value is free again once its last subscription is unsubscribed; to follow several users at once, use one `WS::Client` per user.
+Some payloads omit a subscription field, so two subscriptions that differ only in that field cannot be told apart: `orderUpdates`, `userEvents` and `notification` messages carry no user, and `userFills`/`spotState` messages do not echo `aggregateByTime`/`ignorePortfolioMargin`. On these channels a `WS::Client` holds one value of that field per identifier: a subscription that conflicts with an active one (a second user on `orderUpdates`/`userEvents`/`notification`, or the same user's `userFills`/`spotState` with a different flag; an omitted flag counts as `false`) raises `Hyperliquid::WebSocketError` without registering anything. Same-value duplicates are allowed. The value is free again once its last subscription is unsubscribed; to follow several users at once, use one `WS::Client` per user.
 
 ## Queue Overflow
 

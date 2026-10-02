@@ -11,22 +11,29 @@ module Hyperliquid
       # user/coin are downcased; dex nil => '' (server canonicalizes an omitted dex to ""); interval verbatim.
       ROUTING_KEYS = {
         'allMids' => [], 'orderUpdates' => [], 'userEvents' => [],
+        'notification' => [],
         'l2Book' => %i[coin], 'trades' => %i[coin], 'bbo' => %i[coin],
+        'activeAssetCtx' => %i[coin],
         'candle' => %i[coin interval],
         'userFills' => %i[user], 'userFundings' => %i[user],
         'userNonFundingLedgerUpdates' => %i[user], 'userTwapSliceFills' => %i[user],
         'userTwapHistory' => %i[user], 'userHistoricalOrders' => %i[user],
-        'allDexsClearinghouseState' => %i[user], 'webData3' => %i[user]
+        'allDexsClearinghouseState' => %i[user], 'webData3' => %i[user],
+        'spotState' => %i[user],
+        'clearinghouseState' => %i[user dex], 'openOrders' => %i[user dex], 'twapStates' => %i[user dex],
+        'activeAssetData' => %i[user coin]
       }.freeze
 
       # Server channel names that differ from the subscription type.
       CHANNEL_ALIASES = {
-        'user' => 'userEvents'
+        'user' => 'userEvents',
+        'activeSpotAssetCtx' => 'activeAssetCtx'
       }.freeze
 
       # Payload omits this subscription field, so two subscriptions differing in it cannot be told apart.
       EXCLUSIVE_FIELDS = {
-        'orderUpdates' => :user, 'userEvents' => :user, 'userFills' => :aggregateByTime
+        'orderUpdates' => :user, 'userEvents' => :user, 'userFills' => :aggregateByTime,
+        'notification' => :user, 'spotState' => :ignorePortfolioMargin
       }.freeze
 
       attr_reader :dropped_message_count, :explorer_dropped_message_count

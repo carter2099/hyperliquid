@@ -34,7 +34,17 @@ CHECKS = [
   ['userTwapSliceFills', { type: 'userTwapSliceFills', user: ADDR }, ->(d) { d['user'] == ADDR }],
   ['userTwapHistory', { type: 'userTwapHistory', user: ADDR }, ->(d) { d['user'] == ADDR }],
   ['userHistoricalOrders', { type: 'userHistoricalOrders', user: ADDR }, ->(d) { d['user'] == ADDR }],
-  ['allDexsClearinghouseState', { type: 'allDexsClearinghouseState', user: ADDR }, ->(d) { d['user'] == ADDR }]
+  ['allDexsClearinghouseState', { type: 'allDexsClearinghouseState', user: ADDR }, ->(d) { d['user'] == ADDR }],
+  ['clearinghouseState (main dex)', { type: 'clearinghouseState', user: ADDR },
+   ->(d) { d['user'] == ADDR && d['dex'] == '' }],
+  ['clearinghouseState (xyz)', { type: 'clearinghouseState', user: ADDR, dex: 'xyz' }, ->(d) { d['dex'] == 'xyz' }],
+  ['openOrders (main dex)', { type: 'openOrders', user: ADDR }, ->(d) { d['dex'] == '' }],
+  ['twapStates (xyz)', { type: 'twapStates', user: ADDR, dex: 'xyz' }, ->(d) { d['dex'] == 'xyz' }],
+  ['spotState', { type: 'spotState', user: ADDR }, ->(d) { d['user'] == ADDR }],
+  ['activeAssetData BTC', { type: 'activeAssetData', user: ADDR, coin: 'BTC' },
+   ->(d) { d['coin'] == 'BTC' && d['user'] == ADDR }],
+  ['activeAssetCtx BTC', { type: 'activeAssetCtx', coin: 'BTC' }, ->(d) { d['coin'] == 'BTC' }],
+  ['activeAssetCtx PURR/USDC', { type: 'activeAssetCtx', coin: 'PURR/USDC' }, ->(d) { d['coin'] == 'PURR/USDC' }]
 ].freeze
 
 def routing_summary(data)

@@ -692,6 +692,34 @@ RSpec.describe Hyperliquid::WS::Client do
       expect { client.subscribe({ type: 'userFills', user: '0xBBB', aggregateByTime: false }, &noop) }
         .not_to raise_error
     end
+
+    it 'rejects notification for a second user' do
+      client.subscribe({ type: 'notification', user: '0xAAA' }, &noop)
+
+      expect { client.subscribe({ type: 'notification', user: '0xBBB' }, &noop) }
+        .to raise_error(Hyperliquid::WebSocketError, /notification messages do not include user/)
+    end
+
+    it 'rejects spotState for the same user with a different ignorePortfolioMargin' do
+      client.subscribe({ type: 'spotState', user: '0xAAA', ignorePortfolioMargin: true }, &noop)
+
+      expect { client.subscribe({ type: 'spotState', user: '0xAAA' }, &noop) }
+        .to raise_error(Hyperliquid::WebSocketError, /ignorePortfolioMargin/)
+    end
+
+    it 'treats an omitted ignorePortfolioMargin as false' do
+      client.subscribe({ type: 'spotState', user: '0xAAA' }, &noop)
+
+      expect { client.subscribe({ type: 'spotState', user: '0xAAA', ignorePortfolioMargin: false }, &noop) }
+        .not_to raise_error
+    end
+
+    it 'allows different ignorePortfolioMargin settings for different users' do
+      client.subscribe({ type: 'spotState', user: '0xAAA', ignorePortfolioMargin: true }, &noop)
+
+      expect { client.subscribe({ type: 'spotState', user: '0xBBB', ignorePortfolioMargin: false }, &noop) }
+        .not_to raise_error
+    end
   end
 
   describe 'parity channel routing' do
@@ -741,12 +769,107 @@ RSpec.describe Hyperliquid::WS::Client do
         'webData3',
         { 'userState' => { 'user' => user }, 'perpDexStates' => [] },
         "webData3:#{user}"
+      ],
+      [
+        'clearinghouseState (no dex)',
+        { type: 'clearinghouseState', user: upper },
+        'clearinghouseState',
+        { 'dex' => '', 'user' => user, 'clearinghouseState' => {} },
+        "clearinghouseState:#{user}:"
+      ],
+      [
+        'clearinghouseState (dex xyz)',
+        { type: 'clearinghouseState', user: upper, dex: 'xyz' },
+        'clearinghouseState',
+        { 'dex' => 'xyz', 'user' => user, 'clearinghouseState' => {} },
+        "clearinghouseState:#{user}:xyz"
+      ],
+      [
+        'openOrders (dex xyz)',
+        { type: 'openOrders', user: upper, dex: 'xyz' },
+        'openOrders',
+        { 'dex' => 'xyz', 'user' => user, 'orders' => [] },
+        "openOrders:#{user}:xyz"
+      ],
+      [
+        'twapStates (no dex)',
+        { type: 'twapStates', user: upper },
+        'twapStates',
+        { 'dex' => '', 'user' => user, 'states' => [] },
+        "twapStates:#{user}:"
+      ],
+      [
+        'spotState',
+        { type: 'spotState', user: upper, ignorePortfolioMargin: true },
+        'spotState',
+        { 'user' => user, 'spotState' => { 'balances' => [] } },
+        "spotState:#{user}"
+      ],
+      [
+        'notification',
+        { type: 'notification', user: upper },
+        'notification',
+        { 'notification' => 'x' },
+        'notification'
+      ],
+      [
+        'activeAssetCtx (perp)',
+        { type: 'activeAssetCtx', coin: 'BTC' },
+        'activeAssetCtx',
+        { 'coin' => 'BTC', 'ctx' => {} },
+        'activeAssetCtx:btc'
+      ],
+      [
+        'activeAssetCtx (HIP-3)',
+        { type: 'activeAssetCtx', coin: 'xyz:XYZ100' },
+        'activeAssetCtx',
+        { 'coin' => 'xyz:XYZ100', 'ctx' => {} },
+        'activeAssetCtx:xyz:xyz100'
+      ],
+      [
+        'activeAssetCtx (spot, echoed as activeSpotAssetCtx)',
+        { type: 'activeAssetCtx', coin: 'PURR/USDC' },
+        'activeSpotAssetCtx',
+        { 'coin' => 'PURR/USDC', 'ctx' => {} },
+        'activeAssetCtx:purr/usdc'
+      ],
+      [
+        'activeAssetData',
+        { type: 'activeAssetData', user: upper, coin: 'BTC' },
+        'activeAssetData',
+        { 'user' => user, 'coin' => 'BTC', 'leverage' => {} },
+        "activeAssetData:#{user}:btc"
       ]
     ].each do |label, subscription, channel, data, expected|
       it "routes #{label} subscriptions and messages to #{expected}" do
         expect(client.send(:subscription_identifier, subscription)).to eq(expected)
         expect(client.send(:compute_identifier, channel, data)).to eq(expected)
       end
+    end
+
+    it 'does not accept activeSpotAssetCtx as a subscription type' do
+      expect { client.send(:subscription_identifier, { type: 'activeSpotAssetCtx', coin: '@107' }) }
+        .to raise_error(Hyperliquid::WebSocketError, /Unsupported subscription type/)
+    end
+
+    it 'keeps a dex subscription apart from main-dex messages' do
+      expect(client.send(:subscription_identifier, { type: 'clearinghouseState', user: upper, dex: 'xyz' }))
+        .not_to eq(client.send(:compute_identifier, 'clearinghouseState', { 'dex' => '', 'user' => user }))
+    end
+
+    it 'treats an omitted dex and dex: "" as the same subscription' do
+      expect(client.send(:subscription_identifier, { type: 'clearinghouseState', user: upper, dex: '' }))
+        .to eq(client.send(:subscription_identifier, { type: 'clearinghouseState', user: upper }))
+    end
+
+    it 'keeps openOrders for two users apart' do
+      expect(client.send(:subscription_identifier, { type: 'openOrders', user: '0xAAA' }))
+        .not_to eq(client.send(:subscription_identifier, { type: 'openOrders', user: '0xBBB' }))
+    end
+
+    it 'keeps activeAssetData for one user on two coins apart' do
+      expect(client.send(:subscription_identifier, { type: 'activeAssetData', user: upper, coin: 'BTC' }))
+        .not_to eq(client.send(:subscription_identifier, { type: 'activeAssetData', user: upper, coin: 'ETH' }))
     end
   end
 
