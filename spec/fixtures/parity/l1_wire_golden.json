@@ -1,0 +1,636 @@
+{
+  "info_responses": {
+    "allMids": {
+      "@1": "0.001234",
+      "BTC": "96123.4",
+      "DOGE": "0.123456",
+      "ETH": "3012.37",
+      "PURR/USDC": "0.18765",
+      "SOL": "187.645"
+    },
+    "clearinghouseState": {
+      "assetPositions": [
+        {
+          "position": {
+            "coin": "ETH",
+            "szi": "-0.25"
+          },
+          "type": "oneWay"
+        }
+      ]
+    },
+    "meta": {
+      "universe": [
+        {
+          "maxLeverage": 40,
+          "name": "BTC",
+          "szDecimals": 5
+        },
+        {
+          "maxLeverage": 25,
+          "name": "ETH",
+          "szDecimals": 4
+        },
+        {
+          "maxLeverage": 20,
+          "name": "SOL",
+          "szDecimals": 2
+        },
+        {
+          "maxLeverage": 10,
+          "name": "DOGE",
+          "szDecimals": 0
+        }
+      ]
+    },
+    "spotMeta": {
+      "tokens": [
+        {
+          "index": 0,
+          "isCanonical": true,
+          "name": "USDC",
+          "szDecimals": 8,
+          "weiDecimals": 8
+        },
+        {
+          "index": 1,
+          "isCanonical": true,
+          "name": "PURR",
+          "szDecimals": 0,
+          "weiDecimals": 5
+        },
+        {
+          "index": 2,
+          "isCanonical": false,
+          "name": "TKN",
+          "szDecimals": 2,
+          "weiDecimals": 8
+        }
+      ],
+      "universe": [
+        {
+          "index": 0,
+          "isCanonical": true,
+          "name": "PURR/USDC",
+          "tokens": [
+            1,
+            0
+          ]
+        },
+        {
+          "index": 1,
+          "isCanonical": false,
+          "name": "@1",
+          "tokens": [
+            2,
+            0
+          ]
+        }
+      ]
+    }
+  },
+  "private_key": "0x0123456789012345678901234567890123456789012345678901234567890123",
+  "rows": [
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":1,\"b\":true,\"p\":\"1670.1\",\"s\":\"0.0147\",\"r\":false,\"t\":{\"limit\":{\"tif\":\"Gtc\"}}}],\"grouping\":\"na\"}",
+      "expires_after": null,
+      "mainnet": true,
+      "name": "order_limit_gtc_mainnet",
+      "nonce": 1700000000000,
+      "r": "0x19b051fd9e676e2f2f10adbef8c14cde35f0e4cc9bb5575e0a2931d07f3cdeaa",
+      "s": "0x6165544c32d789961e827356c394a84359b3062d1146c51c091ed989a2dced3c",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":1,\"b\":true,\"p\":\"1670.1\",\"s\":\"0.0147\",\"r\":false,\"t\":{\"limit\":{\"tif\":\"Gtc\"}}}],\"grouping\":\"na\"}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "order_limit_gtc_testnet",
+      "nonce": 1700000000000,
+      "r": "0x798163e262f0bfe303f8696f4375af2f9acc56790281d2291d97967b13311eaf",
+      "s": "0x3ee795084f9507dee26fdbe7eb3b10f8f09145507bfae75c13f1a5f97c0b19ee",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":0,\"b\":false,\"p\":\"95000.5\",\"s\":\"0.001\",\"r\":true,\"t\":{\"limit\":{\"tif\":\"Alo\"}}}],\"grouping\":\"na\"}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "order_limit_alo_reduce_only",
+      "nonce": 1700000000000,
+      "r": "0x0f258e215a1325c9fbd5800b71c65248ce7c1de8ea7ce2fb693e9d07c6bcfded",
+      "s": "0x3ad4a7c06202a92060574e6c4170337d9041e3c410d3c2662e9452b7c2379f5d",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":10000,\"b\":true,\"p\":\"0.12345\",\"s\":\"100\",\"r\":false,\"t\":{\"limit\":{\"tif\":\"Ioc\"}}}],\"grouping\":\"na\"}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "order_limit_ioc_spot",
+      "nonce": 1700000000000,
+      "r": "0x7616172a0eb13bed7fa9c8d44b4743f8a9384bf5e3153b6f63ecad7a771d1b7f",
+      "s": "0x6b5b4182e082d207eb1ff2f123a4d259158409db135292b934ae2c03bcb268e6",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":1,\"b\":false,\"p\":\"3500\",\"s\":\"0.5\",\"r\":true,\"t\":{\"trigger\":{\"isMarket\":true,\"triggerPx\":\"3600\",\"tpsl\":\"tp\"}}}],\"grouping\":\"na\"}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "order_trigger_tp_market",
+      "nonce": 1700000000000,
+      "r": "0x370f52766efbd31ef5a05f5d8710bfd4b22bc916b3bc3c30272e05bd628f8d1b",
+      "s": "0x7e988c4421c6f9386d66713907ccaf950b5d3b5a30a3ce7a75739284d16c9446",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":2,\"b\":false,\"p\":\"150.1\",\"s\":\"1.25\",\"r\":true,\"t\":{\"trigger\":{\"isMarket\":false,\"triggerPx\":\"150.25\",\"tpsl\":\"sl\"}}}],\"grouping\":\"na\"}",
+      "expires_after": null,
+      "mainnet": true,
+      "name": "order_trigger_sl_limit",
+      "nonce": 1700000000000,
+      "r": "0x6be5b14d919d37e4d85c889b0d95a1d12840efa1d1499da7338e2415bc6c0062",
+      "s": "0x58aefb03182720aaddee35562ba0f2938ddd2ea47012af3476a5b0b3d30cdbf6",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":1,\"b\":true,\"p\":\"2000\",\"s\":\"0.1\",\"r\":false,\"t\":{\"limit\":{\"tif\":\"Gtc\"}},\"c\":\"0x0000000000000000000000000000abcd\"}],\"grouping\":\"na\"}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "order_with_cloid",
+      "nonce": 1700000000000,
+      "r": "0x1883a6b93e169ab496b3e9bffcfcf0b94a720af5de8ce7134dbefaf3c8bceaf3",
+      "s": "0x460b1d11d466555a3f739c77d10591a9551871ec991c04e29bbe0f8992423390",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":1,\"b\":true,\"p\":\"2000\",\"s\":\"0.1\",\"r\":false,\"t\":{\"limit\":{\"tif\":\"Gtc\"}}}],\"grouping\":\"na\",\"builder\":{\"b\":\"0xabcdef0123456789abcdef0123456789abcdef01\",\"f\":10}}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "order_with_builder",
+      "nonce": 1700000000000,
+      "r": "0x05a3a2b1c62d1202fbe670c663be5f1e721b08a024d287237d4a1aa81048e056",
+      "s": "0x77c2ca520d750c5eb94d3b19f514286da01203b0b6bfc16f53236ccbee98a0f1",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":3,\"b\":true,\"p\":\"0.12\",\"s\":\"100\",\"r\":false,\"t\":{\"limit\":{\"tif\":\"Gtc\"}}}],\"grouping\":\"na\"}",
+      "expires_after": null,
+      "mainnet": true,
+      "name": "order_vault_mainnet",
+      "nonce": 1700000000000,
+      "r": "0x4386723148007e4fe4430f160b4e069ee69b4f0cbea4ea331fb7aaf14b6904b3",
+      "s": "0x09bbd477156f4f798e29f2c55edab2a5bedc46bd6bc1364bffe05a28bcaf8dac",
+      "v": 27,
+      "vault_address": "0x1719884EB866cb12b2287399b15f7db5e7d775ea"
+    },
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":1,\"b\":true,\"p\":\"2000\",\"s\":\"0.1\",\"r\":false,\"t\":{\"limit\":{\"tif\":\"Gtc\"}}}],\"grouping\":\"na\"}",
+      "expires_after": 1700000060000,
+      "mainnet": false,
+      "name": "order_expires_testnet",
+      "nonce": 1700000000000,
+      "r": "0x13f71f8540d2c67ac6188e07d3eb4a82fc75700bbf69e8969effb99a120301a9",
+      "s": "0x7d5838bd2ec59e4472e74e5271135052d813456d5857bc99af8800c4c38bf128",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":0,\"b\":true,\"p\":\"90000\",\"s\":\"0.002\",\"r\":false,\"t\":{\"limit\":{\"tif\":\"Alo\"}}}],\"grouping\":\"na\"}",
+      "expires_after": 1700000060000,
+      "mainnet": false,
+      "name": "order_vault_expires_testnet",
+      "nonce": 1700000000000,
+      "r": "0xa30a85ec08bb18b3f5971917f43f1a4f7c37fbbbb1399d6becb23eb473e00c90",
+      "s": "0x48d4ba456871f8a155069810c879bbd78b26641dd5521e6409ee5118475d24d0",
+      "v": 27,
+      "vault_address": "0x1719884EB866cb12b2287399b15f7db5e7d775ea"
+    },
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":1,\"b\":true,\"p\":\"3000\",\"s\":\"0.2\",\"r\":false,\"t\":{\"limit\":{\"tif\":\"Gtc\"}},\"c\":\"0x0000000000000000000000000000abcd\"},{\"a\":1,\"b\":false,\"p\":\"2900\",\"s\":\"0.2\",\"r\":true,\"t\":{\"trigger\":{\"isMarket\":true,\"triggerPx\":\"2950\",\"tpsl\":\"sl\"}}}],\"grouping\":\"normalTpsl\"}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "bulk_orders_normal_tpsl",
+      "nonce": 1700000000000,
+      "r": "0xd939a757675eb69a8dc04208767b54ffa050389d0f6fe65b75012d32b4ff5aa8",
+      "s": "0x65f59990d90a91d3b07fc985818e0fe353532c09d8c63a3c708c30d43f2ec8ef",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":0,\"b\":true,\"p\":\"95000\",\"s\":\"0.01\",\"r\":false,\"t\":{\"limit\":{\"tif\":\"Ioc\"}}},{\"a\":10001,\"b\":false,\"p\":\"0.0015\",\"s\":\"12.5\",\"r\":false,\"t\":{\"limit\":{\"tif\":\"Gtc\"}}}],\"grouping\":\"na\",\"builder\":{\"b\":\"0xabcdef0123456789abcdef0123456789abcdef01\",\"f\":25}}",
+      "expires_after": null,
+      "mainnet": true,
+      "name": "bulk_orders_builder_mainnet",
+      "nonce": 1700000000000,
+      "r": "0xd3b467eb1ba6aad3731fdb51e2dcd6491c322239476f31cba5c19550fc561e62",
+      "s": "0x339b981b552b206769eff192b59816dad2e13fff2030c97fa4a0822bffe6ee6d",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":1,\"b\":true,\"p\":\"3163\",\"s\":\"0.1\",\"r\":false,\"t\":{\"limit\":{\"tif\":\"Ioc\"}}}],\"grouping\":\"na\"}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "market_open_perp_buy",
+      "nonce": 1700000000000,
+      "r": "0x96a2cdaa722ef6af2ffc44c63577d6e0f480e493c39e426808df92bd02fe4d5c",
+      "s": "0x1948fa0c024f0cc79232b0226b1a2e06a46c60f6384895a958797d0a5db854df",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":0,\"b\":false,\"p\":\"95162\",\"s\":\"0.01\",\"r\":false,\"t\":{\"limit\":{\"tif\":\"Ioc\"}}}],\"grouping\":\"na\"}",
+      "expires_after": null,
+      "mainnet": true,
+      "name": "market_open_perp_sell",
+      "nonce": 1700000000000,
+      "r": "0x8b7af89c648c9eaadcd940d62ae85b9d1dac4c903b703ad242f17d2f012c80d5",
+      "s": "0x125f7e51ce9bf46c5a6083cba0f5dfc8b7cf020423aaeb7f1291327a22bfd1f0",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":10001,\"b\":true,\"p\":\"0.001296\",\"s\":\"100\",\"r\":false,\"t\":{\"limit\":{\"tif\":\"Ioc\"}}}],\"grouping\":\"na\"}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "market_open_spot_buy",
+      "nonce": 1700000000000,
+      "r": "0xf11ae1d605337ca8a2e5d5d10ed66abad619872e7478d1da9b00547d519c361f",
+      "s": "0x135abb2bb6e02169f4e4b220e0e4db80f8e1345625a87c90ecd2e2aa1b4da15c",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"order\",\"orders\":[{\"a\":1,\"b\":true,\"p\":\"3163\",\"s\":\"0.25\",\"r\":true,\"t\":{\"limit\":{\"tif\":\"Ioc\"}}}],\"grouping\":\"na\"}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "market_close_short",
+      "nonce": 1700000000000,
+      "r": "0xe836b2db670199da03696bfa6754ee07819b3812acfe82dece0be47bea7d2edd",
+      "s": "0x33c72f240484d9f047ab8efd572f0eef565e2448dae0c0d7cff937974d981fcb",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"cancel\",\"cancels\":[{\"a\":1,\"o\":123456789}]}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "cancel",
+      "nonce": 1700000000000,
+      "r": "0x11c9d87e57e3a06e768de9fc54fd43f926c101a52109175132c991c69f0f26d8",
+      "s": "0x456e3f4eabf96cc67a6af0507cb2230dd6cfe90e6c7b57504760b95468741a51",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"cancel\",\"cancels\":[{\"a\":0,\"o\":42}]}",
+      "expires_after": null,
+      "mainnet": true,
+      "name": "cancel_vault_mainnet",
+      "nonce": 1700000000000,
+      "r": "0xdc97aeb704fe9c0ea88ea2f133b4c17ea15aae638415514b5ff4a4081c85fd43",
+      "s": "0x2db84fc035894ed9680ba49e82838aa7632358c9d11002b3bb369cd567be61ac",
+      "v": 27,
+      "vault_address": "0x1719884EB866cb12b2287399b15f7db5e7d775ea"
+    },
+    {
+      "action_json": "{\"type\":\"cancelByCloid\",\"cancels\":[{\"asset\":1,\"cloid\":\"0x0000000000000000000000000000abcd\"}]}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "cancel_by_cloid",
+      "nonce": 1700000000000,
+      "r": "0xcfa39dc1e13eb2b28cbf54569b0eef9a603e4456dac78280e6a61c7df1295a7c",
+      "s": "0x7bcce7f764f0385532afada15e1ff1708a31b686411100baf3368591f7273687",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"cancel\",\"cancels\":[{\"a\":1,\"o\":1},{\"a\":10000,\"o\":2}]}",
+      "expires_after": null,
+      "mainnet": true,
+      "name": "bulk_cancel_mainnet",
+      "nonce": 1700000000000,
+      "r": "0xf1fe0e747e92be8825bb40fe72b0d67509cf42ef93b22fc44375c5b39eb88a65",
+      "s": "0x0260173ae9f84398fe4c8e2e3676cf8fac3ae3234634f66a1a3f8e92f69d9290",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"cancelByCloid\",\"cancels\":[{\"asset\":1,\"cloid\":\"0x0000000000000000000000000000abcd\"},{\"asset\":2,\"cloid\":\"0x00000000000000000000000000001234\"}]}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "bulk_cancel_by_cloid",
+      "nonce": 1700000000000,
+      "r": "0x5e1a00f3eb3a64d0a4cd06e61f6203d3cbfe9a8678eefa632548797d64f82955",
+      "s": "0x286d207f3db8b418000fa6d9fe6dad79ec0e84fe95abe96f2f86c08f00262065",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"batchModify\",\"modifies\":[{\"oid\":123,\"order\":{\"a\":1,\"b\":true,\"p\":\"2000.5\",\"s\":\"0.1\",\"r\":false,\"t\":{\"limit\":{\"tif\":\"Gtc\"}}}}]}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "modify_order_oid",
+      "nonce": 1700000000000,
+      "r": "0xfadceb61c63bd4b7a640b576095d6b4e4b2e75bf36b8ef51215af9d844413255",
+      "s": "0x3eab07826fbbfe2d26aa3ce54cdcd2bd8c2569230939f85137a82feb4805e610",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"batchModify\",\"modifies\":[{\"oid\":\"0x0000000000000000000000000000abcd\",\"order\":{\"a\":1,\"b\":false,\"p\":\"3100\",\"s\":\"0.3\",\"r\":true,\"t\":{\"limit\":{\"tif\":\"Alo\"}},\"c\":\"0x00000000000000000000000000001234\"}}]}",
+      "expires_after": null,
+      "mainnet": true,
+      "name": "modify_order_cloid_mainnet",
+      "nonce": 1700000000000,
+      "r": "0xacd2291f55cdcc235cdd1c103c2cd74c01e90eca239c2c3b9a0980a39577784b",
+      "s": "0x559fd9793f5c89125165d234497866818cf364ffc188bfa3f9a8a4c9218c1528",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"batchModify\",\"modifies\":[{\"oid\":1,\"order\":{\"a\":0,\"b\":true,\"p\":\"90000\",\"s\":\"0.001\",\"r\":false,\"t\":{\"limit\":{\"tif\":\"Gtc\"}}}},{\"oid\":\"0x00000000000000000000000000001234\",\"order\":{\"a\":1,\"b\":false,\"p\":\"3500\",\"s\":\"0.5\",\"r\":true,\"t\":{\"trigger\":{\"isMarket\":true,\"triggerPx\":\"3400\",\"tpsl\":\"tp\"}},\"c\":\"0x00000000000000000000000000001234\"}}]}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "bulk_modify_orders",
+      "nonce": 1700000000000,
+      "r": "0xe728f85f5b29fd45798f0570e13815f5e5b2af46af412cbe9293773e1bd33d85",
+      "s": "0x5122952c9103032dd04cd7099c51b552c77dccf38b758aba64a445aeacc9d4f2",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"updateLeverage\",\"asset\":1,\"isCross\":true,\"leverage\":10}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "update_leverage_cross",
+      "nonce": 1700000000000,
+      "r": "0x1aa09db4f2e99885f33834542e1f2eb6c0dae76f3d4fc0702bb35efe4930db72",
+      "s": "0x34605cb3c25107371fb5e5b3b76a3fa53353a4c3519a99cb9b2bd940e643ff9a",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"updateLeverage\",\"asset\":0,\"isCross\":false,\"leverage\":5}",
+      "expires_after": null,
+      "mainnet": true,
+      "name": "update_leverage_isolated_mainnet",
+      "nonce": 1700000000000,
+      "r": "0xcb4de15bb52861ef35be8bf29f4ae05b06c48742741db50eea316f31eab6d4f6",
+      "s": "0x4e45d0ab3aca03e8ad1cdcf4e3f5b921d7b0d35ab48e0aace13e731a966a49de",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"updateIsolatedMargin\",\"asset\":1,\"isBuy\":true,\"ntli\":12500000}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "update_isolated_margin",
+      "nonce": 1700000000000,
+      "r": "0x189233108f7072a9d73201e0e10c5163c23eb9c247bdd56c6bbd65ce2bb75481",
+      "s": "0x51d08b46ec94a6bda59e9f0482bac31d84ffd03d7ebd5758d82b9dfc454634d4",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"updateIsolatedMargin\",\"asset\":2,\"isBuy\":true,\"ntli\":-3250000}",
+      "expires_after": null,
+      "mainnet": true,
+      "name": "update_isolated_margin_negative_mainnet",
+      "nonce": 1700000000000,
+      "r": "0x5f15df2801d5f0b3e1de7cd1cda2769b11e254c837f93331a2e82dbbf7272784",
+      "s": "0x47570bd86a6ca773f5b1df9ca7d3ddb10fa98d584503562d1fcd14898b637faf",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"scheduleCancel\"}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "schedule_cancel_unset",
+      "nonce": 1700000000000,
+      "r": "0xfcd3ce1e34b60ce9ceb75a93eedf63d2f0bdfe574427fc4949756e0b4ffc487f",
+      "s": "0x50f1cde33e2434a742de4ee38f8d9f8d74063cd29b48af92ee27c123a009d6f1",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"scheduleCancel\",\"time\":1700000100000}",
+      "expires_after": null,
+      "mainnet": true,
+      "name": "schedule_cancel_time_mainnet",
+      "nonce": 1700000000000,
+      "r": "0x24eaf3e40517c7df9299fb33f1f2a6485ce6855380efd930e3dfdafd15f2083b",
+      "s": "0x7928066fda8b7e7f8afd9ce77bdec76e65419dbd71275424d34de52c3b859953",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"scheduleCancel\",\"time\":1700000100000}",
+      "expires_after": 1700000060000,
+      "mainnet": false,
+      "name": "schedule_cancel_vault_expires",
+      "nonce": 1700000000000,
+      "r": "0x7c1926a2310432ff8d38926881ba6252f8c4efd7f66f25035abd356dd19f9c2a",
+      "s": "0x178b38a9aedec1da03077c4314c798dc9230632d9005a2bc47fb8cada61532a8",
+      "v": 27,
+      "vault_address": "0x1719884EB866cb12b2287399b15f7db5e7d775ea"
+    },
+    {
+      "action_json": "{\"type\":\"createSubAccount\",\"name\":\"parity-sub\"}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "create_sub_account",
+      "nonce": 1700000000000,
+      "r": "0x9bb7683c1cfcbe08bdfabf3144bb6c4ff234cfc0d4fb35b2dc42a0c412bd23d5",
+      "s": "0x32340795687a10874cfcfe703b179a4ce81f73f4050a6519011faa0125818f37",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"createSubAccount\",\"name\":\"parity-sub\"}",
+      "expires_after": 1700000060000,
+      "mainnet": false,
+      "name": "create_sub_account_expires",
+      "nonce": 1700000000000,
+      "r": "0x1b181badad7ab000f0446d9d559c2b23ae95d7c415949f3f828563cb115cd61f",
+      "s": "0x748377fd4553767f57cb3988e0480328d7736e441607c8cbc770349521689f84",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"subAccountTransfer\",\"subAccountUser\":\"0x1d9470d4b963f552e6f671a81619d395877bf409\",\"isDeposit\":true,\"usd\":1000000}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "sub_account_transfer",
+      "nonce": 1700000000000,
+      "r": "0x675b1b9bf00e1a16f78a9b3b636d472d1b6c9263b72752e2023b272b6f638d6b",
+      "s": "0x68219a9c94181d9498c07d8d8b7c457df35db2bb1813999447c4cab3aa8deca8",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"subAccountTransfer\",\"subAccountUser\":\"0x1d9470d4b963f552e6f671a81619d395877bf409\",\"isDeposit\":false,\"usd\":2500000}",
+      "expires_after": 1700000060000,
+      "mainnet": true,
+      "name": "sub_account_transfer_expires",
+      "nonce": 1700000000000,
+      "r": "0xfd5ddec55395b8d5cd0148d3ad8014af6b3e9faec58218203d8bc5fd7b8839ba",
+      "s": "0x64ee420ee9ebcdab13dfeffe14a2ff77522347ee01d6d3db8246c50087efd8b6",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"subAccountSpotTransfer\",\"subAccountUser\":\"0x1d9470d4b963f552e6f671a81619d395877bf409\",\"isDeposit\":true,\"token\":\"PURR:0xc4bf3f870c0e9465323c0b6ed28096c2\",\"amount\":\"12.5\"}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "sub_account_spot_transfer",
+      "nonce": 1700000000000,
+      "r": "0xa288a22a43e016e9d609bd1bbc7add56f5c5cd53f48b5d21c2b8298664d7ee73",
+      "s": "0x36d61da9b635d429c6ccc7eee3b0f736ca5149e0e4a153fd848e1572a7556d12",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"subAccountSpotTransfer\",\"subAccountUser\":\"0x1d9470d4b963f552e6f671a81619d395877bf409\",\"isDeposit\":false,\"token\":\"PURR:0xc4bf3f870c0e9465323c0b6ed28096c2\",\"amount\":\"3\"}",
+      "expires_after": 1700000060000,
+      "mainnet": false,
+      "name": "sub_account_spot_transfer_expires",
+      "nonce": 1700000000000,
+      "r": "0xd08015350b36d7769c2e733b4c9bf572ee27cbf0d250ac3fddad3234c4774943",
+      "s": "0x1a0670fd75e460a58021e6d956e760c527efbdc48612f5bb6a71e9b3a06518d0",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"vaultTransfer\",\"vaultAddress\":\"0x1719884EB866cb12b2287399b15f7db5e7d775ea\",\"isDeposit\":true,\"usd\":5000000}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "vault_usd_transfer",
+      "nonce": 1700000000000,
+      "r": "0xb51a0cc6bb3c5ee5c2ddd3f6739a6c848904cbd9162d3fd3a139462800618409",
+      "s": "0x6c254b8682d469117f17dcd9def6936cc3546f9e8dbdd971e912a323d4148cb2",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"vaultTransfer\",\"vaultAddress\":\"0x1719884EB866cb12b2287399b15f7db5e7d775ea\",\"isDeposit\":false,\"usd\":1000000}",
+      "expires_after": 1700000060000,
+      "mainnet": false,
+      "name": "vault_usd_transfer_expires",
+      "nonce": 1700000000000,
+      "r": "0xa5c2d7b03b31b5b95acdba16090476ba809d038cd647dc74be6cffa7a7ea7969",
+      "s": "0x729df82061b1b042a216ca0d1a1eb2581f6791b51fc8f2da1c1671fdb22f2771",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"setReferrer\",\"code\":\"PARITY\"}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "set_referrer",
+      "nonce": 1700000000000,
+      "r": "0x852135a6876438dd0800f1a7059ed66a3e5a23e76f54615296be12b7edf4e860",
+      "s": "0x0aba2d770b3b7d23a343fd2cddf2889f873e1fc7ab80c531fdab1a721f39f376",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"setReferrer\",\"code\":\"PARITY\"}",
+      "expires_after": 1700000060000,
+      "mainnet": false,
+      "name": "set_referrer_expires",
+      "nonce": 1700000000000,
+      "r": "0x7398e7bd9e5987444242a508eb8c5a6960650680c45130bb384b554bab343dd5",
+      "s": "0x53d5fc643c118e92062bed53adb9119092cec2c1484d8b7c498e3c46d6b788dd",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"evmUserModify\",\"usingBigBlocks\":true}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "use_big_blocks_enable",
+      "nonce": 1700000000000,
+      "r": "0xa625b2f1b5af103b1f56e38a9bc8c3e4b649e4dd5091a31c0a40c82f97af590d",
+      "s": "0x442451f9392165a055603e4163f52769065adb22a8790a8126c470762c1c5d04",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"evmUserModify\",\"usingBigBlocks\":false}",
+      "expires_after": 1700000060000,
+      "mainnet": true,
+      "name": "use_big_blocks_disable_expires_mainnet",
+      "nonce": 1700000000000,
+      "r": "0x22844bc6e1fcaa4b0260ba5a34f11134be7f0b92467580fd176ef856bfd42101",
+      "s": "0x44f1775f92dc3b397915ebd00ec6613fc5542c3639f9a5fc4e1d494516d25bf0",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"noop\"}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "noop",
+      "nonce": 1700000000123,
+      "r": "0x151ee96b891fa818b2ef43b16e283c3babef6f1a8a9b1f431bb11260277a30cf",
+      "s": "0x7642e905eb5b405ab9c65dc75b5df38301dcb8ac9ff5e3b39acdda6502adde7d",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"noop\"}",
+      "expires_after": null,
+      "mainnet": true,
+      "name": "noop_vault_mainnet",
+      "nonce": 1700000000123,
+      "r": "0x277f552278fc0559fd76cb9937376d046cf5425d5ae66daf06ed1e8c83f4a20a",
+      "s": "0x64fd399189d202499bb88540cdc656ccdb2fc6db463e1a805c0461f1d0f61c1a",
+      "v": 28,
+      "vault_address": "0x1719884EB866cb12b2287399b15f7db5e7d775ea"
+    },
+    {
+      "action_json": "{\"type\":\"agentEnableDexAbstraction\"}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "agent_enable_dex_abstraction",
+      "nonce": 1700000000000,
+      "r": "0x4e1636932a93e5a5b1dc07944e7f087204ffd0a41a975eb1cd8729cf7bb4710c",
+      "s": "0x2e49aa19622c0546592b800f74e0d07d34e7f3cb37084ca6cfd0a9beaf0ae01c",
+      "v": 27,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"agentSetAbstraction\",\"abstraction\":\"u\"}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "agent_set_abstraction",
+      "nonce": 1700000000000,
+      "r": "0x093874db7738dc23602081943a5ea8b37a394b06893aa21c8c44dd1dad59bdfc",
+      "s": "0x1c9120ce0f7db5789aff0ab3d2fba1089bbe429b90d1a2167aa91d380d730b12",
+      "v": 28,
+      "vault_address": null
+    },
+    {
+      "action_json": "{\"type\":\"gossipPriorityBid\",\"slotId\":7,\"ip\":\"1.2.3.4\",\"maxGas\":1000000}",
+      "expires_after": null,
+      "mainnet": false,
+      "name": "gossip_priority_bid",
+      "nonce": 1700000000000,
+      "r": "0xafc15f4ab5c136608c65a0b54b8368b77cb719a764231314123dcec3134300c0",
+      "s": "0x747ba2613569dc2d66b702dd995e700880bdfe6bd21ce09cb5f08d1cb7391e24",
+      "v": 27,
+      "vault_address": null
+    }
+  ],
+  "signer_address": "0x14791697260E4c9A71f18484C9f997B308e59325",
+  "source": "hyperliquid-python-sdk 0.24.0 (2fdb18f9517675ea03695a0962bd19eece9c83f0)"
+}

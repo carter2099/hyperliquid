@@ -1,0 +1,137 @@
+Signer address (sanity check, must match Ruby): 0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A
+nonce=1700000000000 mainnet=True
+
+=== P1 registerAsset (Python SDK method, no schema) ===
+  action: {"type":"perpDeploy","registerAsset":{"maxGas":1000000000000,"assetRequest":{"coin":"test:TEST0","szDecimals":2,"oraclePx":"10","marginTableId":10,"onlyIsolated":false},"dex":"test","schema":null}}
+  action_hash: 0x324a5cc06182977a6384badb7fbbf7a6fda28859fb8104ff01678157846f2f2a
+  r: 0x0008115d5c4d25e4f3b59dd1cbab8333160bd910f807d527fd127d81d8af7bb9
+  s: 0x247732d929724cd4cd39290e04494e0bd96a7093572bf7a3fcfa5494f0cce184
+  v: 27
+
+=== P2 registerAsset (Python SDK method, schema + mixed-case oracleUpdater) ===
+  action: {"type":"perpDeploy","registerAsset":{"maxGas":null,"assetRequest":{"coin":"test:TEST0","szDecimals":2,"oraclePx":"10","marginTableId":10,"onlyIsolated":true},"dex":"test","schema":{"fullName":"test dex","collateralToken":0,"oracleUpdater":"0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a"}}}
+  action_hash: 0x49b6f7a505d625cfe48e2cd7bd8c30622772f15b4ff6f89df47ab4da3cf33907
+  r: 0x88f7ad23cfbbf1071abe334c9800c730b2f3bb931efcd96b887c187dda6452fb
+  s: 0x32d59c5e07a8cb4d1496693c43f86e023d988f19b0ef8e5698a5604b14d01f89
+  v: 27
+
+=== P3 setOracle (Python SDK method, unsorted input dicts) ===
+  action: {"type":"perpDeploy","setOracle":{"dex":"test","oraclePxs":[["test:TEST0","12"],["test:TEST1","1"]],"markPxs":[[["test:TEST0","14"],["test:TEST1","3"]]],"externalPerpPxs":[["test:TEST0","12.1"],["test:TEST1","1.1"]]}}
+  action_hash: 0xb40a9b1fe5e812e0f1d74b372a5843316713a39f9bb3716c6ef03941f016fb78
+  r: 0x29a1917249c8e0b179fdc155f20fb7523900d4c287fa9d9755d914069fd00bdf
+  s: 0x7339a3eea1e3f106f9b79105f2e6d615108f6a8c3b88b1030f8ca3255caef9ba
+  v: 27
+
+=== D1 registerAsset2 (no schema, maxGas null) ===
+  action: {"type":"perpDeploy","registerAsset2":{"maxGas":null,"assetRequest":{"coin":"test:TEST1","szDecimals":3,"oraclePx":"2.5","marginTableId":20,"marginMode":"strictIsolated"},"dex":"test","schema":null}}
+  action_hash: 0xb0bd708933afa96393333db9d057da348f79be193d8f1de205039939b02a4cb8
+  r: 0x25f3c3bfbf5d184b7ca6e89cda796c9de6ddd162091cb76c84674283215e480c
+  s: 0x4011bfa29eb8c1fe86f77477470e75e1dbfeffb7efac48ffb288a1ddb0e3cf3b
+  v: 27
+
+=== D2 registerAsset2 (schema, oracleUpdater null) ===
+  action: {"type":"perpDeploy","registerAsset2":{"maxGas":500000000,"assetRequest":{"coin":"test:TEST1","szDecimals":3,"oraclePx":"2.5","marginTableId":20,"marginMode":"noCross"},"dex":"test","schema":{"fullName":"test dex","collateralToken":0,"oracleUpdater":null}}}
+  action_hash: 0x650030fe100added589e0229611fd1be047c87c06d5ebd116a73d0ff36e67457
+  r: 0x2f780e22da1a7e0ac38031e760729d669f078fd1dd9d12d262ec22c0cb5cd8a0
+  s: 0x1800cbaf5709af341ee255b9f6ee0b1869ca30d5c0f63341c4ed8193f36f0660
+  v: 27
+
+=== D3 setFundingMultipliers ===
+  action: {"type":"perpDeploy","setFundingMultipliers":[["test:A","0.5"],["test:B","2"]]}
+  action_hash: 0x2fa34f436c1e48b4f41a30c4b663918a6b62f8abe108619db93f239b9dea3754
+  r: 0xe094af5e0147a7f986554314c3bfdf9f2232463a0219a09ac94b852d18979a4f
+  s: 0x4b1c02770a3291e4c07e12641ccec0b00ab0337163dc8803fb5dbc2dfd59191a
+  v: 28
+
+=== D4 setFundingInterestRates ===
+  action: {"type":"perpDeploy","setFundingInterestRates":[["test:A","-0.0001"],["test:B","0.00005"]]}
+  action_hash: 0xc1f0af91022715632b9ce25df14576ba17acda08a74c806ce986355af5cac4e7
+  r: 0xf0d4bef909927f77abcf2c248b380bdd498c2b64198ede5f73d99923a44332a1
+  s: 0x4db0eab46a724be79df52d1127e691b7952e786335ff7a670f80933ce3e7de6f
+  v: 27
+
+=== D5 setFundingClamps ===
+  action: {"type":"perpDeploy","setFundingClamps":[["test:A","0.0003"],["test:B","0.01"]]}
+  action_hash: 0x31b188a00bb2f0a236e17c5efb14bda5f68d5fbfd5fbe381feb7b3592b3c62a8
+  r: 0x40a0321ff5eab42664b1106ddceaab3b134212006e86b394683c9c82e13eaaa3
+  s: 0x48e2adf87085182c1f8cb3d3a3860b314c87bc37facbf2173bcb3b1efe473fd3
+  v: 27
+
+=== D6 haltTrading ===
+  action: {"type":"perpDeploy","haltTrading":{"coin":"test:A","isHalted":true}}
+  action_hash: 0xd3a556ce0624bcc230cc5e3a6c96ece0603683c702e24d6418fe000cc1004ab2
+  r: 0x23a967f621a19a85e5d7d26e605902e28f92c2f9894b9e573c09d63f9afec93a
+  s: 0x2eba0cf40566517e588dc6f8d939b49ad164141312fb79fd2579ff96e62eaf91
+  v: 27
+
+=== D7 insertMarginTable ===
+  action: {"type":"perpDeploy","insertMarginTable":{"dex":"test","marginTable":{"description":"tiered","marginTiers":[{"lowerBound":0,"maxLeverage":20},{"lowerBound":1000000,"maxLeverage":10}]}}}
+  action_hash: 0xcb271c411061f1ea1e9b100d394993e6f02d7e3456e8c7367bd6fb56a4640ea9
+  r: 0x96b7b729f59cad9e76c5988ca0c495f8d5b4482de932fe2127c8ef4cd6b538a9
+  s: 0x77964b77ede19e8863c7975770062c92c565226069bc68303cde8bcacd20e7a7
+  v: 27
+
+=== D8 setMarginTableIds ===
+  action: {"type":"perpDeploy","setMarginTableIds":[["test:A",10],["test:B",20]]}
+  action_hash: 0xc502bb33d8761348bb2245f59fed93a35cbfb006dabcecdea8b6cd32666efce6
+  r: 0xe9fd3950d7d2f99154d04c54566f961f4a7b8aff9522962a0f018575c058da00
+  s: 0x01f47a245b78195d2bb3851919576dc121791a946cbca9fd575569944ce75ddb
+  v: 28
+
+=== D9 setFeeRecipient (address lowercased) ===
+  action: {"type":"perpDeploy","setFeeRecipient":{"dex":"test","feeRecipient":"0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a"}}
+  action_hash: 0x39e6a86d439543805fba30d7cb183282730e41fbb6b981035b8952d51002dcbe
+  r: 0xa0bd1cf078ace3162be390db3c33b2e36548cfc76202a83ee8754e1af5fc09d7
+  s: 0x1447f036b2f1927d558267d3f1e3404fb44d51235b19531d096e4a9b37bf91b9
+  v: 28
+
+=== D10 setOpenInterestCaps (null removes cap) ===
+  action: {"type":"perpDeploy","setOpenInterestCaps":[["test:A",1000000],["test:B",null]]}
+  action_hash: 0x011e5735313426acf81cce4431c9d1d3ba3a98afb52ce8215998a0fde94b452d
+  r: 0xad771891b3b5b3fca5aa292885cb3846e691c60965a60ad893b025963de1f5d4
+  s: 0x77a48e15a935cdb8681591a064c63c6607e4c6049a21bd393dfafca6dd342faa
+  v: 27
+
+=== D11 setSubDeployers (user lowercased) ===
+  action: {"type":"perpDeploy","setSubDeployers":{"dex":"test","subDeployers":[{"variant":"setOracle","user":"0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a","allowed":true},{"variant":"haltTrading","user":"0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a","allowed":false}]}}
+  action_hash: 0x1693439e4630c019586476c0f16b38c48e7fde54758caf51326bc517741274eb
+  r: 0x25086d86dd87241723d5211a37eaf9043f3f193b1a14119788946321b4db840f
+  s: 0x4e29652c1d7289876412253e0a3daabf6cae35ff206f4f51f486f6b76b0182ae
+  v: 27
+
+=== D12 setMarginModes ===
+  action: {"type":"perpDeploy","setMarginModes":[["test:A","noCross"],["test:B","strictIsolated"]]}
+  action_hash: 0x0f9129393a8774aa1218b52c9fcba63450e8413871f0472b3011ee3034a2c8f3
+  r: 0x5385a57fd6f57c1c1c57a115641af91c8ff52635fb8e73c1520b9d4a0168dba0
+  s: 0x4aae95c24660336b03b72d9db8ea5816a0e66b3350a75b52f7fa28cf4510db76
+  v: 27
+
+=== D13 setDeployerFees ===
+  action: {"type":"perpDeploy","setDeployerFees":[["test:A",{"scale":"0.5","growthMode":false}],["test:B",{"scale":"3.01","growthMode":true}]]}
+  action_hash: 0x3e3f7b90784bbe6bba457ac4c0a3230f78efbe7b6e99fef56ed1a020ee6fdc16
+  r: 0xbe7b0c152491cbb0bf81a18459057dc0ec00e5879c67725e48a3722f6703fe0f
+  s: 0x5bad12e9690590368c26e2b9c531044ae0e4bff0ccc235ebb929e064a998ea5c
+  v: 27
+
+=== D14 setPerpAnnotation (displayName null) ===
+  action: {"type":"perpDeploy","setPerpAnnotation":{"coin":"test:A","category":"stocks","description":"Test asset","displayName":null,"keywords":["test","demo"]}}
+  action_hash: 0x5bd4147b4d89e010ae5df02811162f89b21e6915ef088685edd6e3f1a65e45aa
+  r: 0x693fa311a645b9115ec314b6146ccf4cf80bec1fc99353976a49aec2bb372279
+  s: 0x7c8586f6b9c1b2b28e598f61f4b07f21569cb13a38c34084ddcd69e9ea497c54
+  v: 27
+
+=== D15 disableDex ===
+  action: {"type":"perpDeploy","disableDex":"test"}
+  action_hash: 0x484ada9e4c87dd853d1542618e4e1a4112ab7cad0085042cce66c67e9da918d6
+  r: 0x94ec2a17a9ddf3eb620130f783241421d6ba5d4bb3ae05a5a2cbf89c80157c88
+  s: 0x34688c81da1cc2ed1678b0ec0750e484680fc55f6b02579dd19d571696b13fb4
+  v: 28
+
+=== D16 haltTrading with expires_after ===
+  action: {"type":"perpDeploy","haltTrading":{"coin":"test:A","isHalted":false}}
+  expires_after: 1700000060000
+  action_hash: 0x0db9228315567d2fa99b0a7a169ad11f64cebbba7432c607cd6d9f598c51c160
+  r: 0x6bb02fb51b10d56c6bef6f39c9719a77ce77720440c24108c5ef6d834654e88b
+  s: 0x5e2307268178d684b3cede5b8f5ecc446ac709844fb529e9895e5a2353395409
+  v: 28
+

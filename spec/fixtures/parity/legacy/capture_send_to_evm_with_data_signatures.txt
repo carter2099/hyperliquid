@@ -1,0 +1,34 @@
+signer_address  = 0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A
+private_key     = 0x1111111111111111111111111111111111111111111111111111111111111111
+chainId         = 421614 (0x66eee)
+nonce           = 1700000000000
+base message    = {'hyperliquidChain': 'Mainnet', 'token': 'USDC', 'amount': '1', 'sourceDex': 'spot', 'destinationRecipient': '0x0000000000000000000000000000000000000001', 'addressEncoding': 'hex', 'destinationChainId': 998, 'gasLimit': 200000, 'nonce': 1700000000000}
+
+--- Fixture A: empty bytes b'' ---
+  data input          = b''
+  messageHash         = 0x5f5b76906b3cb44975dbc60d22ac4ec37d03ebb4ee4700fd3a11447be361eb20
+  r                   = 0x74d708bb7b212d2449c5dc82aff2565d9813a2e1d47ad486c8bde843618d1fdb
+  s                   = 0x30f760fccdaacd3bfa1cb877fdbeb25468c9576128f0b38cfbc6059f05d3a179
+  v                   = 28
+
+--- Fixture A': string '0x' (must match Fixture A) ---
+  data input          = '0x'
+  messageHash         = 0x5f5b76906b3cb44975dbc60d22ac4ec37d03ebb4ee4700fd3a11447be361eb20
+  r                   = 0x74d708bb7b212d2449c5dc82aff2565d9813a2e1d47ad486c8bde843618d1fdb
+  s                   = 0x30f760fccdaacd3bfa1cb877fdbeb25468c9576128f0b38cfbc6059f05d3a179
+  v                   = 28
+
+--- Fixture B: non-empty bytes b'\xde\xad\xbe\xef' ---
+  data input          = b'\xde\xad\xbe\xef'
+  messageHash         = 0x36a7134c9740ebf2664b46bcd95b3ddf244605e4d414bac9f98a332f08c1d780
+  r                   = 0xc628edcdf24aa7a5916314418f738eb1f1fdad468ef499dd706d7cf164e58a02
+  s                   = 0x11542fd00026ce84da9cd3004a31ddff18a1e70ce00f1a6dce6fbf16d618cf67
+  v                   = 27
+
+--- Fixture B': string '0xdeadbeef' (must match Fixture B) ---
+  data input          = '0xdeadbeef'
+  messageHash         = 0x36a7134c9740ebf2664b46bcd95b3ddf244605e4d414bac9f98a332f08c1d780
+  r                   = 0xc628edcdf24aa7a5916314418f738eb1f1fdad468ef499dd706d7cf164e58a02
+  s                   = 0x11542fd00026ce84da9cd3004a31ddff18a1e70ce00f1a6dce6fbf16d618cf67
+  v                   = 27
+
