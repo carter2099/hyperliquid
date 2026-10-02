@@ -1994,6 +1994,39 @@ module Hyperliquid
       star_proxy_action(dex, user, { modifyApproval: approved })
     end
 
+    # Allow or disallow a user to deposit to/withdraw from a HIP-3* venue's backstop liquidator
+    # (`perpDeploy` L1 action, star proxy modifyBackstopLiquidatorApproval). Testnet-only.
+    # @param dex [String] HIP-3* perp dex name
+    # @param user [String] Proxied user address (lowercased)
+    # @param allowed [Boolean] Allow the user to deposit to/withdraw from the venue's backstop liquidator
+    # @return [Hash] Exchange response
+    def star_modify_backstop_liquidator_approval(dex:, user:, allowed:)
+      star_proxy_action(dex, user, { modifyBackstopLiquidatorApproval: allowed })
+    end
+
+    # Set or clear reduce-only mode for an approved user on a HIP-3* venue
+    # (`perpDeploy` L1 action, star proxy setReduceOnly). Testnet-only.
+    # @param dex [String] HIP-3* perp dex name
+    # @param user [String] Proxied user address (lowercased)
+    # @param reduce_only [Boolean] Restrict an approved user to reducing positions on the venue
+    # @return [Hash] Exchange response
+    def star_set_reduce_only(dex:, user:, reduce_only:)
+      star_proxy_action(dex, user, { setReduceOnly: reduce_only })
+    end
+
+    # Send collateral from a user to another address on the same HIP-3* venue
+    # (`perpDeploy` L1 action, star proxy sendAsset). Testnet-only.
+    # @param dex [String] HIP-3* perp dex name
+    # @param user [String] Proxied (sending) user address (lowercased)
+    # @param destination [String] Recipient address on the same venue (lowercased)
+    # @param amount [String, Numeric] Collateral amount; Strings sent verbatim, Numerics via float_to_wire
+    #   (perp_deploy_decimal)
+    # @return [Hash] Exchange response
+    def star_send_asset(dex:, user:, destination:, amount:)
+      send_asset = { destination: destination.downcase, amount: perp_deploy_decimal(amount) }
+      star_proxy_action(dex, user, { sendAsset: send_asset })
+    end
+
     # Set HIP-3* spot oracle prices (`perpDeploy` L1 action, star setOracle). Testnet-only.
     # @param dex [String] HIP-3* perp dex name
     # @param oracle_pxs [Hash{String=>String,Numeric}] Dex-prefixed coin => price; sorted by coin.

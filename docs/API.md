@@ -311,6 +311,9 @@ Validator-operator L1 actions. Signed by the validator (or, for `c_signer_*`, it
 Deployer/sub-deployer actions on HIP-3* venues (`perpDeploy` L1 action, `star` variant). Coins are dex-prefixed (`'mydex:BTC'`); `user`/`destination` are lowercased; `star_set_oracle` prices and `star_send_asset` amounts take String (sent verbatim) or Numeric (normalized); oracle prices are sorted by coin; `star_order` orders default to reduce-only.
 
 - `star_modify_approval(dex:, user:, approved:)` - Add (`true`) or remove (`false`) a user on the venue's allow-list (removal clears the user's flags)
+- `star_modify_backstop_liquidator_approval(dex:, user:, allowed:)` - Allow (`true`) or disallow (`false`) a user to deposit to/withdraw from the venue's backstop liquidator
+- `star_set_reduce_only(dex:, user:, reduce_only:)` - Restrict (`true`) or unrestrict (`false`) an approved user to reducing positions on the venue
+- `star_send_asset(dex:, user:, destination:, amount:)` - Send `amount` of collateral from `user` to `destination` on the same venue
 - `star_set_oracle(dex:, oracle_pxs:)` - Set the venue's spot oracle prices from `{ coin => price }`
 
 ### Client Utilities

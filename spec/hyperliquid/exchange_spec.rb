@@ -5490,6 +5490,58 @@ RSpec.describe Hyperliquid::Exchange do
       end
     end
 
+    describe '#star_modify_backstop_liquidator_approval' do
+      it 'F2: matches the Python SDK action and L1 signature' do
+        json = '{"type":"perpDeploy","star":{"dex":"test","operation":{"proxy":["0x19e7e376e7c213b7e7e7e46cc70a5dd086' \
+               'daff2a",{"modifyBackstopLiquidatorApproval":true}]}}}'
+        sig = { 'r' => '0x89b4ff45c80d850de9301a84f42e82b637e9bf9e288306e18181fdbb28d60dc0',
+                's' => '0x073d9688e3631fc901d1afd7a4c9901f09df6b546be1680b950ac53ed2674fe0', 'v' => 28 }
+        stub_star_exchange(json, sig)
+        result = star_exchange.star_modify_backstop_liquidator_approval(dex: 'test', user: proxied_user, allowed: true)
+        expect(result['status']).to eq('ok')
+      end
+    end
+
+    describe '#star_set_reduce_only' do
+      it 'F3: matches the Python SDK action and L1 signature' do
+        json = '{"type":"perpDeploy","star":{"dex":"test","operation":{"proxy":["0x19e7e376e7c213b7e7e7e46cc70a5dd086' \
+               'daff2a",{"setReduceOnly":true}]}}}'
+        sig = { 'r' => '0x225c49823fa14d176145c390bc2da16d388686640e8d2602d6d4e5c0af0ada9f',
+                's' => '0x337cda8acd9e399d42b01c5f405f59e0ea7cf69328b64e5895785f8c0eabde05', 'v' => 27 }
+        stub_star_exchange(json, sig)
+        result = star_exchange.star_set_reduce_only(dex: 'test', user: proxied_user, reduce_only: true)
+        expect(result['status']).to eq('ok')
+      end
+    end
+
+    describe '#star_send_asset' do
+      it 'F8: lowercases the destination and sends a String amount verbatim' do
+        json = '{"type":"perpDeploy","star":{"dex":"test","operation":{"proxy":["0x19e7e376e7c213b7e7e7e46cc70a5dd086' \
+               'daff2a",{"sendAsset":{"destination":"0x00000000000000000000000000000000000000bb",' \
+               '"amount":"100.0"}}]}}}'
+        sig = { 'r' => '0xc00dc6455275171fe3373da9cfcc3e430a699ccd39b0911968c4fb4127e86f05',
+                's' => '0x7ee5952ce1632139f101cb5f7bb0f0538baa47a1ef036e65cb89647e18bed043', 'v' => 28 }
+        stub_star_exchange(json, sig)
+        result = star_exchange.star_send_asset(dex: 'test', user: proxied_user,
+                                               destination: '0x00000000000000000000000000000000000000BB',
+                                               amount: '100.0')
+        expect(result['status']).to eq('ok')
+      end
+
+      it 'normalizes a Numeric amount via float_to_wire (no scientific notation)' do
+        stub_request(:post, exchange_endpoint)
+          .with do |req|
+            JSON.parse(req.body).dig('action', 'star', 'operation', 'proxy', 1, 'sendAsset', 'amount') == '0.00001'
+          end
+          .to_return(status: 200, body: star_response.to_json)
+
+        result = star_exchange.star_send_asset(dex: 'test', user: proxied_user,
+                                               destination: '0x00000000000000000000000000000000000000BB',
+                                               amount: 0.00001)
+        expect(result['status']).to eq('ok')
+      end
+    end
+
     describe '#star_set_oracle' do
       it 'F9: sorts prices by coin, sends Strings verbatim and normalizes Numerics' do
         json = '{"type":"perpDeploy","star":{"dex":"test","operation":{"setOracle":{"oraclePxs":[["test:BTC","100000"' \
