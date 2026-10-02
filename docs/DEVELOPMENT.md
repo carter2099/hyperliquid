@@ -61,6 +61,7 @@ Available test scripts:
 | `test_20_explorer_ws.rb` | Explorer WebSocket block stream |
 | `test_22_outcome_deploy.rb` | HIP-4 outcome deployer actions (structured-rejection wire check) |
 | `test_24_perp_deploy_wire.rb` | Send `perpDeploy` actions to a nonexistent dex; expect a structured rejection (proves signing) |
+| `test_26_spot_deploy_rejection.rb` | spotDeploy structured-rejection wire check on token 0 with a throwaway-key control (no state change) |
 | `test_27_validator_actions.rb` | Validator-operator actions (`validator_l1_stream`, `c_signer_*`, `c_validator_change_profile`, `c_validator_unregister`) — rejection-only wire check behind a fail-closed non-validator safety guard; `c_validator_register` is never sent |
 
 ## Linting

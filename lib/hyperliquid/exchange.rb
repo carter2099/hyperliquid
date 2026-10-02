@@ -1823,6 +1823,83 @@ module Hyperliquid
       perp_deploy_action(:disableDex, dex)
     end
 
+    # ---- Spot deploy (HIP-1 / HIP-2): one `spotDeploy` L1 action, one method per variant ----
+
+    # Register a new spot token via the deploy gas auction (`spotDeploy.registerToken2`, L1).
+    # On success `response.data` is the new token index.
+    # @param token_name [String] Token ticker
+    # @param sz_decimals [Integer] Size decimals
+    # @param wei_decimals [Integer] Wei decimals
+    # @param max_gas [Integer] Maximum auction gas the deployer will pay (HYPE wei units)
+    # @param full_name [String, nil] Optional full name (omitted when nil)
+    # Integer params accept an Integer or an integer String (coerced with Integer(); Floats are truncated).
+    # @return [Hash] Exchange response
+    def spot_deploy_register_token(token_name:, sz_decimals:, wei_decimals:, max_gas:, full_name: nil)
+      register_token = {
+        spec: { name: token_name, szDecimals: Integer(sz_decimals), weiDecimals: Integer(wei_decimals) },
+        maxGas: Integer(max_gas)
+      }
+      register_token[:fullName] = full_name unless full_name.nil?
+      spot_deploy_action(:registerToken2, register_token)
+    end
+
+    # Assign genesis balances for a deployed token (`spotDeploy.userGenesis`, L1). Repeatable.
+    # @param token [Integer] Token index
+    # @param user_and_wei [Array<Array(String, Integer|String)>] [[address, wei], ...]
+    # @param existing_token_and_wei [Array<Array(Integer, Integer|String)>] [[token, wei], ...]
+    # @param blacklist_users [Array<Array(String, Boolean)>, nil] Omitted when nil. The server rejects it
+    #   (even []) unless both other lists are empty.
+    # @return [Hash] Exchange response
+    def spot_deploy_user_genesis(token:, user_and_wei:, existing_token_and_wei:, blacklist_users: nil)
+      user_genesis = {
+        token: Integer(token),
+        userAndWei: user_and_wei.map { |user, wei| [user.downcase, wei_to_wire(wei)] },
+        existingTokenAndWei: existing_token_and_wei.map { |existing, wei| [Integer(existing), wei_to_wire(wei)] }
+      }
+      unless blacklist_users.nil?
+        user_genesis[:blacklistUsers] = blacklist_users.map { |user, blacklist| [user.downcase, blacklist] }
+      end
+      spot_deploy_action(:userGenesis, user_genesis)
+    end
+
+    # Finalize genesis for a deployed token (`spotDeploy.genesis`, L1).
+    # @param token [Integer] Token index
+    # @param max_supply [Integer, String] Maximum supply in wei (Float raises ArgumentError)
+    # @param no_hyperliquidity [Boolean] Send `noHyperliquidity: true` (omitted when false)
+    # @return [Hash] Exchange response
+    def spot_deploy_genesis(token:, max_supply:, no_hyperliquidity: false)
+      genesis = { token: Integer(token), maxSupply: wei_to_wire(max_supply) }
+      genesis[:noHyperliquidity] = true if no_hyperliquidity
+      spot_deploy_action(:genesis, genesis)
+    end
+
+    # Register a spot pair (`spotDeploy.registerSpot`, L1).
+    # On success `response.data` is the new spot (pair) index.
+    # @param base_token [Integer] Base token index
+    # @param quote_token [Integer] Quote token index
+    # @return [Hash] Exchange response
+    def spot_deploy_register_spot(base_token:, quote_token:)
+      spot_deploy_action(:registerSpot, { tokens: [Integer(base_token), Integer(quote_token)] })
+    end
+
+    # Seed Hyperliquidity for a spot pair (`spotDeploy.registerHyperliquidity`, L1).
+    # @param spot [Integer] Spot (pair) index
+    # @param start_px [Float, String] Starting price
+    # @param order_sz [Float, String] Size of each order
+    # @param n_orders [Integer] Number of orders
+    # @param n_seeded_levels [Integer, nil] Number of seeded levels (omitted when nil)
+    # @return [Hash] Exchange response
+    def spot_deploy_register_hyperliquidity(spot:, start_px:, order_sz:, n_orders:, n_seeded_levels: nil)
+      register = {
+        spot: Integer(spot),
+        startPx: float_to_wire(start_px),
+        orderSz: float_to_wire(order_sz),
+        nOrders: Integer(n_orders)
+      }
+      register[:nSeededLevels] = Integer(n_seeded_levels) unless n_seeded_levels.nil?
+      spot_deploy_action(:registerHyperliquidity, register)
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!
@@ -2027,6 +2104,19 @@ module Hyperliquid
       }
     end
 
+    # Convert an integer wei amount to its wire string. Integers are stringified exactly and
+    # Strings pass through verbatim. Floats are rejected (Float#to_s gives "1.0e+16" / "100.0" forms).
+    # @param value [Integer, String] Amount in wei
+    # @return [String]
+    # @raise [ArgumentError] For any other type
+    def wei_to_wire(value)
+      case value
+      when Integer then value.to_s
+      when String then value
+      else raise ArgumentError, "wei amount must be an Integer or String, got #{value.inspect}"
+      end
+    end
+
     # Calculate slippage price for market orders
     # Maintains parity with official Python SDK
     # 1. Apply slippage to mid price
@@ -2206,6 +2296,18 @@ module Hyperliquid
         action, nonce,
         expires_after: @expires_after
       )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Build, sign (L1), and post a `spotDeploy` action with a single variant key.
+    # `type` must be inserted first: msgpack preserves Hash order and the server hashes it.
+    # @param variant [Symbol] Variant key, e.g. :registerToken2
+    # @param payload [Hash, Array] Variant payload
+    # @return [Hash] Exchange response
+    def spot_deploy_action(variant, payload)
+      nonce = timestamp_ms
+      action = { type: 'spotDeploy', variant => payload }
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
       post_action(action, signature, nonce, nil)
     end
 

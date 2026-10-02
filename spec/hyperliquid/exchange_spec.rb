@@ -5135,4 +5135,174 @@ RSpec.describe Hyperliquid::Exchange do
       end
     end
   end
+
+  # Fixtures captured 2026-10-01 against hyperliquid-python-sdk 0.24.0 (2fdb18f95176) via
+  # ~/agent-state/hyperliquid-sdk-fixtures/capture_spot_deploy_signatures.py. Do not edit without re-capturing.
+  describe 'spotDeploy Python-SDK parity' do
+    let(:fixture_client) { Hyperliquid::Client.new(base_url: Hyperliquid::Constants::MAINNET_API_URL) }
+    let(:fixture_endpoint) { "#{Hyperliquid::Constants::MAINNET_API_URL}/exchange" }
+    let(:fixture_signer) { Hyperliquid::Signing::Signer.new(private_key: "0x#{'11' * 32}", testnet: false) }
+    let(:fixture_exchange) do
+      described_class.new(client: fixture_client, signer: fixture_signer,
+                          info: Hyperliquid::Info.new(fixture_client), testnet: false)
+    end
+    let(:captured) { {} }
+
+    before do
+      allow(fixture_exchange).to receive(:timestamp_ms).and_return(1_700_000_000_000)
+      stub_request(:post, fixture_endpoint).with { |req| captured.replace(JSON.parse(req.body)) }
+                                           .to_return(status: 200, body: '{"status":"ok"}')
+    end
+
+    calls = {
+      # SP1 rows
+      'register_token' => [:spot_deploy_register_token,
+                           { token_name: 'TEST0', sz_decimals: 2, wei_decimals: 8, max_gas: 1_000_000_000_000,
+                             full_name: 'Test token example' }],
+      'register_token_no_full_name' => [:spot_deploy_register_token,
+                                        { token_name: 'TEST0', sz_decimals: 2, wei_decimals: 8,
+                                          max_gas: 1_000_000_000_000 }],
+      'user_genesis' => [:spot_deploy_user_genesis,
+                         { token: 1234,
+                           user_and_wei: [%w[0x0000000000000000000000000000000000000001 100000000000000],
+                                          ['0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF', 100_000_000_000_000]],
+                           existing_token_and_wei: [[1, '100000000000000']] }],
+      'user_genesis_blacklist' => [:spot_deploy_user_genesis,
+                                   { token: 1234, user_and_wei: [], existing_token_and_wei: [],
+                                     blacklist_users: [['0x0000000000000000000000000000000000000002', true],
+                                                       ['0x0000000000000000000000000000000000000003', false]] }],
+      'genesis' => [:spot_deploy_genesis, { token: 1234, max_supply: '300000000000000' }],
+      'genesis_no_hyperliquidity' => [:spot_deploy_genesis,
+                                      { token: 1234, max_supply: 300_000_000_000_000, no_hyperliquidity: true }],
+      'register_spot' => [:spot_deploy_register_spot, { base_token: 1234, quote_token: 0 }],
+      'register_hyperliquidity' => [:spot_deploy_register_hyperliquidity,
+                                    { spot: 567, start_px: 2.5, order_sz: 4.25, n_orders: 100 }],
+      'register_hyperliquidity_seeded' => [:spot_deploy_register_hyperliquidity,
+                                           { spot: 567, start_px: '2.5', order_sz: '4.25', n_orders: 100,
+                                             n_seeded_levels: 10 }]
+    }
+
+    expected = {
+      # SP1 rows
+      'register_token' => {
+        json: '{"type":"spotDeploy","registerToken2":{"spec":{"name":"TEST0","szDecimals":2,"weiDecimals":8},"maxGas' \
+              '":1000000000000,"fullName":"Test token example"}}',
+        hash: '0xa13d7652f2ea1faabd9cf53f68c7acdca86fde36c584afb5636a9ad21df12352',
+        r: '0x2a09b3847f7b627fa278f1e5a2744d08cf042cdfabe74613561ccbfe60a8e99d',
+        s: '0x1a18ba2299ad3d432fc717da76c50dae61878ee09a17a6f4316b5b0ac2888bc2',
+        v: 27
+      },
+      'register_token_no_full_name' => {
+        json: '{"type":"spotDeploy","registerToken2":{"spec":{"name":"TEST0","szDecimals":2,"weiDecimals":8},"maxGas' \
+              '":1000000000000}}',
+        hash: '0xfb601f4ae7126b415cac841bcb697a33b8375654947933ed6be8df5e301ae98b',
+        r: '0x9cbf0d90df429723aab02b8ad80ff0bb02c4ee416f31183595d571a14e3ff454',
+        s: '0x5f705ae2a125d127be9538361fcbf35efcc9f0fc0d3f62b886ca15a14fd5b7b0',
+        v: 27
+      },
+      'user_genesis' => {
+        json: '{"type":"spotDeploy","userGenesis":{"token":1234,"userAndWei":[["0x0000000000000000000000000000000000' \
+              '000001","100000000000000"],["0xffffffffffffffffffffffffffffffffffffffff","100000000000000"]],"existin' \
+              'gTokenAndWei":[[1,"100000000000000"]]}}',
+        hash: '0x4dc25df936f71cee78d05624142b6c86b8c63d3e624c1c4284957ab35f6dac7c',
+        r: '0xbbb5f8eb957fa2d279b7971f03931aa4aeb0815ca41c72b58377782d5c9e2faf',
+        s: '0x48f5f7092f90fe7cdf1eae37c9e75054928870ba4caeb0ca651633bffb894800',
+        v: 27
+      },
+      'user_genesis_blacklist' => {
+        json: '{"type":"spotDeploy","userGenesis":{"token":1234,"userAndWei":[],"existingTokenAndWei":[],"blacklistU' \
+              'sers":[["0x0000000000000000000000000000000000000002",true],["0x00000000000000000000000000000000000000' \
+              '03",false]]}}',
+        hash: '0x887736c4dd1266f9ac20fde4c562cec7343c50b3b32c3f18432cb8c135545540',
+        r: '0x56bed2e7fd8f78bc234926e5a6046b828c8b6d388ae6acdb78ba1ed61e1843fd',
+        s: '0x6a8b0ba0ed95e931a418568844c9c444c02810a75af76d8fd732bb66c36fe134',
+        v: 28
+      },
+      'genesis' => {
+        json: '{"type":"spotDeploy","genesis":{"token":1234,"maxSupply":"300000000000000"}}',
+        hash: '0xfd4308f6b4539953d01e85ee8724a7653aa1492d91acf378f67c536c9df2501b',
+        r: '0x19500306424b5756005380707c4fe534bd3b7f7f7d43b7088956e53c346ff49d',
+        s: '0x7086a7d510d469b1654e2689e1d0ff68cf29da5867095129e9819092c079a772',
+        v: 28
+      },
+      'genesis_no_hyperliquidity' => {
+        json: '{"type":"spotDeploy","genesis":{"token":1234,"maxSupply":"300000000000000","noHyperliquidity":true}}',
+        hash: '0x0dc1ddca03ff871cb14c59daaa3d8d496351593ed13dcc53b01c3e949b8352ca',
+        r: '0x1c16a050d2a6da2287f1f246f7a770f343e7b9fbba573f5b3706c2bffcc11baa',
+        s: '0x5b63ba4b2a52fb1550c76865477992e2043057981bbd93e2f659041e9670a0d9',
+        v: 27
+      },
+      'register_spot' => {
+        json: '{"type":"spotDeploy","registerSpot":{"tokens":[1234,0]}}',
+        hash: '0x14497fed3981b4dbd8b5d9c26bf3ccebc17c36af9c9210ea6e9e8751d01b5b6d',
+        r: '0x3f8732197c9df670dc104f89a166db51f2fafeed7d3e5d8f6647610817af26a6',
+        s: '0x762b087d380a0f6f19e10efccf75c85592ff29de4ac696ade70ba2f922d28277',
+        v: 27
+      },
+      'register_hyperliquidity' => {
+        json: '{"type":"spotDeploy","registerHyperliquidity":{"spot":567,"startPx":"2.5","orderSz":"4.25","nOrders":' \
+              '100}}',
+        hash: '0xbef3b2c2ce41add59907763e56609b4c637310e53fe781cf3304be9c8c94b6f7',
+        r: '0xb68d8ecd54e1972a0eef20e04953e04fb4ceedfe660cfb469070bb610ddc724f',
+        s: '0x6c5790d741ef824d7fbf634f4b1f149535c59170711979e2c84f7897604fc328',
+        v: 27
+      },
+      'register_hyperliquidity_seeded' => {
+        json: '{"type":"spotDeploy","registerHyperliquidity":{"spot":567,"startPx":"2.5","orderSz":"4.25","nOrders":' \
+              '100,"nSeededLevels":10}}',
+        hash: '0x2c34336e22298edfbd192e78fbba0a0c0344b806ffc66fa1213bb44de1d31098',
+        r: '0xdfdceba95307de8239457e3bfd12440832c8fb9c1dcf96986c99b9542bc7ffdf',
+        s: '0x7736643a9abd96f5fb21b0d84671765f3ead1d3d586388b232c7cc181abdec45',
+        v: 28
+      }
+    }
+
+    calls.each do |name, (meth, kwargs)|
+      it "#{name} matches the Python SDK body, hash and signature" do
+        fx = expected.fetch(name)
+        fixture_exchange.public_send(meth, **kwargs)
+        expect(captured['action'].to_json).to eq(fx[:json])
+        expect(captured['nonce']).to eq(1_700_000_000_000)
+        expect(captured).not_to have_key('vaultAddress')
+        expect(captured['signature']).to eq('r' => fx[:r], 's' => fx[:s], 'v' => fx[:v])
+        action = JSON.parse(fx[:json], symbolize_names: true)
+        expect(Hyperliquid::Signing::Signer.compute_action_hash(action, 1_700_000_000_000)).to eq(fx[:hash])
+      end
+    end
+  end
+
+  describe 'spotDeploy behavior' do
+    it 'rejects Float wei without sending' do
+      expect { exchange.spot_deploy_genesis(token: 1, max_supply: 1.0e14) }.to raise_error(ArgumentError)
+      expect(a_request(:post, exchange_endpoint)).not_to have_been_made
+    end
+
+    it 'rejects non-integer token strings' do
+      expect { exchange.spot_deploy_register_spot(base_token: 'abc', quote_token: 0) }.to raise_error(ArgumentError)
+    end
+
+    it 'coerces integer strings to Integers' do
+      captured = nil
+      stub_request(:post, exchange_endpoint).with { |req| captured = JSON.parse(req.body) }
+                                            .to_return(status: 200, body: '{"status":"ok"}')
+      exchange.spot_deploy_register_spot(base_token: '1234', quote_token: '0')
+      expect(captured.dig('action', 'registerSpot', 'tokens')).to eq([1234, 0])
+    end
+
+    it 'sends an explicit empty blacklistUsers list' do
+      captured = nil
+      stub_request(:post, exchange_endpoint).with { |req| captured = JSON.parse(req.body) }
+                                            .to_return(status: 200, body: '{"status":"ok"}')
+      exchange.spot_deploy_user_genesis(token: 1, user_and_wei: [], existing_token_and_wei: [], blacklist_users: [])
+      expect(captured.dig('action', 'userGenesis', 'blacklistUsers')).to eq([])
+    end
+
+    it 'omits noHyperliquidity when false' do
+      captured = nil
+      stub_request(:post, exchange_endpoint).with { |req| captured = JSON.parse(req.body) }
+                                            .to_return(status: 200, body: '{"status":"ok"}')
+      exchange.spot_deploy_genesis(token: 1, max_supply: '1', no_hyperliquidity: false)
+      expect(captured.dig('action', 'genesis')).not_to have_key('noHyperliquidity')
+    end
+  end
 end

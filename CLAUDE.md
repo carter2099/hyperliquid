@@ -64,7 +64,7 @@ The signing chain in `lib/hyperliquid/signing/` must exactly match the official 
 2. **Phantom agent**: `{ source: 'a'|'b', connectionId: action_hash }` (`a`=mainnet, `b`=testnet)
 3. **EIP-712 signature** over phantom agent with Exchange domain (chain ID 1337)
 
-Any change to signing must maintain parity with the Python SDK or transactions will be rejected by the exchange.
+Any change to signing must maintain parity with the Python SDK or transactions will be rejected by the exchange. Explorer `userDetails` echoes submitted action JSON verbatim — use it to confirm live wire shapes of docs-only actions (e.g. spot-deploy aligned-quote variants send `[token]`, not the documented `{token}`).
 
 HIP-4 deployer actions (`activateOutcomeDeployer` enum and `outcomeDeploy {type, venue, operation}`) are L1; key order is pinned by Python-SDK parity fixtures; `keywordToValue` pairs are sorted by the SDK, `setSubDeployers`/named-outcome lists keep caller order.
 
@@ -77,6 +77,7 @@ Validator-operator actions (`c_signer_*`, `c_validator_*`, `validator_l1_stream`
 ### Numeric Conversion
 
 - **`float_to_wire`** (in Exchange): converts to string with 8-decimal precision, validates rounding tolerance (`1e-12`), normalizes trailing zeros. No scientific notation.
+- **`wei_to_wire`** (Exchange, private): integer-wei string fields (spot-deploy `maxSupply`, genesis amounts): Integer→`to_s`, String verbatim, anything else (notably Float) raises. Deployer-action integer fields are coerced with `Integer()` (raises on garbage; Floats truncate) because a stringly-typed int changes the msgpack hash.
 - **Market order pricing** (`_slippage_price`): apply slippage (default 5%) to mid price → round to 5 significant figures → round to `(6 for perp, 8 for spot) - szDecimals` decimal places.
 - **Spot vs perp**: assets with index `>= 10_000` are spot (`SPOT_ASSET_THRESHOLD` in Exchange). This affects decimal place calculations.
 

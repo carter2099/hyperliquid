@@ -265,6 +265,16 @@ Deployer actions for HIP-4 outcome venues. `keyword_to_value` takes a Hash or an
 - `finalize_evm_contract(token:, input:)` - Finalize a spot token's ERC-20 link; `input:` is `{ create: { nonce: n } }`, `'firstStorageSlot'` or `'customStorageSlot'`
 - `authorize_aqav2_role(token:, role:)` - Authorize an AQAv2 role, `'technical'` or `'treasury'`
 
+### Spot Deploy (HIP-1)
+
+All are L1 `spotDeploy` actions; `expires_after` is honored; no `vault_address`. Deploy order: `spot_deploy_register_token` → `spot_deploy_user_genesis` (repeatable; `spot_deploy_enable_freeze_privilege` must come before genesis) → `spot_deploy_genesis` → `spot_deploy_register_spot` → `spot_deploy_register_hyperliquidity`. Optional afterwards: fee share, quote token, annotation, label, EVM link (+ `finalize_evm_contract`). Related info: `spot_deploy_state(user)`, `spot_pair_deploy_auction_status`, `token_details`.
+
+- `spot_deploy_register_token(token_name:, sz_decimals:, wei_decimals:, max_gas:, full_name: nil)` - Register a token via the deploy gas auction; `response.data` is the new token index
+- `spot_deploy_user_genesis(token:, user_and_wei:, existing_token_and_wei:, blacklist_users: nil)` - Assign genesis balances (`[[address, wei]]`, `[[token, wei]]`); `blacklist_users` only when both lists are empty
+- `spot_deploy_genesis(token:, max_supply:, no_hyperliquidity: false)` - Finalize genesis; wei amounts are Integer or String
+- `spot_deploy_register_spot(base_token:, quote_token:)` - Register a spot pair; `response.data` is the spot index
+- `spot_deploy_register_hyperliquidity(spot:, start_px:, order_sz:, n_orders:, n_seeded_levels: nil)` - Seed Hyperliquidity for a spot pair
+
 ### Rate Limits and Nonces
 
 - `reserve_request_weight(weight:, destination: nil)` - Buy extra request weight, optionally for another existing user
