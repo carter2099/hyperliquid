@@ -6,16 +6,17 @@
 # Every probe targets token 0 (USDC), whose deployer is the protocol, so no wallet can be
 # authorized and nothing can change on-chain. A correctly shaped, correctly signed action
 # gets a structured `err` naming a deployer/token/precondition problem. Each probe is then
-# repeated with a fresh throwaway key (never funded, so it cannot exist on-chain): that
-# control normally gets "User or API Wallet ... does not exist"; a different text for the wallet proves
-# the rejection depended on the recovered signer (a hash/signing bug recovers a random address -> FAIL).
-# Identical texts mean the server rejected before signer lookup: WARN wire-only (deserialization proven).
+# repeated with a throwaway key (never funded, so it cannot exist on-chain): that control
+# must get a signature-class rejection ("User or API Wallet ... does not exist") whose text
+# differs from the wallet's, proving the rejection depended on the recovered signer (a
+# hash/signing bug recovers a random address and gets the control's text -> FAIL).
 #
 # Usage:
 #   HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_26_spot_deploy_rejection.rb
 
-require 'securerandom'
 require_relative 'test_helpers'
+
+NAME = 'Test 26 spot_deploy rejection'
 
 WIRE_OR_SIGNATURE = /does not exist|deserializ|unknown variant|missing field|invalid type|signature|signer/i
 
@@ -44,34 +45,28 @@ rescue Hyperliquid::Error => e
 end
 
 sdk = build_sdk
-control = Hyperliquid.new(testnet: true, private_key: "0x#{SecureRandom.hex(32)}")
+control = throwaway_sdk
 separator('TEST 26: spotDeploy rejection wire check')
 
 PROBES.each do |method, kwargs|
   puts "#{method}(#{kwargs.inspect})"
   status, text = send_probe(sdk, method, kwargs)
   if status == 'ok'
-    $test_failed = true
-    puts red("  FAIL: unexpected success: #{text} (wallet has deployer rights on token 0?)")
+    fail!("  FAIL: unexpected success: #{text} (wallet has deployer rights on token 0?)")
     next
   end
   if status != 'err' || text.match?(WIRE_OR_SIGNATURE)
-    $test_failed = true
-    puts red("  FAIL (wire/signature class): #{status} #{text}")
+    fail!("  FAIL (wire/signature class): #{status} #{text}")
     next
   end
 
   control_status, control_text = send_probe(control, method, kwargs)
   if control_status == 'ok'
-    $test_failed = true
-    puts red("  FAIL: throwaway key succeeded: #{control_text}")
-  elsif control_text == text
-    # The server rejected before signer lookup: proves deserialization only (hash is pinned by unit specs).
-    puts "  WARN wire-only: control got the same text: #{text}"
+    fail!("  FAIL: throwaway key succeeded: #{control_text}")
   else
-    puts green("  PASS: #{text}")
-    puts "  control: #{control_status} #{control_text}"
+    puts "  wallet rejection: #{text}"
+    assert_signer_dependent(method.to_s, text, control_text)
   end
 end
 
-test_passed('Test 26 spot_deploy rejection')
+test_passed(NAME)

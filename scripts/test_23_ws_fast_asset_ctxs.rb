@@ -13,15 +13,9 @@
 # Usage:
 #   ruby scripts/test_23_ws_fast_asset_ctxs.rb
 
-require_relative '../lib/hyperliquid'
+require_relative 'test_helpers'
 
-def green(text)
-  "\e[32m#{text}\e[0m"
-end
-
-def red(text)
-  "\e[31m#{text}\e[0m"
-end
+NAME = 'Test 23 WebSocket fastAssetCtxs'
 
 def valid_ctxs?(frame)
   frame.is_a?(Hash) && !frame.empty? && frame.all? do |coin, ctx|
@@ -31,16 +25,12 @@ def valid_ctxs?(frame)
   end
 end
 
-puts
-puts '=' * 60
-puts 'TEST 23: WebSocket fastAssetCtxs Subscription'
-puts '=' * 60
-puts
-puts 'Network: Testnet'
+separator('TEST 23: WebSocket fastAssetCtxs Subscription')
+
+sdk = build_public_sdk
 puts 'Subscribing to fastAssetCtxs (3 frames, then disconnect)'
 puts
 
-sdk = Hyperliquid.new(testnet: true)
 frames = []
 mutex = Mutex.new
 done = ConditionVariable.new
@@ -72,18 +62,10 @@ end
 
 sdk.ws.close
 
-failures = []
-failures << "received #{frames.length}/3 frames within 30s" if frames.length < 3
-failures << 'a frame was not a coin => {markPx, midPx} Hash' unless frames.all? { |f| valid_ctxs?(f) }
-snapshot = frames.first || {}
-failures << "snapshot too small (#{snapshot.size} coins)" if snapshot.size < 100
-failures << 'snapshot missing BTC markPx' unless snapshot.dig('BTC', 'markPx')
+fail!("received #{frames.length}/3 frames within 30s") if frames.length < 3
+fail!('a frame was not a coin => {markPx, midPx} Hash') unless frames.all? { |f| valid_ctxs?(f) }
+snapshot = frames.first.is_a?(Hash) ? frames.first : {}
+fail!("snapshot too small (#{snapshot.size} coins)") if snapshot.size < 100
+fail!('snapshot missing BTC markPx') unless snapshot.dig('BTC', 'markPx')
 
-puts
-if failures.empty?
-  puts green('Test 23 WebSocket fastAssetCtxs passed!')
-else
-  failures.each { |f| puts red("FAIL: #{f}") }
-  puts red('Test 23 WebSocket fastAssetCtxs FAILED')
-  exit 1
-end
+test_passed(NAME)

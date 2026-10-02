@@ -5,12 +5,19 @@
 #
 # Toggles spot-dusting opt-out for the calling wallet. Sends two actions:
 # opt_out: true, then opt_out: false, leaving the wallet in its original state
-# (spot dusting opted-in by default).
+# (spot dusting opted-in by default). The opt-in runs in an `ensure`, so an error
+# after the opt-out still restores the wallet.
 #
 # Usage:
 #   HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_19_spot_user.rb
 
 require_relative 'test_helpers'
+
+NAME = 'Test 19 spot_user'
+
+def default_ok?(result)
+  result.is_a?(Hash) && result['status'] == 'ok' && result.dig('response', 'type') == 'default'
+end
 
 sdk = build_sdk
 separator('TEST 19: spotUser (spot-dusting opt-out)')
@@ -18,38 +25,37 @@ separator('TEST 19: spotUser (spot-dusting opt-out)')
 puts "Wallet: #{sdk.exchange.address}"
 puts
 
-puts 'Opting out of spot dusting...'
-result = sdk.exchange.spot_user(opt_out: true)
+# true from the moment the opt-out is sent until the server rejects it: an exception or an
+# unexpected response may mean the wallet got opted out, and opting back in is the safe restore.
+restore = false
+begin
+  puts 'Opting out of spot dusting...'
+  restore = true
+  result = sdk.exchange.spot_user(opt_out: true)
+  restore = false if result.is_a?(Hash) && result['status'] == 'err'
 
-if api_error?(result)
-  puts red("spot_user (opt_out: true) FAILED: #{result.inspect}")
-  test_passed('Test 19 spot_user')
-  exit 1
+  if default_ok?(result)
+    puts green("Opt-out OK: #{result.inspect}")
+    wait_with_countdown(WAIT_SECONDS, 'Settling before toggle back...')
+  else
+    fail!("spot_user (opt_out: true) FAILED: #{result.inspect}")
+  end
+rescue StandardError => e
+  fail!("spot_user (opt_out: true) raised #{e.class}: #{e.message}")
+ensure
+  if restore
+    puts 'Opting back in to spot dusting...'
+    begin
+      result = sdk.exchange.spot_user(opt_out: false)
+      if default_ok?(result)
+        puts green("Opt-in OK: #{result.inspect}")
+      else
+        fail!("spot_user (opt_out: false) FAILED: #{result.inspect}; the wallet may be left opted out of spot dusting")
+      end
+    rescue StandardError => e
+      fail!("spot_user (opt_out: false) raised #{e.class}: #{e.message}; the wallet may be left opted out of spot dusting")
+    end
+  end
 end
 
-unless result.is_a?(Hash) && result['status'] == 'ok' && result.dig('response', 'type') == 'default'
-  $test_failed = true
-  puts red("Unexpected opt-out response: #{result.inspect}")
-end
-
-puts green("Opt-out OK: #{result.inspect}") unless $test_failed
-
-wait_with_countdown(WAIT_SECONDS, 'Settling before toggle back...')
-
-puts 'Opting back in to spot dusting...'
-result = sdk.exchange.spot_user(opt_out: false)
-
-if api_error?(result)
-  puts red("spot_user (opt_out: false) FAILED: #{result.inspect}")
-  test_passed('Test 19 spot_user')
-  exit 1
-end
-
-unless result.is_a?(Hash) && result['status'] == 'ok' && result.dig('response', 'type') == 'default'
-  $test_failed = true
-  puts red("Unexpected opt-in response: #{result.inspect}")
-end
-
-puts green("Opt-in OK: #{result.inspect}") unless $test_failed
-
-test_passed('Test 19 spot_user')
+test_passed(NAME)

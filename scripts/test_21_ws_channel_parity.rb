@@ -13,15 +13,9 @@
 # Usage:
 #   ruby scripts/test_21_ws_channel_parity.rb
 
-require_relative '../lib/hyperliquid'
+require_relative 'test_helpers'
 
-def green(text)
-  "\e[32m#{text}\e[0m"
-end
-
-def red(text)
-  "\e[31m#{text}\e[0m"
-end
+NAME = 'Test 21 WebSocket channel parity'
 
 # Any address works: snapshot channels deliver even for an empty account.
 ADDR = '0xdfc24b077bc1425ad1dea75bcb6f8158e10df303'
@@ -60,16 +54,12 @@ def routing_summary(data)
   fields.empty? ? "keys=#{data.keys.first(4).join(',')}" : fields.join(' ')
 end
 
-puts
-puts '=' * 60
-puts 'TEST 21: WebSocket Channel Parity'
-puts '=' * 60
-puts
-puts 'Network: Testnet'
+separator('TEST 21: WebSocket Channel Parity')
+
+sdk = build_public_sdk
 puts "Subscribing to #{CHECKS.length} channels for #{ADDR}"
 puts
 
-sdk = Hyperliquid.new(testnet: true)
 received = {}
 cross_deliveries = []
 mutex = Mutex.new
@@ -99,9 +89,9 @@ end
 # Local guard check (no network): orderUpdates messages carry no user, so a
 # second user on the same client must be rejected.
 guard_ok = false
-sdk.ws.subscribe({ type: 'orderUpdates', user: ADDR }) { |_d| }
+sdk.ws.subscribe({ type: 'orderUpdates', user: ADDR }) { |_d| nil }
 begin
-  sdk.ws.subscribe({ type: 'orderUpdates', user: '0x0000000000000000000000000000000000000001' }) { |_d| }
+  sdk.ws.subscribe({ type: 'orderUpdates', user: '0x0000000000000000000000000000000000000001' }) { |_d| nil }
 rescue Hyperliquid::WebSocketError => e
   guard_ok = true
   puts "Exclusivity guard: #{e.message}"
@@ -120,24 +110,18 @@ end
 
 sdk.ws.close
 
-failures = []
 CHECKS.each do |label, _subscription, _predicate|
   if received[label]
     puts green("✓ #{label} (#{received[label]})")
   else
-    puts red("✗ #{label} (no matching message within #{TIMEOUT}s)")
-    failures << "#{label}: no message"
+    fail!("✗ #{label} (no matching message within #{TIMEOUT}s)")
   end
 end
-puts guard_ok ? green('✓ orderUpdates exclusivity guard') : red('✗ orderUpdates exclusivity guard')
-failures << 'second-user orderUpdates subscription did not raise WebSocketError' unless guard_ok
-cross_deliveries.each { |c| failures << "cross-delivery #{c}" }
-
-puts
-if failures.empty?
-  puts green('Test 21 WebSocket channel parity passed!')
+if guard_ok
+  puts green('✓ orderUpdates exclusivity guard')
 else
-  failures.each { |f| puts red("FAIL: #{f}") }
-  puts red('Test 21 WebSocket channel parity FAILED')
-  exit 1
+  fail!('✗ second-user orderUpdates subscription did not raise WebSocketError')
 end
+cross_deliveries.each { |c| fail!("cross-delivery #{c}") }
+
+test_passed(NAME)
