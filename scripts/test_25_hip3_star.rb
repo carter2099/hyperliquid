@@ -21,6 +21,9 @@ require_relative 'test_helpers'
 
 DEPLOYER_REJECTION = 'Invalid perp deployer or sub-deployer'
 APPROVAL_REJECTION = 'User requires approval'
+# Observed 2026-10-02 for the standard-abstraction agent wallet on star dex `ignp`; a throwaway
+# key gets "User or API Wallet … does not exist." for the same call, so the text is signer-dependent.
+TRADE_REJECTION = 'User cannot trade the specified asset'
 
 sdk = build_sdk
 separator('TEST 25: HIP-3* star (testnet-only)')
@@ -71,14 +74,14 @@ ensure
   sleep 1
 end
 
-check_star('star_modify_approval', [DEPLOYER_REJECTION]) do
+check_star('star_modify_approval', [DEPLOYER_REJECTION, TRADE_REJECTION]) do
   sdk.exchange.star_modify_approval(dex: dex, user: sdk.exchange.address, approved: true)
 end
 
 # Exercises asset_index on a live star dex plus the nested asset-list wire
 universe = sdk.info.meta(dex: dex)['universe'].map { |asset| asset['name'] }
 cancel_coin = universe.include?("#{dex}:BTC") ? "#{dex}:BTC" : universe.first
-check_star("star_cancel_all (#{cancel_coin})", [DEPLOYER_REJECTION, APPROVAL_REJECTION]) do
+check_star("star_cancel_all (#{cancel_coin})", [DEPLOYER_REJECTION, APPROVAL_REJECTION, TRADE_REJECTION]) do
   sdk.exchange.star_cancel_all(dex: dex, user: sdk.exchange.address, coins: [cancel_coin])
 end
 
