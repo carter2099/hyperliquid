@@ -241,6 +241,12 @@ Signed actions (`POST /exchange`). Requires `Hyperliquid.new(private_key: ...)`.
 
 - `gossip_priority_bid(slot_id:, ip:, max_gas:, vault_address: nil)` - Bid for a gossip priority slot
 
+Validator-operator L1 actions. Signed by the validator (or, for `c_signer_*`, its signer) key; no `vault_address:`; all support `expires_after`.
+
+- `c_signer_jail_self` - Jail the signer's own validator (`CSignerAction`)
+- `c_signer_unjail_self` - Unjail the signer's own validator (`CSignerAction`)
+- `validator_l1_stream(risk_free_rate:)` - Validator vote on the aligned-quote-asset risk-free rate (e.g. `'0.04'` for 4%)
+
 ### Client Utilities
 
 - `address` - The signing wallet's address

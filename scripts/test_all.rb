@@ -38,7 +38,8 @@ SCRIPTS = [
   'test_17_create_vault.rb',
   'test_18_user_portfolio_margin.rb',
   'test_19_spot_user.rb',
-  'test_20_explorer_ws.rb'
+  'test_20_explorer_ws.rb',
+  'test_27_validator_actions.rb'
 ].freeze
 
 def green(text)

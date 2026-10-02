@@ -26,7 +26,7 @@ ruby example.rb            # example usage script
 Integration scripts live in `scripts/` as standalone files (`test_NN_<name>.rb`). They require a real testnet private key and hit the live testnet API.
 
 ```bash
-HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_all.rb              # all 20
+HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_all.rb              # all 21
 HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_automated.rb        # CI-friendly subset (14)
 HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_08_usd_class_transfer.rb  # single
 HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/testnet_wallet_check.rb [--fix]  # wallet preconditions report; --fix switches to standard abstraction + rebalances (never from a runner)

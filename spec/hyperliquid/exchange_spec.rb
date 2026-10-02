@@ -3943,4 +3943,223 @@ RSpec.describe Hyperliquid::Exchange do
       expect(result['status']).to eq('ok')
     end
   end
+
+  describe '#c_signer_jail_self' do
+    let(:ok_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends CSignerAction with jailSelf: null' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action'] == { 'type' => 'CSignerAction', 'jailSelf' => nil } &&
+            body['action'].key?('jailSelf') &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.c_signer_jail_self
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'signs as an L1 action without user-signed fields or vaultAddress' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          !body['action'].key?('signatureChainId') &&
+            !body['action'].key?('hyperliquidChain') &&
+            !body.key?('vaultAddress')
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.c_signer_jail_self
+      expect(result['status']).to eq('ok')
+    end
+
+    it 'propagates expires_after when set on the exchange' do
+      exchange.expires_after = 9_999_999_999_999
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['expiresAfter'] == 9_999_999_999_999 &&
+            body.dig('action', 'type') == 'CSignerAction'
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.c_signer_jail_self
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#c_signer_unjail_self' do
+    let(:ok_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends CSignerAction with unjailSelf: null' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action'] == { 'type' => 'CSignerAction', 'unjailSelf' => nil } &&
+            body['action'].key?('unjailSelf') &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash)
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.c_signer_unjail_self
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  describe '#validator_l1_stream' do
+    let(:ok_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    it 'sends validatorL1Stream with riskFreeRate and no vaultAddress' do
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['action'] == { 'type' => 'validatorL1Stream', 'riskFreeRate' => '0.05' } &&
+            body['nonce'].is_a?(Integer) &&
+            body['signature'].is_a?(Hash) &&
+            !body.key?('vaultAddress')
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.validator_l1_stream(risk_free_rate: '0.05')
+      expect(result['status']).to eq('ok')
+    end
+
+    [[0.04, '0.04'], ['0.0500', '0.05'], [1, '1']].each do |input, expected|
+      it "normalises risk_free_rate #{input.inspect} to #{expected.inspect}" do
+        stub_request(:post, exchange_endpoint)
+          .with { |req| JSON.parse(req.body).dig('action', 'riskFreeRate') == expected }
+          .to_return(status: 200, body: ok_response.to_json)
+
+        result = exchange.validator_l1_stream(risk_free_rate: input)
+        expect(result['status']).to eq('ok')
+      end
+    end
+
+    it 'propagates expires_after when set on the exchange' do
+      exchange.expires_after = 9_999_999_999_999
+      stub_request(:post, exchange_endpoint)
+        .with do |req|
+          body = JSON.parse(req.body)
+          body['expiresAfter'] == 9_999_999_999_999 &&
+            body.dig('action', 'type') == 'validatorL1Stream'
+        end
+        .to_return(status: 200, body: ok_response.to_json)
+
+      result = exchange.validator_l1_stream(risk_free_rate: '0.04')
+      expect(result['status']).to eq('ok')
+    end
+  end
+
+  # Python SDK parity for validator-operator L1 actions. Fixtures captured 2026-10-01 from
+  # hyperliquid-python-sdk 0.24.0 (2fdb18f95176) via
+  # ~/agent-state/hyperliquid-sdk-fixtures/capture_validator_action_signatures.py. Do not edit
+  # expected values without re-capturing.
+  describe 'validator actions: Python SDK signature parity' do
+    let(:fixture_private_key) { '0x1111111111111111111111111111111111111111111111111111111111111111' }
+    let(:fixture_nonce) { 1_700_000_000_000 }
+    let(:fixture_signer) do
+      Hyperliquid::Signing::Signer.new(private_key: fixture_private_key, testnet: false)
+    end
+    let(:mainnet_client) { Hyperliquid::Client.new(base_url: Hyperliquid::Constants::MAINNET_API_URL) }
+    let(:fixture_exchange) do
+      described_class.new(client: mainnet_client, signer: fixture_signer,
+                          info: Hyperliquid::Info.new(mainnet_client), testnet: false)
+    end
+    let(:testnet_fixture_exchange) do
+      testnet_client = Hyperliquid::Client.new(base_url: Hyperliquid::Constants::TESTNET_API_URL)
+      described_class.new(client: testnet_client,
+                          signer: Hyperliquid::Signing::Signer.new(private_key: fixture_private_key, testnet: true),
+                          info: Hyperliquid::Info.new(testnet_client), testnet: true)
+    end
+    let(:ok_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+
+    # Stubs the exchange endpoint, pins the nonce, runs the block, returns the parsed body.
+    def posted_body(exchange_under_test, base_url: Hyperliquid::Constants::MAINNET_API_URL)
+      body = nil
+      stub_request(:post, "#{base_url}/exchange")
+        .with { |req| body = JSON.parse(req.body) }
+        .to_return(status: 200, body: ok_response.to_json)
+      allow(exchange_under_test).to receive(:timestamp_ms).and_return(fixture_nonce)
+      yield
+      body
+    end
+
+    it 'fixture signer address sanity check' do
+      expect(fixture_signer.address).to eq('0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A')
+    end
+
+    it 'F1: c_signer_jail_self matches Python' do
+      body = posted_body(fixture_exchange) { fixture_exchange.c_signer_jail_self }
+
+      expect(Hyperliquid::Signing::Signer.compute_action_hash({ type: 'CSignerAction', jailSelf: nil }, fixture_nonce))
+        .to eq('0x7e23c76d01bfde153fd823a7cae68ce30fa526715e47108348fc4b7b832e407c')
+      expect(body['signature']).to eq(
+        'r' => '0x38635f701cb33b50fbad584847661e0a07dc8d37e474e545f365832b4bc66eb1',
+        's' => '0x21cac402b3d154ea4072f91512d5167448d39f4730def46b029c23b2357930ee',
+        'v' => 28
+      )
+    end
+
+    it 'F2: c_signer_unjail_self matches Python' do
+      body = posted_body(fixture_exchange) { fixture_exchange.c_signer_unjail_self }
+
+      expect(Hyperliquid::Signing::Signer.compute_action_hash({ type: 'CSignerAction', unjailSelf: nil },
+                                                              fixture_nonce))
+        .to eq('0xc613fed303750252362dada66b05b04833d4559ca0fc9454150489c569d0f077')
+      expect(body['signature']).to eq(
+        'r' => '0xb329b0565d78bf514952392a4657e16d1283c0570df6f784b556776cffb97999',
+        's' => '0x5653180bdda309c4b5114708d2d4b041e6591655dcae74481212b070795bc122',
+        'v' => 27
+      )
+    end
+
+    it 'F3: c_signer_jail_self on testnet matches Python (same hash, testnet source)' do
+      body = posted_body(testnet_fixture_exchange, base_url: Hyperliquid::Constants::TESTNET_API_URL) do
+        testnet_fixture_exchange.c_signer_jail_self
+      end
+
+      expect(Hyperliquid::Signing::Signer.compute_action_hash({ type: 'CSignerAction', jailSelf: nil }, fixture_nonce))
+        .to eq('0x7e23c76d01bfde153fd823a7cae68ce30fa526715e47108348fc4b7b832e407c')
+      expect(body['signature']).to eq(
+        'r' => '0x6fab3809fbf0e64be37c69f0bb95966a692a82309130cbf2068155d9d2239456',
+        's' => '0x27940b36a7dd9ca5b206a40d8fcb22134b14bd8614deab5a86c208781102d374',
+        'v' => 28
+      )
+    end
+
+    it 'F4: c_signer_jail_self with expires_after matches Python' do
+      fixture_exchange.expires_after = 1_700_000_060_000
+      body = posted_body(fixture_exchange) { fixture_exchange.c_signer_jail_self }
+
+      expect(Hyperliquid::Signing::Signer.compute_action_hash({ type: 'CSignerAction', jailSelf: nil }, fixture_nonce,
+                                                              expires_after: 1_700_000_060_000))
+        .to eq('0x81bbf71ae28a5450b2a52ac6fffe60f4293d8e2996b94f1084377fd9c624e63d')
+      expect(body['expiresAfter']).to eq(1_700_000_060_000)
+      expect(body['signature']).to eq(
+        'r' => '0x265235480f198a868b3ca097917cc1a8a902096c7a225713e4c3966da8700f91',
+        's' => '0x5aed84098873d2504cd1150dd4972e8a38cc7387d083c6e759cd670a55dc35c8',
+        'v' => 28
+      )
+    end
+
+    ['0.05', 0.05, '0.0500'].each do |rate|
+      it "F9: validator_l1_stream(risk_free_rate: #{rate.inspect}) matches Python sign_l1_action" do
+        body = posted_body(fixture_exchange) { fixture_exchange.validator_l1_stream(risk_free_rate: rate) }
+
+        expect(Hyperliquid::Signing::Signer.compute_action_hash({ type: 'validatorL1Stream', riskFreeRate: '0.05' },
+                                                                fixture_nonce))
+          .to eq('0x519b23e287b6172a38a34bb9cea9c13d1cc80955e5e857b2856f26953411a0c5')
+        expect(body['action']).to eq('type' => 'validatorL1Stream', 'riskFreeRate' => '0.05')
+        expect(body['signature']).to eq(
+          'r' => '0x3105c52c6f6d8d03ff7af1fb99129d2cf5d4a9d14524e1e025a74abcc8494ba3',
+          's' => '0x025f23dddac180e66973b6cba6a1ca8be9e904b631ddb67a9137afec45364b7e',
+          'v' => 28
+        )
+      end
+    end
+  end
 end

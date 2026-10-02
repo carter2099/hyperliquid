@@ -59,6 +59,7 @@ Available test scripts:
 | `test_18_user_portfolio_margin.rb` | Enable then disable portfolio margin (not in test_automated) |
 | `test_19_spot_user.rb` | Opt out of then back into spot dusting (not in test_automated) |
 | `test_20_explorer_ws.rb` | Explorer WebSocket block stream |
+| `test_27_validator_actions.rb` | Validator-operator actions (`validator_l1_stream`, `c_signer_*`) — rejection-only wire check behind a fail-closed non-validator safety guard |
 
 ## Linting
 

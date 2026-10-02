@@ -1455,6 +1455,34 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Validator operators: jail the signer's own validator (`CSignerAction` L1 action, jailSelf variant).
+    # Must be signed by the validator's registered signer key.
+    # @return [Hash] Exchange response
+    def c_signer_jail_self
+      c_signer_action(:jailSelf)
+    end
+
+    # Validator operators: unjail the signer's own validator (`CSignerAction` L1 action, unjailSelf variant).
+    # Must be signed by the validator's registered signer key.
+    # @return [Hash] Exchange response
+    def c_signer_unjail_self
+      c_signer_action(:unjailSelf)
+    end
+
+    # Validator operators: vote on the risk-free rate for the aligned quote asset
+    # (`validatorL1Stream` L1 action).
+    # @param risk_free_rate [String, Numeric] Rate as a decimal (e.g. "0.04" for 4%); normalised via float_to_wire
+    # @return [Hash] Exchange response
+    def validator_l1_stream(risk_free_rate:)
+      nonce = timestamp_ms
+      action = { type: 'validatorL1Stream', riskFreeRate: float_to_wire(risk_free_rate) }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!
@@ -1725,6 +1753,18 @@ module Hyperliquid
       else
         raise ArgumentError, 'order_type must specify :limit or :trigger'
       end
+    end
+
+    # Build, sign, and post a `CSignerAction` L1 action whose variant key carries null.
+    # @param variant [Symbol] :jailSelf or :unjailSelf
+    def c_signer_action(variant)
+      nonce = timestamp_ms
+      action = { type: 'CSignerAction', variant => nil }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
     end
 
     # Post an action to the exchange endpoint
