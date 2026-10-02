@@ -54,8 +54,8 @@ Available test scripts:
 | `test_13_ws_l2_book.rb` | WebSocket `l2Book` subscription (top of book) |
 | `test_14_ws_candle.rb` | WebSocket `candle` subscription (OHLCV) |
 | `test_15_explorer.rb` | Explorer RPC `user_details` and `tx_details` |
-| `test_16_send_to_evm_with_data.rb` | Send USDC to HyperEVM with calldata (not in test_automated) |
-| `test_17_create_vault.rb` | Create a vault with a $100 seed (not in test_automated) |
+| `test_16_send_to_evm_with_data.rb` | Send USDC to HyperEVM with calldata (default: rejection wire check; `live` sends 1 USDC) |
+| `test_17_create_vault.rb` | Create a vault (default: rejection wire check; `live` seeds a real vault with $100) |
 | `test_18_user_portfolio_margin.rb` | Enable then disable portfolio margin (not in test_automated) |
 | `test_19_spot_user.rb` | Opt out of then back into spot dusting (not in test_automated) |
 | `test_20_explorer_ws.rb` | Explorer WebSocket block stream |

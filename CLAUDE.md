@@ -27,12 +27,12 @@ Integration scripts live in `scripts/` as standalone files (`test_NN_<name>.rb`)
 
 ```bash
 HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_all.rb              # all 21
-HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_automated.rb        # CI-friendly subset (14)
+HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_automated.rb        # CI-friendly subset (16)
 HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_08_usd_class_transfer.rb  # single
 HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/testnet_wallet_check.rb [--fix]  # wallet preconditions report; --fix switches to standard abstraction + rebalances (never from a runner)
 ```
 
-`test_automated.rb` is the unattended runner — same as `test_all.rb` but excludes scripts that require manual testnet preconditions (e.g. `test_09_sub_account_lifecycle` needs $100k traded volume; `test_12_staking` needs HYPE balance). Some scripts use structured-rejection wire checks instead of skipping (e.g. `test_08` when the wallet is unified): a balance/volume/mode-class `err` can only be produced after the server recovered the signer to this wallet, so it proves signing end-to-end. `test_11` preflights its third-party builder's eligibility via Info and only downgrades to a warning if that builder drifts ineligible.
+`test_automated.rb` is the unattended runner — same as `test_all.rb` but excludes scripts that require manual testnet preconditions (e.g. `test_09_sub_account_lifecycle` needs $100k traded volume; `test_12_staking` needs HYPE balance). Some scripts use structured-rejection wire checks instead of skipping (e.g. `test_08` when the wallet is unified): a balance/volume/mode-class `err` can only be produced after the server recovered the signer to this wallet, so it proves signing end-to-end. `test_11` preflights its third-party builder's eligibility via Info and only downgrades to a warning if that builder drifts ineligible. `test_16_send_to_evm_with_data` and `test_17_create_vault` default to such zero-cost rejection wire checks; their funds-moving/locking paths are opt-in via a `live` CLI arg (`ruby scripts/test_16_send_to_evm_with_data.rb live` burns 1 USDC; `ruby scripts/test_17_create_vault.rb live` locks $100 in a new vault) and never run from a runner.
 
 `test_integration.rb` at the project root is a thin convenience wrapper.
 
@@ -90,7 +90,7 @@ Many Info methods accept a `dex:` kwarg (e.g. `meta(dex: 'foo')`, `user_state(us
 ### Testing
 
 - **Unit tests** (`spec/`): RSpec + WebMock. WebMock resets between tests. Monkey-patching disabled. Test files mirror `lib/` structure. No live HTTP calls in unit tests. The WS client spec (`spec/hyperliquid/ws/client_spec.rb`) includes comprehensive isolation tests verifying that explorer WS messages never route to main-API callbacks and vice versa — this is critical because the two transports share the same `WS::Client` class.
-- **Integration tests** (`scripts/`): run against testnet with a real private key. Each script is self-contained. Helpers (separators, status dumping, retry-on-oracle-bounce) live in `scripts/test_helpers.rb`. `test_20_explorer_ws.rb` subscribes to `explorerBlock` on testnet and collects 3 block events (60s timeout) to verify the explorer WS transport works end-to-end.
+- **Integration tests** (`scripts/`): run against testnet with a real private key. Each script is self-contained. Helpers (separators, status dumping, retry-on-oracle-bounce) live in `scripts/test_helpers.rb`. `test_14_ws_candle.rb` runs three concurrent candle subscriptions (ETH/1m, ETH/15m, BTC/1m) with per-message coin/interval routing checks and needs 2 ETH/1m + 1 ETH/15m updates in 120s; on timeout it asks `Info#recent_trades('ETH')` — ETH trades in the window without candle updates is a FAIL, no testnet ETH trades is INCONCLUSIVE (exit 0, yellow line). `test_20_explorer_ws.rb` subscribes to `explorerBlock` on testnet and collects 3 block events (60s timeout) to verify the explorer WS transport works end-to-end.
 - **`dump_status` / `check_result` helpers** in `test_helpers.rb` must guard against `result['response']` *itself* being a String for transfer-style actions (`usdClassTransfer`, `approveBuilderFee`) — not just `result['response']['data']`. This was a real bug fixed in 1.1.0; preserve the guards if refactoring those helpers.
 
 ### Code Style

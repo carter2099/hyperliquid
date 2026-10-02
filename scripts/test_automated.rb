@@ -6,6 +6,9 @@
 # Same as test_all.rb but excludes tests unsuitable for unattended runs:
 #   - test_09_sub_account_lifecycle.rb: requires $100k traded volume on testnet to create sub-accounts
 #   - test_12_staking.rb: requires HYPE token balance (locking issues)
+#   - test_18_user_portfolio_margin.rb, test_19_spot_user.rb: pending promotion
+# test_16/test_17 run in their default zero-cost rejection wire-check mode
+# (their `live` arg is never passed from a runner).
 #
 # Usage:
 #   HYPERLIQUID_PRIVATE_KEY=0x... ruby scripts/test_automated.rb
@@ -24,6 +27,8 @@ SCRIPTS = [
   'test_13_ws_l2_book.rb',
   'test_14_ws_candle.rb',
   'test_15_explorer.rb',
+  'test_16_send_to_evm_with_data.rb',
+  'test_17_create_vault.rb',
   'test_20_explorer_ws.rb'
 ].freeze
 
