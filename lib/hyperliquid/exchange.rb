@@ -1390,18 +1390,54 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
-    # Activate or deactivate the signer as an outcome deployer
-    # (`activateOutcomeDeployer` L1 action, HIP-4).
-    # @param is_deactivate [Boolean] True to deactivate, false to activate
+    # Activate the signer as a HIP-4 outcome deployer and claim a venue name
+    # (`activateOutcomeDeployer` L1 action, activate variant). Irreversible in practice:
+    # the stake is locked for the minimum staking duration and the venue name stays
+    # reserved forever. Requires Standard account abstraction ("disabled").
+    # @param venue_name [String] Venue to claim (2-4 lowercase ASCII letters; server-validated)
     # @return [Hash] Exchange response
-    def activate_outcome_deployer(is_deactivate:)
-      nonce = timestamp_ms
-      action = { type: 'activateOutcomeDeployer', isDeactivate: is_deactivate }
-      signature = @signer.sign_l1_action(
-        action, nonce,
-        expires_after: @expires_after
-      )
-      post_action(action, signature, nonce, nil)
+    def activate_outcome_deployer(venue_name:)
+      outcome_deployer_activation({ activate: { venueName: venue_name } })
+    end
+
+    # Permanently deactivate the signer as a HIP-4 outcome deployer
+    # (`activateOutcomeDeployer` L1 action, deactivate variant). Requires the minimum
+    # staking duration to have elapsed and no active outcomes; the account can never
+    # activate again and its venue name stays reserved.
+    # @return [Hash] Exchange response
+    def deactivate_outcome_deployer
+      outcome_deployer_activation({ deactivate: nil })
+    end
+
+    # HIP-4: deploy a standalone YES/NO outcome from a standalone-outcome template
+    # (`outcomeDeploy` L1 action, registerStandaloneOutcomeFromTemplate operation).
+    # The response is passed through unmodified; callers must check its `status`.
+    # @param venue [String] Deployer venue (sub-deployers pass the venue they act for)
+    # @param template_id [String] Template id (see Info#outcome_templates)
+    # @param keyword_to_value [Hash, Array<Array(String, String)>] One value per template
+    #   keyword; keys/values are stringified and sorted by keyword before signing
+    # @param deployer_fee_scale [String, Numeric] Decimal in [0, 10]; Strings are sent verbatim
+    # @return [Hash] Exchange response
+    def register_standalone_outcome_from_template(venue:, template_id:, keyword_to_value:, deployer_fee_scale:)
+      instance = outcome_template_instance(template_id, keyword_to_value, deployer_fee_scale)
+      outcome_deploy_action(venue, { registerStandaloneOutcomeFromTemplate: instance })
+    end
+
+    # HIP-4: settle one outcome of the venue (`outcomeDeploy` L1 action, settleOutcome operation).
+    # `name`, `description` and `side_names` must exactly match the outcome (copy them from
+    # Info#outcome_meta: name, description, sideSpecs[].name).
+    # @param venue [String] Deployer venue
+    # @param outcome [Integer] Outcome identifier
+    # @param settle_fraction [String, Numeric] Payout fraction of the first side in [0, 1]
+    # @param name [String] Outcome name
+    # @param description [String] Outcome description
+    # @param side_names [Array<String>] The two side names
+    # @param details [String] Settlement details (protocol currently requires '')
+    # @return [Hash] Exchange response
+    def settle_outcome(venue:, outcome:, settle_fraction:, name:, description:, side_names:, details: '')
+      settlement = outcome_settlement(outcome: outcome, settle_fraction: settle_fraction, name: name,
+                                      description: description, side_names: side_names, details: details)
+      outcome_deploy_action(venue, { settleOutcome: settlement })
     end
 
     # Finalize the link between a HyperCore spot token and an ERC-20 contract on
@@ -1868,6 +1904,51 @@ module Hyperliquid
       normalized = BigDecimal(rounded_str).to_s('F')
       # Remove trailing zeros after decimal point, and trailing decimal point
       normalized.sub(/(\.\d*?)0+\z/, '\1').sub(/\.\z/, '')
+    end
+
+    # Sign and post a HIP-4 `outcomeDeploy` L1 action. Key order type, venue, operation is load-bearing.
+    def outcome_deploy_action(venue, operation)
+      nonce = timestamp_ms
+      action = { type: 'outcomeDeploy', venue: venue, operation: operation }
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Sign and post an `activateOutcomeDeployer` L1 action with the given enum variant.
+    def outcome_deployer_activation(variant)
+      nonce = timestamp_ms
+      action = { type: 'activateOutcomeDeployer' }.merge(variant)
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Template instance { id, keywordToValue[, deployerFeeScale] } (fee scale only on
+    # standalone/question instances, never on named-outcome instances).
+    def outcome_template_instance(template_id, keyword_to_value, deployer_fee_scale = nil)
+      instance = { id: template_id, keywordToValue: outcome_keyword_pairs(keyword_to_value) }
+      instance[:deployerFeeScale] = outcome_decimal_wire(deployer_fee_scale) unless deployer_fee_scale.nil?
+      instance
+    end
+
+    # Hash or [[k, v], ...] -> [[String, String], ...] sorted by keyword (signed list must be sorted).
+    def outcome_keyword_pairs(keyword_to_value)
+      keyword_to_value.to_a.map { |keyword, value| [keyword.to_s, value.to_s] }.sort_by(&:first)
+    end
+
+    # Decimal string for HIP-4 fee scales / settle fractions: Strings verbatim, Numerics via float_to_wire.
+    def outcome_decimal_wire(value)
+      value.is_a?(String) ? value : float_to_wire(value)
+    end
+
+    # One settlement entry; key order outcome, settleFraction, details, nameAndDescription, sideNames.
+    def outcome_settlement(outcome:, settle_fraction:, name:, description:, side_names:, details: '')
+      {
+        outcome: outcome.to_i,
+        settleFraction: outcome_decimal_wire(settle_fraction),
+        details: details,
+        nameAndDescription: [name, description],
+        sideNames: side_names.map(&:to_s)
+      }
     end
 
     # Calculate slippage price for market orders

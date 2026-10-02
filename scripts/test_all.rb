@@ -39,6 +39,7 @@ SCRIPTS = [
   'test_18_user_portfolio_margin.rb',
   'test_19_spot_user.rb',
   'test_20_explorer_ws.rb',
+  'test_22_outcome_deploy.rb',
   'test_24_perp_deploy_wire.rb',
   'test_27_validator_actions.rb'
 ].freeze

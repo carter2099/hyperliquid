@@ -246,7 +246,15 @@ HIP-3 deployer actions: each method signs one variant of the `perpDeploy` L1 act
 - `merge_outcome(outcome:, amount: nil)` - Merge Yes and No shares into quote tokens; `nil` merges the maximum
 - `merge_question(question:, amount: nil)` - Merge Yes shares of every outcome of a question; `nil` merges the maximum
 - `negate_outcome(question:, outcome:, amount:)` - Turn No shares of one outcome into Yes shares of the question's other outcomes
-- `activate_outcome_deployer(is_deactivate:)` - Activate (`false`) or deactivate (`true`) this wallet as an outcome deployer
+
+### Outcome Deploy (HIP-4)
+
+Deployer actions for HIP-4 outcome venues. `keyword_to_value` takes a Hash or an Array of pairs; the SDK stringifies and sorts it by keyword before signing. Decimals (`deployer_fee_scale`, `settle_fraction`) accept a String (sent verbatim) or a Numeric. Settlements must echo the outcome's `name`, `description` and side names from `outcome_meta`. Responses are passed through unmodified, so check `status`.
+
+- `activate_outcome_deployer(venue_name:)` - Activate this wallet as an outcome deployer and claim `venue_name` (2-4 lowercase letters); locks stake and reserves the venue permanently
+- `deactivate_outcome_deployer` - Permanently deactivate this wallet as an outcome deployer (needs the minimum staking duration elapsed and no active outcomes)
+- `register_standalone_outcome_from_template(venue:, template_id:, keyword_to_value:, deployer_fee_scale:)` - Deploy a standalone Yes/No outcome from a template; `deployer_fee_scale` is a decimal in [0, 10]
+- `settle_outcome(venue:, outcome:, settle_fraction:, name:, description:, side_names:, details: '')` - Settle one outcome; `settle_fraction` is the first side's payout in [0, 1]; `side_names` is the two side names
 
 ### Tokens and HyperEVM
 

@@ -511,9 +511,11 @@ module Hyperliquid
     end
 
     # Retrieve prediction market outcome metadata
-    # @return [Hash] Hash with outcomes (each with outcome, name, description, sideSpecs)
-    #   and questions (each with question, name, description, fallbackOutcome,
-    #   namedOutcomes, settledNamedOutcomes)
+    # @return [Hash] Hash with outcomes (each with outcome, name, description, sideSpecs,
+    #   quoteToken, and for deployer outcomes venue/deployerFeeScale), questions (each with
+    #   question, name, description, fallbackOutcome, namedOutcomes, settledNamedOutcomes),
+    #   deployers (each with deployer, venue, subDeployers as [variant, [addresses]] pairs)
+    #   and feeScale
     def outcome_meta
       @client.post(Constants::INFO_ENDPOINT, { type: 'outcomeMeta' })
     end

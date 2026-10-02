@@ -4091,59 +4091,263 @@ RSpec.describe Hyperliquid::Exchange do
     end
   end
 
-  describe '#activate_outcome_deployer' do
+  describe 'HIP-4 outcome deployer actions' do
     let(:ok_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+    let(:captured) { {} }
 
-    it 'sends activateOutcomeDeployer with isDeactivate: false to activate' do
+    before do
       stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['action']['type'] == 'activateOutcomeDeployer' &&
-            body['action']['isDeactivate'] == false &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
-        end
+        .with { |req| captured[:body] = JSON.parse(req.body) }
         .to_return(status: 200, body: ok_response.to_json)
-
-      result = exchange.activate_outcome_deployer(is_deactivate: false)
-      expect(result['status']).to eq('ok')
     end
 
-    it 'sends activateOutcomeDeployer with isDeactivate: true to deactivate' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['action']['isDeactivate'] == true
-        end
-        .to_return(status: 200, body: ok_response.to_json)
-
-      result = exchange.activate_outcome_deployer(is_deactivate: true)
-      expect(result['status']).to eq('ok')
+    # Not a `let`: examples that call twice must see the latest request body.
+    def body
+      captured[:body]
     end
 
-    it 'does not include vaultAddress in the payload' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          !body.key?('vaultAddress')
-        end
-        .to_return(status: 200, body: ok_response.to_json)
+    describe '#activate_outcome_deployer' do
+      it 'sends the activate variant with the venue name and an L1 signature' do
+        result = exchange.activate_outcome_deployer(venue_name: 'ab')
 
-      exchange.activate_outcome_deployer(is_deactivate: false)
+        expect(result['status']).to eq('ok')
+        expect(body['action'].to_json).to eq(
+          { type: 'activateOutcomeDeployer', activate: { venueName: 'ab' } }.to_json
+        )
+        expect(body).not_to have_key('vaultAddress')
+        expect(body['nonce']).to be_a(Integer)
+        expect(body['signature']).to be_a(Hash)
+      end
+
+      it 'propagates expires_after when set on the exchange' do
+        exchange.expires_after = 9_999_999_999_999
+        exchange.activate_outcome_deployer(venue_name: 'ab')
+
+        expect(body['expiresAfter']).to eq(9_999_999_999_999)
+      end
+
+      it 'no longer accepts the removed is_deactivate: keyword' do
+        expect { exchange.activate_outcome_deployer(is_deactivate: false) }.to raise_error(ArgumentError)
+      end
     end
 
-    it 'propagates expires_after when set on the exchange' do
-      exchange.expires_after = 9_999_999_999_999
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['expiresAfter'] == 9_999_999_999_999 &&
-            body.dig('action', 'type') == 'activateOutcomeDeployer'
-        end
-        .to_return(status: 200, body: ok_response.to_json)
+    describe '#deactivate_outcome_deployer' do
+      it 'sends the deactivate variant with an explicit null value' do
+        exchange.deactivate_outcome_deployer
 
-      result = exchange.activate_outcome_deployer(is_deactivate: false)
-      expect(result['status']).to eq('ok')
+        expect(body['action'].key?('deactivate') && body['action']['deactivate'].nil?).to be(true)
+        expect(body['action'].to_json).to eq({ type: 'activateOutcomeDeployer', deactivate: nil }.to_json)
+        expect(body).not_to have_key('vaultAddress')
+      end
+    end
+
+    describe '#register_standalone_outcome_from_template' do
+      it 'sends the docs example with keywords stringified and sorted' do
+        exchange.register_standalone_outcome_from_template(
+          venue: 'ab',
+          template_id: 'abc',
+          keyword_to_value: { underlying: 'ABC', expiry: '20260801-0600', target: 100 },
+          deployer_fee_scale: '1'
+        )
+
+        expected = {
+          type: 'outcomeDeploy',
+          venue: 'ab',
+          operation: {
+            registerStandaloneOutcomeFromTemplate: {
+              id: 'abc',
+              keywordToValue: [%w[expiry 20260801-0600], %w[target 100], %w[underlying ABC]],
+              deployerFeeScale: '1'
+            }
+          }
+        }
+        expect(body['action'].to_json).to eq(expected.to_json)
+      end
+
+      it 'converts Numeric fee scales to canonical decimal strings' do
+        { 1.5 => '1.5', 1 => '1' }.each do |input, wire|
+          exchange.register_standalone_outcome_from_template(
+            venue: 'ab', template_id: 'abc', keyword_to_value: {}, deployer_fee_scale: input
+          )
+          instance = body.dig('action', 'operation', 'registerStandaloneOutcomeFromTemplate')
+          expect(instance['deployerFeeScale']).to eq(wire)
+        end
+      end
+
+      it 'sends an empty keyword list for an empty Hash' do
+        exchange.register_standalone_outcome_from_template(
+          venue: 'ab', template_id: 'sportsContestDraw', keyword_to_value: {}, deployer_fee_scale: '0'
+        )
+
+        expect(body.dig('action', 'operation', 'registerStandaloneOutcomeFromTemplate', 'keywordToValue')).to eq([])
+      end
+
+      it 'sends the venue verbatim, without vaultAddress, propagating expires_after' do
+        exchange.expires_after = 9_999_999_999_999
+        exchange.register_standalone_outcome_from_template(
+          venue: 'AB', template_id: 'abc', keyword_to_value: [%w[k v]], deployer_fee_scale: '1'
+        )
+
+        expect(body['action']['venue']).to eq('AB')
+        expect(body).not_to have_key('vaultAddress')
+        expect(body['expiresAfter']).to eq(9_999_999_999_999)
+      end
+    end
+
+    describe '#settle_outcome' do
+      let(:settle_args) do
+        {
+          venue: 'ab',
+          outcome: 7,
+          settle_fraction: '1',
+          name: 'template:abc',
+          description: 'expiry:20260801-0600|target:100|underlying:ABC',
+          side_names: ['template:Over', 'template:Under']
+        }
+      end
+
+      it 'sends the docs example in wire key order with empty details by default' do
+        exchange.settle_outcome(**settle_args)
+
+        expected = {
+          type: 'outcomeDeploy',
+          venue: 'ab',
+          operation: {
+            settleOutcome: {
+              outcome: 7,
+              settleFraction: '1',
+              details: '',
+              nameAndDescription: ['template:abc', 'expiry:20260801-0600|target:100|underlying:ABC'],
+              sideNames: ['template:Over', 'template:Under']
+            }
+          }
+        }
+        expect(body['action'].to_json).to eq(expected.to_json)
+      end
+
+      it 'converts Numeric settle fractions to canonical decimal strings' do
+        { 0.66 => '0.66', 1 => '1' }.each do |input, wire|
+          exchange.settle_outcome(**settle_args, settle_fraction: input)
+          expect(body.dig('action', 'operation', 'settleOutcome', 'settleFraction')).to eq(wire)
+        end
+      end
+
+      it 'coerces the outcome id to an Integer' do
+        exchange.settle_outcome(**settle_args, outcome: '7')
+
+        expect(body.dig('action', 'operation', 'settleOutcome', 'outcome')).to eq(7)
+      end
+    end
+  end
+
+  describe 'HIP-4 deployer L1 signature parity' do
+    let(:fixture_key) { '0x1111111111111111111111111111111111111111111111111111111111111111' }
+    let(:fixture_signer) { Hyperliquid::Signing::Signer.new(private_key: fixture_key, testnet: true) }
+    let(:fixture_exchange) { described_class.new(client: client, signer: fixture_signer, info: info, testnet: true) }
+    let(:captured) { {} }
+
+    before do
+      allow(fixture_exchange).to receive(:timestamp_ms).and_return(1_700_000_000_000)
+      stub_request(:post, exchange_endpoint)
+        .with { |req| captured[:body] = JSON.parse(req.body) }
+        .to_return(status: 200, body: { 'status' => 'ok', 'response' => { 'type' => 'default' } }.to_json)
+    end
+
+    def expect_parity(action_hash, signature, expires_after: nil)
+      action = JSON.parse(captured[:body]['action'].to_json, symbolize_names: true)
+      computed = Hyperliquid::Signing::Signer.compute_action_hash(
+        action, 1_700_000_000_000, expires_after: expires_after
+      )
+      expect(computed).to eq(action_hash)
+      expect(captured[:body]['signature']).to eq(signature)
+    end
+
+    let(:settle_outcome_args) do
+      {
+        venue: 'ab',
+        outcome: 7,
+        settle_fraction: '1',
+        name: 'template:abc',
+        description: 'expiry:20260801-0600|target:100|underlying:ABC',
+        side_names: ['template:Over', 'template:Under']
+      }
+    end
+
+    it 'uses the fixture signer address' do
+      expect(fixture_signer.address).to eq('0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A')
+    end
+
+    it 'matches the Python SDK for activate' do
+      fixture_exchange.activate_outcome_deployer(venue_name: 'ab')
+
+      expect_parity(
+        '0x05c9f76676ddbd600019b49b0aaa2f5c7f89d1af6fc68fab6ea0ba8300188edc',
+        {
+          'r' => '0x6b27aaf2ca4cdf95fb0689d9db0ac5e2c941429f1394bd2b107361c6ca4fce6b',
+          's' => '0x596511dfaf58c5f066dccb8314bb73ae1378a9b1694f262db2ffcfd11bf44c07',
+          'v' => 27
+        }
+      )
+    end
+
+    it 'matches the Python SDK for deactivate' do
+      fixture_exchange.deactivate_outcome_deployer
+
+      expect_parity(
+        '0x52f61b4bc82bd41ad4637339b4c53ab60521799aba47b7bc9b94510498ddcfac',
+        {
+          'r' => '0xac3c56be7d35df53ad70791e81cc8846f587c64500dd6b247e7dc6847f15d714',
+          's' => '0x4a113c46921befbba26459bc8e97a4cdf118433a69283f85d5c924105fc31452',
+          'v' => 28
+        }
+      )
+    end
+
+    it 'matches the Python SDK for registerStandaloneOutcomeFromTemplate (unsorted input)' do
+      fixture_exchange.register_standalone_outcome_from_template(
+        venue: 'ab',
+        template_id: 'abc',
+        keyword_to_value: { 'underlying' => 'ABC', 'expiry' => '20260801-0600', 'target' => '100' },
+        deployer_fee_scale: '1'
+      )
+
+      expect_parity(
+        '0xa2465dfa5d3ccab1d358a580a43035338ddc0bac3764d5cf71137e7c6ba908c5',
+        {
+          'r' => '0x4cea80c3993345321133f64e5945efd584c2dc079a71381201d886590f6d8075',
+          's' => '0x32cd917c22e6532ae1b4aff78e15d726bb55ff8bf399bfe86bbe9ea9a1a77223',
+          'v' => 27
+        }
+      )
+    end
+
+    it 'matches the Python SDK for settleOutcome' do
+      fixture_exchange.settle_outcome(**settle_outcome_args)
+
+      expect_parity(
+        '0xc37763461981c07bd2815b23fc1a84b5b8faf32ce4f174c4752e8513d0c34cdb',
+        {
+          'r' => '0xd3c077290cdb96b798a285f7a7955f3acd05beecbdeb1d40bb06bcc5c33cf1df',
+          's' => '0x56f3d1f1736f662753e79410e85291c9210819e726709b26cf4ad862b1f37cc9',
+          'v' => 27
+        }
+      )
+    end
+
+    it 'matches the Python SDK for settleOutcome with expires_after' do
+      fixture_exchange.expires_after = 1_700_000_060_000
+      fixture_exchange.settle_outcome(**settle_outcome_args)
+
+      expect(captured[:body]['expiresAfter']).to eq(1_700_000_060_000)
+      expect_parity(
+        '0xfbe74d8d3cb5740df98025b920faa2a084794efea3f2f6d4eaae5a7185efa1d6',
+        {
+          'r' => '0x186b4b5e23922d2d732a6b8df673301a442a7a7d52f1f15cdfd6e4148271a16b',
+          's' => '0x68917f56f81785160cfba80f6b9db1d000115c18430f9b59a76497e19a9dccd9',
+          'v' => 28
+        },
+        expires_after: 1_700_000_060_000
+      )
     end
   end
 
