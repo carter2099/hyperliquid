@@ -47,12 +47,6 @@ RSpec.describe Hyperliquid::Exchange do
       .to_return(status: 200, body: spot_meta_response.to_json)
   end
 
-  describe '#address' do
-    it 'returns the wallet address from signer' do
-      expect(exchange.address).to eq(signer.address)
-    end
-  end
-
   describe '#order' do
     let(:order_response) do
       {
@@ -104,35 +98,6 @@ RSpec.describe Hyperliquid::Exchange do
             action['orders'].is_a?(Array) &&
             action['orders'].length == 1 &&
             action['grouping'] == 'na'
-        end
-        .to_return(status: 200, body: order_response.to_json)
-
-      result = exchange.order(coin: 'BTC', is_buy: true, size: '0.01', limit_px: '95000')
-      expect(result['status']).to eq('ok')
-    end
-
-    it 'includes signature in request' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          signature = body['signature']
-
-          signature.is_a?(Hash) &&
-            signature['r']&.start_with?('0x') &&
-            signature['s']&.start_with?('0x') &&
-            signature['v'].is_a?(Integer)
-        end
-        .to_return(status: 200, body: order_response.to_json)
-
-      result = exchange.order(coin: 'BTC', is_buy: true, size: '0.01', limit_px: '95000')
-      expect(result['status']).to eq('ok')
-    end
-
-    it 'includes nonce in request' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['nonce'].is_a?(Integer) && body['nonce'].positive?
         end
         .to_return(status: 200, body: order_response.to_json)
 
@@ -772,26 +737,6 @@ RSpec.describe Hyperliquid::Exchange do
       expect(result['status']).to eq('ok')
     end
 
-    it 'includes signature and nonce' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['signature'].is_a?(Hash) &&
-            body['signature']['r']&.start_with?('0x') &&
-            body['nonce'].is_a?(Integer) && body['nonce'].positive?
-        end
-        .to_return(status: 200, body: modify_response.to_json)
-
-      result = exchange.modify_order(
-        oid: 12_345,
-        coin: 'BTC',
-        is_buy: true,
-        size: '0.02',
-        limit_px: '96000'
-      )
-      expect(result['status']).to eq('ok')
-    end
-
     it 'supports vault_address' do
       vault_addr = '0x1234567890123456789012345678901234567890'
 
@@ -1048,19 +993,6 @@ RSpec.describe Hyperliquid::Exchange do
       expect(result['status']).to eq('ok')
     end
 
-    it 'includes signature' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['signature'].is_a?(Hash) &&
-            body['signature']['r']&.start_with?('0x')
-        end
-        .to_return(status: 200, body: margin_response.to_json)
-
-      result = exchange.update_isolated_margin(coin: 'BTC', amount: 50)
-      expect(result['status']).to eq('ok')
-    end
-
     it 'raises ArgumentError for amount that causes rounding' do
       expect do
         exchange.update_isolated_margin(coin: 'BTC', amount: 100.0000019)
@@ -1125,19 +1057,6 @@ RSpec.describe Hyperliquid::Exchange do
         amount: 100,
         destination: '0x1234567890123456789012345678901234567890'
       )
-      expect(result['status']).to eq('ok')
-    end
-
-    it 'includes signature in request' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['signature'].is_a?(Hash) &&
-            body['signature']['r']&.start_with?('0x')
-        end
-        .to_return(status: 200, body: send_response.to_json)
-
-      result = exchange.usd_send(amount: '50', destination: '0x1234567890123456789012345678901234567890')
       expect(result['status']).to eq('ok')
     end
   end
@@ -1309,8 +1228,7 @@ RSpec.describe Hyperliquid::Exchange do
           action = body['action']
           action['type'] == 'createSubAccount' &&
             action['name'] == 'my-sub' &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: create_response.to_json)
 
@@ -1436,13 +1354,84 @@ RSpec.describe Hyperliquid::Exchange do
           body = JSON.parse(req.body)
           action = body['action']
           action['type'] == 'setReferrer' &&
-            action['code'] == 'MY_CODE' &&
-            body['signature'].is_a?(Hash)
+            action['code'] == 'MY_CODE'
         end
         .to_return(status: 200, body: referrer_response.to_json)
 
       result = exchange.set_referrer(code: 'MY_CODE')
       expect(result['status']).to eq('ok')
+    end
+  end
+
+  # These five L1 actions once signed without expiresAfter while post_action sent it, so the
+  # server-side hash differed whenever expires_after was set. The posted signature is checked
+  # by spec/support/exchange_signature_verifier.rb against the posted body (incl. expiresAfter).
+  describe 'L1 account actions with expires_after' do
+    let(:expires_after) { 1_900_000_000_000 }
+    let(:exchange_with_expiry) do
+      described_class.new(client: client, signer: signer, info: info, testnet: true, expires_after: expires_after)
+    end
+
+    sub_account = '0x1234567890123456789012345678901234567890'
+    {
+      create_sub_account: [{ name: 'my-sub' }, 'createSubAccount'],
+      sub_account_transfer: [{ sub_account_user: sub_account, is_deposit: true, usd: 10 }, 'subAccountTransfer'],
+      sub_account_spot_transfer: [{ sub_account_user: sub_account, is_deposit: false, token: 'PURR', amount: 1 },
+                                  'subAccountSpotTransfer'],
+      vault_transfer: [{ vault_address: sub_account, is_deposit: true, usd: 10 }, 'vaultTransfer'],
+      set_referrer: [{ code: 'MY_CODE' }, 'setReferrer']
+    }.each do |method, (kwargs, type)|
+      it "##{method} posts expiresAfter and signs over it" do
+        stub_request(:post, exchange_endpoint).to_return(status: 200, body: { 'status' => 'ok' }.to_json)
+
+        exchange_with_expiry.public_send(method, **kwargs)
+
+        expect(
+          a_request(:post, exchange_endpoint).with do |req|
+            body = JSON.parse(req.body)
+            body['action']['type'] == type && body['expiresAfter'] == expires_after && !body.key?('vaultAddress')
+          end
+        ).to have_been_made.once
+      end
+    end
+  end
+
+  describe '#reload_metadata!' do
+    let(:reloaded_meta_response) do
+      {
+        'universe' => [
+          { 'name' => 'BTC', 'szDecimals' => 5 },
+          { 'name' => 'SOL', 'szDecimals' => 3 },
+          { 'name' => 'DOGE', 'szDecimals' => 1 },
+          { 'name' => 'XRP', 'szDecimals' => 1 },
+          { 'name' => 'ETH', 'szDecimals' => 4 }
+        ]
+      }
+    end
+
+    def eth_order_posted_with_asset?(index)
+      a_request(:post, exchange_endpoint).with do |req|
+        JSON.parse(req.body)['action']['orders'].first['a'] == index
+      end
+    end
+
+    it 'makes the next order re-fetch meta and use the new asset index' do
+      meta_stub = stub_request(:post, info_endpoint)
+                  .with(body: { type: 'meta' }.to_json)
+                  .to_return({ status: 200, body: meta_response.to_json },
+                             { status: 200, body: reloaded_meta_response.to_json })
+      stub_request(:post, exchange_endpoint).to_return(status: 200, body: { 'status' => 'ok' }.to_json)
+      place_eth = -> { exchange.order(coin: 'ETH', is_buy: true, size: '0.1', limit_px: '3000') }
+
+      2.times { place_eth.call }
+      expect(meta_stub).to have_been_requested.once
+      expect(eth_order_posted_with_asset?(1)).to have_been_made.twice
+
+      exchange.reload_metadata!
+      place_eth.call
+
+      expect(meta_stub).to have_been_requested.twice
+      expect(eth_order_posted_with_asset?(4)).to have_been_made.once
     end
   end
 
@@ -1589,19 +1578,6 @@ RSpec.describe Hyperliquid::Exchange do
       result = exchange.approve_agent(agent_address: agent_address, agent_name: 'my-bot')
       expect(result['status']).to eq('ok')
     end
-
-    it 'includes signature in request' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['signature'].is_a?(Hash) &&
-            body['signature']['r']&.start_with?('0x')
-        end
-        .to_return(status: 200, body: approve_response.to_json)
-
-      result = exchange.approve_agent(agent_address: agent_address)
-      expect(result['status']).to eq('ok')
-    end
   end
 
   describe '#approve_builder_fee' do
@@ -1619,19 +1595,6 @@ RSpec.describe Hyperliquid::Exchange do
             action['nonce'].is_a?(Integer) &&
             action['signatureChainId'] == '0x66eee' &&
             action['hyperliquidChain'] == 'Testnet'
-        end
-        .to_return(status: 200, body: approve_response.to_json)
-
-      result = exchange.approve_builder_fee(builder: builder_address, max_fee_rate: '0.01%')
-      expect(result['status']).to eq('ok')
-    end
-
-    it 'includes signature in request' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['signature'].is_a?(Hash) &&
-            body['signature']['r']&.start_with?('0x')
         end
         .to_return(status: 200, body: approve_response.to_json)
 
@@ -1680,23 +1643,6 @@ RSpec.describe Hyperliquid::Exchange do
         validator: validator_address,
         wei: 500_000_000_000_000_000,
         is_undelegate: true
-      )
-      expect(result['status']).to eq('ok')
-    end
-
-    it 'includes signature in request' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['signature'].is_a?(Hash) &&
-            body['signature']['r']&.start_with?('0x')
-        end
-        .to_return(status: 200, body: delegate_response.to_json)
-
-      result = exchange.token_delegate(
-        validator: validator_address,
-        wei: 1_000_000_000_000_000_000,
-        is_undelegate: false
       )
       expect(result['status']).to eq('ok')
     end
@@ -1749,19 +1695,6 @@ RSpec.describe Hyperliquid::Exchange do
       result = exchange.user_dex_abstraction(enabled: true, user: custom_user)
       expect(result['status']).to eq('ok')
     end
-
-    it 'includes signature in request' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['signature'].is_a?(Hash) &&
-            body['signature']['r']&.start_with?('0x')
-        end
-        .to_return(status: 200, body: dex_response.to_json)
-
-      result = exchange.user_dex_abstraction(enabled: true)
-      expect(result['status']).to eq('ok')
-    end
   end
 
   describe '#agent_enable_dex_abstraction' do
@@ -1773,8 +1706,7 @@ RSpec.describe Hyperliquid::Exchange do
           body = JSON.parse(req.body)
           action = body['action']
           action['type'] == 'agentEnableDexAbstraction' &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: dex_response.to_json)
 
@@ -1793,19 +1725,6 @@ RSpec.describe Hyperliquid::Exchange do
         .to_return(status: 200, body: dex_response.to_json)
 
       result = exchange.agent_enable_dex_abstraction(vault_address: vault_addr)
-      expect(result['status']).to eq('ok')
-    end
-
-    it 'includes signature in request' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['signature'].is_a?(Hash) &&
-            body['signature']['r']&.start_with?('0x')
-        end
-        .to_return(status: 200, body: dex_response.to_json)
-
-      result = exchange.agent_enable_dex_abstraction
       expect(result['status']).to eq('ok')
     end
   end
@@ -1856,8 +1775,7 @@ RSpec.describe Hyperliquid::Exchange do
           action = body['action']
           action['type'] == 'evmUserModify' &&
             action['usingBigBlocks'] == true &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: big_blocks_response.to_json)
 
@@ -1899,8 +1817,7 @@ RSpec.describe Hyperliquid::Exchange do
           body = JSON.parse(req.body)
           action = body['action']
           action == { 'type' => 'noop' } &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: noop_response.to_json)
 
@@ -2158,8 +2075,7 @@ RSpec.describe Hyperliquid::Exchange do
           action = body['action']
           action['type'] == 'agentSetAbstraction' &&
             action['abstraction'] == 'u' &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: abstraction_response.to_json)
 
@@ -2206,8 +2122,7 @@ RSpec.describe Hyperliquid::Exchange do
             action['slotId'] == 42 &&
             action['ip'] == '198.51.100.7' &&
             action['maxGas'] == 1_000 &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: bid_response.to_json)
 
@@ -2250,8 +2165,7 @@ RSpec.describe Hyperliquid::Exchange do
               0x2222222222222222222222222222222222222222
               0x3333333333333333333333333333333333333333
             ] &&
-            signers['threshold'] == 2 &&
-            body['signature'].is_a?(Hash)
+            signers['threshold'] == 2
         end
         .to_return(status: 200, body: convert_response.to_json)
 
@@ -2262,22 +2176,6 @@ RSpec.describe Hyperliquid::Exchange do
           0x2222222222222222222222222222222222222222
         ],
         threshold: 2
-      )
-      expect(result['status']).to eq('ok')
-    end
-
-    it 'includes signature in request' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['signature'].is_a?(Hash) &&
-            body['signature']['r']&.start_with?('0x')
-        end
-        .to_return(status: 200, body: convert_response.to_json)
-
-      result = exchange.convert_to_multi_sig_user(
-        authorized_users: ['0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
-        threshold: 1
       )
       expect(result['status']).to eq('ok')
     end
@@ -2298,8 +2196,7 @@ RSpec.describe Hyperliquid::Exchange do
             action['hyperliquidChain'] == 'Testnet' &&
             action['user'] == mixed_case_user.downcase &&
             action['abstraction'] == 'unifiedAccount' &&
-            action['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            action['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: abstraction_response.to_json)
 
@@ -2321,22 +2218,6 @@ RSpec.describe Hyperliquid::Exchange do
       )
       expect(result['status']).to eq('ok')
     end
-
-    it 'includes signature in request' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['signature'].is_a?(Hash) &&
-            body['signature']['r']&.start_with?('0x')
-        end
-        .to_return(status: 200, body: abstraction_response.to_json)
-
-      result = exchange.user_set_abstraction(
-        user: '0x1111111111111111111111111111111111111111',
-        abstraction: 'disabled'
-      )
-      expect(result['status']).to eq('ok')
-    end
   end
 
   describe '#multi_sig' do
@@ -2355,7 +2236,6 @@ RSpec.describe Hyperliquid::Exchange do
             action['payload']['multiSigUser'] == multi_sig_user.downcase &&
             action['payload']['outerSigner'] == signer.address.downcase &&
             action['payload']['action'] == { 'type' => 'noop' } &&
-            body['signature'].is_a?(Hash) &&
             body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: multi_sig_response.to_json)
@@ -2386,22 +2266,6 @@ RSpec.describe Hyperliquid::Exchange do
         nonce: 1_700_000_000_000
       )
       expect(result['status']).to eq('ok')
-    end
-
-    it 'invokes sign_user_signed_action with SendMultiSig primary type and MULTI_SIG_TYPES' do
-      stub_request(:post, exchange_endpoint).to_return(status: 200, body: multi_sig_response.to_json)
-
-      expect(signer).to receive(:sign_user_signed_action).with(
-        hash_including(:multiSigActionHash, :nonce),
-        'HyperliquidTransaction:SendMultiSig',
-        Hyperliquid::Signing::EIP712::MULTI_SIG_TYPES
-      ).and_call_original
-
-      exchange.multi_sig(
-        multi_sig_user: multi_sig_user,
-        inner_action: inner_action,
-        signatures: []
-      )
     end
 
     it 'normalizes userSetAbstraction long-form abstraction values to wire enum in the L1 payload' do
@@ -2453,7 +2317,7 @@ RSpec.describe Hyperliquid::Exchange do
 
     # Signature parity regression: catches future eth gem regressions on `bytes32` handling
     # in the outer envelope. Fixtures captured 2026-05-07 against Python's eth_account 0.13.7.
-    # See: ~/agent-state/hyperliquid-sdk-fixtures/capture_multi_sig_signatures.py
+    # See: tools/parity/capture_multi_sig_signatures.py
     describe 'EIP-712 outer-signature parity (regression guard for bytes32 type)' do
       let(:fixture_private_key) { '0x1111111111111111111111111111111111111111111111111111111111111111' }
       let(:fixture_signer) { Hyperliquid::Signing::Signer.new(private_key: fixture_private_key, testnet: false) }
@@ -2519,8 +2383,7 @@ RSpec.describe Hyperliquid::Exchange do
           body = JSON.parse(req.body)
           action = body['action']
           action == { 'type' => 'claimRewards' } &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: claim_response.to_json)
 
@@ -2539,8 +2402,7 @@ RSpec.describe Hyperliquid::Exchange do
           action = body['action']
           action['type'] == 'setDisplayName' &&
             action['displayName'] == 'Carter' &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: display_response.to_json)
 
@@ -2571,8 +2433,7 @@ RSpec.describe Hyperliquid::Exchange do
           action = body['action']
           action['type'] == 'registerReferrer' &&
             action['code'] == 'CARTER2099' &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: register_response.to_json)
 
@@ -2592,8 +2453,7 @@ RSpec.describe Hyperliquid::Exchange do
           action['type'] == 'topUpIsolatedOnlyMargin' &&
             action['asset'] == 0 &&
             action['leverage'] == '5' &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: top_up_response.to_json)
 
@@ -2646,8 +2506,7 @@ RSpec.describe Hyperliquid::Exchange do
             action['vaultAddress'] == vault &&
             action['allowDeposits'] == true &&
             action['alwaysCloseOnWithdraw'] == false &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: vault_modify_response.to_json)
 
@@ -2688,8 +2547,7 @@ RSpec.describe Hyperliquid::Exchange do
           action['type'] == 'vaultDistribute' &&
             action['vaultAddress'] == vault &&
             action['usd'] == 10_000_000 &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: vault_distribute_response.to_json)
 
@@ -2733,8 +2591,7 @@ RSpec.describe Hyperliquid::Exchange do
             action['description'] == 'Test description' &&
             action['initialUsd'] == 100_000_000 &&
             action['nonce'] == body['nonce'] &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: create_vault_response.to_json)
 
@@ -2791,8 +2648,7 @@ RSpec.describe Hyperliquid::Exchange do
             action['operation'] == 'supply' &&
             action['token'] == 0 &&
             action['amount'] == '20' &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: borrow_lend_response.to_json)
 
@@ -2842,8 +2698,7 @@ RSpec.describe Hyperliquid::Exchange do
           action['type'] == 'subAccountModify' &&
             action['subAccountUser'] == sub_user &&
             action['name'] == 'trading-bot' &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: sub_modify_response.to_json)
 
@@ -2866,8 +2721,7 @@ RSpec.describe Hyperliquid::Exchange do
             action['hyperliquidChain'] == 'Testnet' &&
             action['user'] == counterpart &&
             action['isFinalize'] == false &&
-            action['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            action['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: link_response.to_json)
 
@@ -2884,19 +2738,6 @@ RSpec.describe Hyperliquid::Exchange do
         .to_return(status: 200, body: link_response.to_json)
 
       result = exchange.link_staking_user(user: counterpart, is_finalize: true)
-      expect(result['status']).to eq('ok')
-    end
-
-    it 'includes signature in request' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['signature'].is_a?(Hash) &&
-            body['signature']['r']&.start_with?('0x')
-        end
-        .to_return(status: 200, body: link_response.to_json)
-
-      result = exchange.link_staking_user(user: counterpart, is_finalize: false)
       expect(result['status']).to eq('ok')
     end
   end
@@ -2919,8 +2760,7 @@ RSpec.describe Hyperliquid::Exchange do
             action['fromSubAccount'] == '' &&
             action['nonce'].is_a?(Integer) &&
             action['nonce'] == body['nonce'] &&
-            !action.keys.intersect?(%w[signatureChainId hyperliquidChain]) &&
-            body['signature'].is_a?(Hash)
+            !action.keys.intersect?(%w[signatureChainId hyperliquidChain])
         end
         .to_return(status: 200, body: agent_send_response.to_json)
 
@@ -2986,8 +2826,7 @@ RSpec.describe Hyperliquid::Exchange do
             action['dex'] == 'xyz' &&
             action['ntl'] == 1_000_000_000 &&
             action['isDeposit'] == true &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: liq_response.to_json)
 
@@ -3038,8 +2877,7 @@ RSpec.describe Hyperliquid::Exchange do
             action['destinationChainId'] == 998 &&
             action['gasLimit'] == 200_000 &&
             action['data'] == '0x' &&
-            action['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            action['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: send_response.to_json)
 
@@ -3104,27 +2942,9 @@ RSpec.describe Hyperliquid::Exchange do
       expect(result['status']).to eq('ok')
     end
 
-    it 'invokes sign_user_signed_action with the new primary type and constant' do
-      stub_request(:post, exchange_endpoint)
-        .to_return(status: 200, body: send_response.to_json)
-
-      expect(signer).to receive(:sign_user_signed_action).with(
-        hash_including(
-          token: 'USDC', amount: '1', sourceDex: 'spot',
-          destinationRecipient: default_args[:destination_recipient],
-          addressEncoding: 'hex', destinationChainId: 998, gasLimit: 200_000,
-          data: '0x'
-        ),
-        'HyperliquidTransaction:SendToEvmWithData',
-        Hyperliquid::Signing::EIP712::SEND_TO_EVM_WITH_DATA_TYPES
-      ).and_call_original
-
-      exchange.send_to_evm_with_data(**default_args)
-    end
-
     # Signature parity regression: catches future eth gem regressions on `bytes` handling.
     # Fixtures captured 2026-05-04 against Python's eth_account 0.13.7. Do not modify
-    # without re-capturing via ~/agent-state/hyperliquid-sdk-fixtures/capture_send_to_evm_with_data_signatures.py
+    # without re-capturing via tools/parity/capture_send_to_evm_with_data_signatures.py
     describe 'EIP-712 signature parity (regression guard for bytes type)' do
       let(:fixture_private_key) { '0x1111111111111111111111111111111111111111111111111111111111111111' }
       let(:fixture_signer) { Hyperliquid::Signing::Signer.new(private_key: fixture_private_key, testnet: false) }
@@ -3185,8 +3005,7 @@ RSpec.describe Hyperliquid::Exchange do
             action['hyperliquidChain'] == 'Testnet' &&
             action['user'] == mixed_case_user.downcase &&
             action['enabled'] == true &&
-            action['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            action['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: portfolio_response.to_json)
 
@@ -3208,25 +3027,6 @@ RSpec.describe Hyperliquid::Exchange do
       )
       expect(result['status']).to eq('ok')
     end
-
-    it 'invokes sign_user_signed_action with the new primary type and constant' do
-      stub_request(:post, exchange_endpoint)
-        .to_return(status: 200, body: portfolio_response.to_json)
-
-      expect(signer).to receive(:sign_user_signed_action).with(
-        hash_including(
-          user: '0x1111111111111111111111111111111111111111',
-          enabled: true
-        ),
-        'HyperliquidTransaction:UserPortfolioMargin',
-        Hyperliquid::Signing::EIP712::USER_PORTFOLIO_MARGIN_TYPES
-      ).and_call_original
-
-      exchange.user_portfolio_margin(
-        user: '0x1111111111111111111111111111111111111111',
-        enabled: true
-      )
-    end
   end
 
   describe '#spot_user' do
@@ -3239,8 +3039,7 @@ RSpec.describe Hyperliquid::Exchange do
           action = body['action']
           action['type'] == 'spotUser' &&
             action['toggleSpotDusting'] == { 'optOut' => true } &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: spot_user_response.to_json)
 
@@ -3298,8 +3097,7 @@ RSpec.describe Hyperliquid::Exchange do
           action['type'] == 'authorizeAqav2Role' &&
             action['token'] == 0 &&
             action['role'] == 'technical' &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: ok_response.to_json)
 
@@ -3357,7 +3155,7 @@ RSpec.describe Hyperliquid::Exchange do
   end
 
   # Byte-parity fixtures captured 2026-10-01 against hyperliquid-python-sdk 0.24.0 (master 2fdb18f95176),
-  # eth_account 0.13.7, msgpack 1.2.3 — see ~/agent-state/hyperliquid-sdk-fixtures/capture_perp_deploy_signatures.py.
+  # eth_account 0.13.7, msgpack 1.2.3 — see tools/parity/capture_perp_deploy_signatures.py.
   # P* fixtures come from the Python SDK's own perp_deploy_* methods; D* are hand-built in live-explorer key order
   # and signed with the Python SDK's sign_l1_action. Pre-verified 19/19 against the current Ruby Signer.
   describe 'perpDeploy (HIP-3 deployer actions)' do
@@ -3715,8 +3513,7 @@ RSpec.describe Hyperliquid::Exchange do
             action['signatureChainId'] == '0x66eee' &&
             action['hyperliquidChain'] == 'Testnet' &&
             action['wei'] == 100_000_000 &&
-            action['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            action['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: c_deposit_response.to_json)
 
@@ -3735,19 +3532,6 @@ RSpec.describe Hyperliquid::Exchange do
       result = exchange.c_deposit(wei: 500_000_000.0)
       expect(result['status']).to eq('ok')
     end
-
-    it 'invokes sign_user_signed_action with the new primary type and constant' do
-      stub_request(:post, exchange_endpoint)
-        .to_return(status: 200, body: c_deposit_response.to_json)
-
-      expect(signer).to receive(:sign_user_signed_action).with(
-        hash_including(wei: 100_000_000),
-        'HyperliquidTransaction:CDeposit',
-        Hyperliquid::Signing::EIP712::C_DEPOSIT_TYPES
-      ).and_call_original
-
-      exchange.c_deposit(wei: 100_000_000)
-    end
   end
 
   describe '#c_withdraw' do
@@ -3762,8 +3546,7 @@ RSpec.describe Hyperliquid::Exchange do
             action['signatureChainId'] == '0x66eee' &&
             action['hyperliquidChain'] == 'Testnet' &&
             action['wei'] == 100_000_000 &&
-            action['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            action['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: c_withdraw_response.to_json)
 
@@ -3782,19 +3565,6 @@ RSpec.describe Hyperliquid::Exchange do
       result = exchange.c_withdraw(wei: 500_000_000.0)
       expect(result['status']).to eq('ok')
     end
-
-    it 'invokes sign_user_signed_action with the new primary type and constant' do
-      stub_request(:post, exchange_endpoint)
-        .to_return(status: 200, body: c_withdraw_response.to_json)
-
-      expect(signer).to receive(:sign_user_signed_action).with(
-        hash_including(wei: 100_000_000),
-        'HyperliquidTransaction:CWithdraw',
-        Hyperliquid::Signing::EIP712::C_WITHDRAW_TYPES
-      ).and_call_original
-
-      exchange.c_withdraw(wei: 100_000_000)
-    end
   end
 
   describe '#twap_order' do
@@ -3811,8 +3581,7 @@ RSpec.describe Hyperliquid::Exchange do
           action = body['action']
           action['type'] == 'twapOrder' &&
             action['twap'] == { 'a' => 1, 'b' => true, 's' => '1.5', 'r' => false, 'm' => 30, 't' => true } &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: twap_order_response.to_json)
 
@@ -3900,8 +3669,7 @@ RSpec.describe Hyperliquid::Exchange do
           action = body['action']
           action['type'] == 'twapCancel' &&
             action['a'] == 0 &&
-            action['t'] == 42 &&
-            body['signature'].is_a?(Hash)
+            action['t'] == 42
         end
         .to_return(status: 200, body: twap_cancel_response.to_json)
 
@@ -3941,8 +3709,7 @@ RSpec.describe Hyperliquid::Exchange do
             action['reduceOnly'] == false &&
             action['retracement'] == { 'pct' => '1.234%' } &&
             action['activationPx'].nil? &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: trailing_stop_response.to_json)
 
@@ -3998,7 +3765,6 @@ RSpec.describe Hyperliquid::Exchange do
             action = body['action']
             action['type'] == 'userOutcome' &&
               action['splitOutcome'] == { 'outcome' => 0, 'amount' => '1' } &&
-              body['signature'].is_a?(Hash) &&
               !body.key?('vaultAddress')
           end
           .to_return(status: 200, body: outcome_response.to_json)
@@ -4541,7 +4307,6 @@ RSpec.describe Hyperliquid::Exchange do
             action['token'] == 200 &&
             action['input'] == { 'create' => { 'nonce' => 0 } } &&
             body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash) &&
             !body.key?('vaultAddress')
         end
         .to_return(status: 200, body: finalize_response.to_json)
@@ -4601,20 +4366,7 @@ RSpec.describe Hyperliquid::Exchange do
             action['signatureChainId'] == '0x66eee' &&
             action['hyperliquidChain'] == 'Testnet' &&
             action['tradingUser'] == trading_user.downcase &&
-            action['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
-        end
-        .to_return(status: 200, body: disable_response.to_json)
-
-      result = exchange.staking_link_disable_trading_user(trading_user: trading_user)
-      expect(result['status']).to eq('ok')
-    end
-
-    it 'includes signature in request' do
-      stub_request(:post, exchange_endpoint)
-        .with do |req|
-          body = JSON.parse(req.body)
-          body['signature'].is_a?(Hash) && body['signature']['r']&.start_with?('0x')
+            action['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: disable_response.to_json)
 
@@ -4634,7 +4386,6 @@ RSpec.describe Hyperliquid::Exchange do
           action['type'] == 'reserveRequestWeight' &&
             action['weight'] == 10 &&
             body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash) &&
             !body.key?('vaultAddress')
         end
         .to_return(status: 200, body: reserve_response.to_json)
@@ -4682,8 +4433,7 @@ RSpec.describe Hyperliquid::Exchange do
           body = JSON.parse(req.body)
           body['action'] == { 'type' => 'CSignerAction', 'jailSelf' => nil } &&
             body['action'].key?('jailSelf') &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: ok_response.to_json)
 
@@ -4729,8 +4479,7 @@ RSpec.describe Hyperliquid::Exchange do
           body = JSON.parse(req.body)
           body['action'] == { 'type' => 'CSignerAction', 'unjailSelf' => nil } &&
             body['action'].key?('unjailSelf') &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: ok_response.to_json)
 
@@ -4748,7 +4497,6 @@ RSpec.describe Hyperliquid::Exchange do
           body = JSON.parse(req.body)
           body['action'] == { 'type' => 'validatorL1Stream', 'riskFreeRate' => '0.05' } &&
             body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash) &&
             !body.key?('vaultAddress')
         end
         .to_return(status: 200, body: ok_response.to_json)
@@ -4819,7 +4567,6 @@ RSpec.describe Hyperliquid::Exchange do
           body = JSON.parse(req.body)
           body['action'] == expected &&
             body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash) &&
             !body.key?('vaultAddress')
         end
         .to_return(status: 200, body: ok_response.to_json)
@@ -4913,8 +4660,7 @@ RSpec.describe Hyperliquid::Exchange do
           body = JSON.parse(req.body)
           body['action'] == { 'type' => 'CValidatorAction', 'unregister' => nil } &&
             body['action'].key?('unregister') &&
-            body['nonce'].is_a?(Integer) &&
-            body['signature'].is_a?(Hash)
+            body['nonce'].is_a?(Integer)
         end
         .to_return(status: 200, body: ok_response.to_json)
 
@@ -4925,7 +4671,7 @@ RSpec.describe Hyperliquid::Exchange do
 
   # Python SDK parity for validator-operator L1 actions. Fixtures captured 2026-10-01 from
   # hyperliquid-python-sdk 0.24.0 (2fdb18f95176) via
-  # ~/agent-state/hyperliquid-sdk-fixtures/capture_validator_action_signatures.py. Do not edit
+  # tools/parity/capture_validator_action_signatures.py. Do not edit
   # expected values without re-capturing.
   describe 'validator actions: Python SDK signature parity' do
     let(:fixture_private_key) { '0x1111111111111111111111111111111111111111111111111111111111111111' }
@@ -5137,7 +4883,7 @@ RSpec.describe Hyperliquid::Exchange do
   end
 
   # Fixtures captured 2026-10-01 against hyperliquid-python-sdk 0.24.0 (2fdb18f95176) via
-  # ~/agent-state/hyperliquid-sdk-fixtures/capture_spot_deploy_signatures.py. Do not edit without re-capturing.
+  # tools/parity/capture_spot_deploy_signatures.py. Do not edit without re-capturing.
   describe 'spotDeploy Python-SDK parity' do
     let(:fixture_client) { Hyperliquid::Client.new(base_url: Hyperliquid::Constants::MAINNET_API_URL) }
     let(:fixture_endpoint) { "#{Hyperliquid::Constants::MAINNET_API_URL}/exchange" }
@@ -5427,7 +5173,7 @@ RSpec.describe Hyperliquid::Exchange do
   describe 'HIP-3* star operations' do
     # Fixtures captured 2026-10-01 with hyperliquid-python-sdk 0.24.0 (eth-account 0.13.7,
     # msgpack 1.2.3) via hyperliquid.utils.signing.action_hash / sign_l1_action, testnet (source "b").
-    # Capture script: ~/agent-state/hyperliquid-sdk-fixtures/capture_star_signatures.py
+    # Capture script: tools/parity/capture_star_signatures.py
     # Do not modify without re-capturing — they lock msgpack key order + L1 signing parity.
     let(:fixture_signer) do
       Hyperliquid::Signing::Signer.new(
