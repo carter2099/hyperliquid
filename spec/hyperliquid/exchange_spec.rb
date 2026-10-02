@@ -25,14 +25,17 @@ RSpec.describe Hyperliquid::Exchange do
     }
   end
 
+  # Shape of real /info spotMeta: szDecimals lives on tokens[], pairs reference them by index.
   let(:spot_meta_response) do
     {
       'universe' => [
-        { 'name' => 'PURR/USDC', 'szDecimals' => 2, 'tokens' => [1, 0] }
+        { 'name' => 'PURR/USDC', 'tokens' => [1, 0], 'index' => 0, 'isCanonical' => true },
+        { 'name' => '@1', 'tokens' => [2, 0], 'index' => 1, 'isCanonical' => false }
       ],
       'tokens' => [
-        { 'name' => 'USDC', 'index' => 0 },
-        { 'name' => 'PURR', 'index' => 1 }
+        { 'name' => 'USDC', 'szDecimals' => 8, 'weiDecimals' => 8, 'index' => 0 },
+        { 'name' => 'PURR', 'szDecimals' => 0, 'weiDecimals' => 5, 'index' => 1 },
+        { 'name' => 'TKN', 'szDecimals' => 2, 'weiDecimals' => 8, 'index' => 2 }
       ]
     }
   end
@@ -496,6 +499,40 @@ RSpec.describe Hyperliquid::Exchange do
       expect do
         exchange.market_order(coin: 'UNKNOWN', is_buy: true, size: '1')
       end.to raise_error(ArgumentError, /Unknown asset or no price/)
+    end
+
+    context 'with spot pairs' do
+      let(:mids_response) { { 'PURR/USDC' => '0.001234', '@1' => '0.001234' } }
+
+      def posted_spot_order(coin)
+        posted = nil
+        stub_request(:post, exchange_endpoint)
+          .with { |req| posted = JSON.parse(req.body)['action']['orders'][0] }
+          .to_return(status: 200, body: { 'status' => 'ok' }.to_json)
+        exchange.market_order(coin: coin, is_buy: true, size: '100', slippage: 0.05)
+        posted
+      end
+
+      it 'rounds the slippage price to 8 - base token szDecimals (base szDecimals 2)' do
+        order = posted_spot_order('@1')
+        expect(order).to include('a' => 10_001, 'p' => '0.001296')
+      end
+
+      it 'rounds the slippage price to 8 decimals when the base token has szDecimals 0' do
+        order = posted_spot_order('PURR/USDC')
+        expect(order).to include('a' => 10_000, 'p' => '0.0012957')
+      end
+
+      it 'raises when a spot pair references a base token missing from spotMeta tokens' do
+        spot_meta_response['tokens'].delete_if { |token| token['index'] == 2 }
+        stub_request(:post, info_endpoint)
+          .with(body: { type: 'spotMeta' }.to_json)
+          .to_return(status: 200, body: spot_meta_response.to_json)
+
+        expect do
+          exchange.market_order(coin: '@1', is_buy: true, size: '100')
+        end.to raise_error(Hyperliquid::Error, /@1 references unknown base token index 2/)
+      end
     end
   end
 

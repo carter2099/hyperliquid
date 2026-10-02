@@ -2189,9 +2189,17 @@ module Hyperliquid
       end
     end
 
+    # spotMeta carries szDecimals on tokens[], not on universe[] pairs; a pair's
+    # size decimals are its base token's (pair['tokens'][0], matched by token index).
     def load_spot_assets
-      @info.spot_meta['universe'].each_with_index do |pair, index|
-        cache_asset(pair['name'], index + SPOT_ASSET_THRESHOLD, pair['szDecimals'] || 0, is_spot: true)
+      spot_meta = @info.spot_meta
+      tokens_by_index = spot_meta['tokens'].to_h { |token| [token['index'], token] }
+      spot_meta['universe'].each_with_index do |pair, index|
+        base_index = pair['tokens'][0]
+        base_token = tokens_by_index[base_index]
+        raise Error, "spotMeta pair #{pair['name']} references unknown base token index #{base_index}" unless base_token
+
+        cache_asset(pair['name'], index + SPOT_ASSET_THRESHOLD, base_token['szDecimals'], is_spot: true)
       end
     end
 
