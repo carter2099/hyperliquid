@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'spec_helper'
+require 'socket'
 
 RSpec.describe Hyperliquid::Client do
   let(:base_url) { 'https://api.example.com' }
@@ -148,107 +149,117 @@ RSpec.describe Hyperliquid::Client do
   end
 
   describe 'retry behavior' do
-    context 'retry configuration' do
-      it 'configures retry middleware with correct options' do
-        expect(described_class::DEFAULT_RETRY_OPTIONS[:max]).to eq(2)
-        expect(described_class::DEFAULT_RETRY_OPTIONS[:interval]).to eq(0.5)
-        expect(described_class::DEFAULT_RETRY_OPTIONS[:backoff_factor]).to eq(2)
-        expect(described_class::DEFAULT_RETRY_OPTIONS[:retry_statuses]).to include(429, 502, 503, 504)
-        expect(described_class::DEFAULT_RETRY_OPTIONS[:exceptions]).to include(Faraday::ConnectionFailed, Faraday::TimeoutError)
-      end
+    let(:max_retries) { described_class::DEFAULT_RETRY_OPTIONS[:max] }
+    let(:info_url) { "#{base_url}/info" }
+    let(:exchange_url) { "#{base_url}/exchange" }
+    let(:sleeps) { [] }
 
-      it 'enables retry middleware on connection when retry_enabled is true' do
-        connection = retry_client.instance_variable_get(:@connection)
-        builder = connection.builder
-
-        middleware_names = builder.handlers.map(&:name)
-        expect(middleware_names).to include('Faraday::Retry::Middleware')
+    before do
+      recorded = sleeps
+      allow_any_instance_of(Faraday::Retry::Middleware).to receive(:sleep) do |_middleware, seconds|
+        recorded << seconds
       end
     end
 
-    context 'error handling with retries enabled' do
-      it 'includes retry statuses for server errors' do
-        retry_statuses = described_class::DEFAULT_RETRY_OPTIONS[:retry_statuses]
+    it 'retries a transient info failure and returns the eventual success' do
+      stub_request(:post, info_url)
+        .to_return({ status: 503, body: '{}' }, { status: 200, body: '{"ok":true}' })
 
-        expect(retry_statuses).to include(429)
-        expect(retry_statuses).to include(502)
-        expect(retry_statuses).to include(503)
-        expect(retry_statuses).to include(504)
-      end
+      expect(retry_client.post('/info', { type: 'allMids' })).to eq('ok' => true)
+      expect(a_request(:post, info_url).with(body: { type: 'allMids' }.to_json)).to have_been_made.times(2)
+    end
 
-      it 'includes connection exceptions for retry' do
-        retry_exceptions = described_class::DEFAULT_RETRY_OPTIONS[:exceptions]
+    it 'retries 429, 502 and 504 on info as well' do
+      [429, 502, 504].each do |status|
+        WebMock.reset!
+        stub_request(:post, info_url).to_return({ status: status, body: '{}' }, { status: 200, body: '{}' })
 
-        expect(retry_exceptions).to include(Faraday::ConnectionFailed)
-        expect(retry_exceptions).to include(Faraday::TimeoutError)
+        expect(retry_client.post('/info')).to eq({})
+        expect(a_request(:post, info_url)).to have_been_made.times(2)
       end
     end
 
-    context 'non-retryable errors' do
-      it 'does not retry 400 bad request errors' do
-        stub_request(:post, full_url)
-          .to_return(status: 400, body: { 'error' => 'Bad request' }.to_json)
+    it 'retries an info connection failure' do
+      stub_request(:post, info_url).to_raise(Faraday::ConnectionFailed.new('reset')).then
+                                   .to_return(status: 200, body: '{}')
 
-        expect { retry_client.post(endpoint) }.to raise_error(Hyperliquid::BadRequestError)
-        expect(a_request(:post, full_url)).to have_been_made.once
+      expect(retry_client.post('/info')).to eq({})
+      expect(a_request(:post, info_url)).to have_been_made.times(2)
+    end
+
+    it 'raises ServerError after max retries with exponential backoff between attempts' do
+      stub_request(:post, info_url).to_return(status: 503, body: { 'error' => 'down' }.to_json)
+
+      expect { retry_client.post('/info') }.to raise_error(Hyperliquid::ServerError) do |error|
+        expect(error.status_code).to eq(503)
+        expect(error.response_body).to eq('error' => 'down')
       end
+      expect(a_request(:post, info_url)).to have_been_made.times(max_retries + 1)
+      expect(sleeps.size).to eq(max_retries)
+      expect(sleeps[0]).to be_between(0.5, 0.75)
+      expect(sleeps[1]).to be_between(1.0, 1.25)
+    end
 
-      it 'does not retry 401 authentication errors' do
-        stub_request(:post, full_url)
-          .to_return(status: 401, body: { 'error' => 'Unauthorized' }.to_json)
+    it 'never retries /exchange, even on a retryable status' do
+      stub_request(:post, exchange_url).to_return(status: 503, body: '{}')
 
-        expect { retry_client.post(endpoint) }.to raise_error(Hyperliquid::AuthenticationError)
-        expect(a_request(:post, full_url)).to have_been_made.once
-      end
+      expect { retry_client.post('/exchange', { action: { type: 'noop' } }) }.to raise_error(Hyperliquid::ServerError)
+      expect(a_request(:post, exchange_url)).to have_been_made.once
+      expect(sleeps).to be_empty
+    end
 
-      it 'does not retry 404 not found errors' do
-        stub_request(:post, full_url)
-          .to_return(status: 404, body: { 'error' => 'Not found' }.to_json)
+    it 'never retries /exchange on a connection failure' do
+      stub_request(:post, exchange_url).to_raise(Faraday::ConnectionFailed.new('reset'))
 
-        expect { retry_client.post(endpoint) }.to raise_error(Hyperliquid::NotFoundError)
-        expect(a_request(:post, full_url)).to have_been_made.once
+      expect { retry_client.post('/exchange', { action: { type: 'noop' } }) }.to raise_error(Hyperliquid::NetworkError)
+      expect(a_request(:post, exchange_url)).to have_been_made.once
+    end
+
+    it 'does not retry info when retries are disabled (the default)' do
+      stub_request(:post, info_url).to_return({ status: 503, body: '{}' }, { status: 200, body: '{}' })
+
+      expect { client.post('/info') }.to raise_error(Hyperliquid::ServerError)
+      expect(a_request(:post, info_url)).to have_been_made.once
+    end
+
+    it 'does not retry statuses outside the retry list' do
+      { 400 => Hyperliquid::BadRequestError, 401 => Hyperliquid::AuthenticationError,
+        404 => Hyperliquid::NotFoundError, 500 => Hyperliquid::ServerError }.each do |status, error_class|
+        WebMock.reset!
+        stub_request(:post, info_url).to_return(status: status, body: '{}')
+
+        expect { retry_client.post('/info') }.to raise_error(error_class)
+        expect(a_request(:post, info_url)).to have_been_made.once
       end
     end
   end
 
-  describe 'initialization' do
-    it 'creates client with default timeout' do
-      client = described_class.new(base_url: base_url)
-      expect(client).to be_a(described_class)
+  describe 'timeout' do
+    around do |example|
+      config = WebMock::Config.instance
+      fields = %i[allow_net_connect allow_localhost allow net_http_connect_on_start]
+      saved = fields.to_h { |field| [field, config.public_send(field)] }
+      WebMock.disable_net_connect!(allow_localhost: true)
+      example.run
+    ensure
+      saved&.each { |field, value| config.public_send(:"#{field}=", value) }
     end
 
-    it 'creates client with custom timeout' do
-      client = described_class.new(base_url: base_url, timeout: 60)
-      expect(client).to be_a(described_class)
-    end
+    it 'applies the configured timeout to reads from a server that never answers' do
+      server = TCPServer.new('127.0.0.1', 0)
+      acceptor = Thread.new do
+        socket = server.accept
+        sleep 5
+        socket.close
+      end
+      slow_client = described_class.new(base_url: "http://127.0.0.1:#{server.addr[1]}", timeout: 0.3)
 
-    it 'creates client with retry disabled by default' do
-      client = described_class.new(base_url: base_url)
-      connection = client.instance_variable_get(:@connection)
-      builder = connection.builder
-
-      middleware_names = builder.handlers.map(&:name)
-      expect(middleware_names).not_to include('Faraday::Retry::Middleware')
-    end
-
-    it 'creates client with retry enabled when specified' do
-      connection = retry_client.instance_variable_get(:@connection)
-      builder = connection.builder
-
-      middleware_names = builder.handlers.map(&:name)
-      expect(middleware_names).to include('Faraday::Retry::Middleware')
-    end
-
-    it 'creates client with all configuration options' do
-      client = described_class.new(base_url: base_url, timeout: 45, retry_enabled: true)
-      expect(client).to be_a(described_class)
-
-      connection = client.instance_variable_get(:@connection)
-      expect(connection.options.timeout).to eq(45)
-
-      builder = connection.builder
-      middleware_names = builder.handlers.map(&:name)
-      expect(middleware_names).to include('Faraday::Retry::Middleware')
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      expect { slow_client.post('/info', { type: 'allMids' }) }.to raise_error(Hyperliquid::TimeoutError)
+      expect(Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).to be < 2
+    ensure
+      acceptor&.kill
+      server&.close
     end
   end
 
@@ -305,15 +316,18 @@ RSpec.describe Hyperliquid::Client do
         .to raise_error(ArgumentError, /Unknown post target/)
     end
 
-    it 'shares retry configuration with the default connection' do
+    it 'retries explorer reads when retries are enabled' do
+      allow_any_instance_of(Faraday::Retry::Middleware).to receive(:sleep)
       retry_explorer_client = described_class.new(
         base_url: base_url, explorer_base_url: explorer_base_url, retry_enabled: true
       )
-      stub_request(:post, explorer_url).to_return(status: 200, body: '{}')
-      retry_explorer_client.post(explorer_endpoint, { type: 'a' }, target: :explorer)
-      explorer_conn = retry_explorer_client.instance_variable_get(:@explorer_connection)
-      middleware_names = explorer_conn.builder.handlers.map(&:name)
-      expect(middleware_names).to include('Faraday::Retry::Middleware')
+      stub_request(:post, explorer_url)
+        .to_return({ status: 503, body: '{}' }, { status: 200, body: '{"type":"txDetails"}' })
+
+      result = retry_explorer_client.post(explorer_endpoint, { type: 'txDetails' }, target: :explorer)
+
+      expect(result).to eq('type' => 'txDetails')
+      expect(a_request(:post, explorer_url)).to have_been_made.times(2)
     end
 
     it 'translates Faraday::ConnectionFailed on explorer to NetworkError' do
