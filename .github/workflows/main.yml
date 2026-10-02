@@ -8,11 +8,21 @@ on:
 
   pull_request:
 
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Job names `Ruby 3.3` / `Ruby 3.4` are required checks in the
+    # steward-auto-merge-gate ruleset; never rename the job or change the matrix
+    # without updating that ruleset.
     name: Ruby ${{ matrix.ruby }}
+    timeout-minutes: 20
     strategy:
+      fail-fast: false
       matrix:
         ruby:
           - '3.3'
@@ -27,3 +37,35 @@ jobs:
           bundler-cache: true
       - name: Run the default task
         run: bundle exec rake
+      # Installs the built .gem into an empty GEM_HOME, so dependencies resolve
+      # from rubygems exactly as a consumer's would (no Gemfile.lock, no git-sourced
+      # rbsecp256k1 fork), and loads it from outside the repo.
+      - name: Built-gem smoke (consumer install)
+        if: matrix.ruby == '3.4'
+        run: |
+          set -euo pipefail
+          unset BUNDLE_GEMFILE BUNDLE_PATH BUNDLE_DEPLOYMENT BUNDLE_FROZEN RUBYOPT RUBYLIB
+          version="$(ruby -e 'load "lib/hyperliquid/version.rb"; print Hyperliquid::VERSION')"
+          gem_file="$RUNNER_TEMP/hyperliquid-$version.gem"
+          gem build hyperliquid.gemspec --output "$gem_file"
+
+          outside="$(tar -xOf "$gem_file" data.tar.gz | tar -tz \
+            | grep -vE '^(lib/|docs/|README\.md$|CHANGELOG\.md$|LICENSE\.txt$|SECURITY\.md$)' || true)"
+          if [ -n "$outside" ]; then
+            echo "::error::Built gem contains paths outside the allowlist:"
+            echo "$outside"
+            exit 1
+          fi
+
+          export GEM_HOME="$RUNNER_TEMP/consumer-gems" GEM_PATH="$RUNNER_TEMP/consumer-gems"
+          gem install --no-document "$gem_file"
+
+          cd "$RUNNER_TEMP"
+          HL_EXPECTED_VERSION="$version" ruby -e '
+            require "hyperliquid"
+            loaded = Gem.loaded_specs.fetch("hyperliquid")
+            abort "hyperliquid loaded from #{loaded.gem_dir}, not the consumer GEM_HOME" unless loaded.gem_dir.start_with?(ENV.fetch("GEM_HOME"))
+            abort "Hyperliquid::VERSION #{Hyperliquid::VERSION} != #{ENV.fetch("HL_EXPECTED_VERSION")}" unless Hyperliquid::VERSION == ENV.fetch("HL_EXPECTED_VERSION")
+            Hyperliquid.new(testnet: true)
+            puts "Built gem #{Hyperliquid::VERSION} installs and loads (#{loaded.gem_dir})"
+          '

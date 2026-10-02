@@ -14,6 +14,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+
       - name: Extract latest changelog section
         run: |
           # Extract content between the first and second ## [x.y.z] headers,
@@ -22,6 +27,27 @@ jobs:
             /^## \[[0-9]/ { count++; if (count == 2) exit }
             count == 1 { print }
           ' CHANGELOG.md > LATEST_CHANGES.md
+
+      - name: Verify tag, version, and changelog section
+        run: |
+          set -euo pipefail
+          version="$(ruby -e 'load "lib/hyperliquid/version.rb"; print Hyperliquid::VERSION')"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match Hyperliquid::VERSION $version (expected v$version)"
+            exit 1
+          fi
+          heading="$(head -n 1 LATEST_CHANGES.md)"
+          case "$heading" in
+            "## [$version]" | "## [$version] "*) ;;
+            *)
+              echo "::error::Latest CHANGELOG.md section heading is '$heading', expected '## [$version] ...'"
+              exit 1
+              ;;
+          esac
+          if ! tail -n +2 LATEST_CHANGES.md | grep -q '[^[:space:]]'; then
+            echo "::error::CHANGELOG.md section for $version is empty"
+            exit 1
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
