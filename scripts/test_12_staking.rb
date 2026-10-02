@@ -7,8 +7,10 @@
 # delegations), then a zero-cost wire check — undelegate an impossible
 # 10^15 wei (10^7 HYPE) and pass only on the structured EXPECTED_REJECTION.
 # The server only produces that text after recovering the user-signed
-# signature to this wallet (an unknown signer gets "Must deposit before
-# performing actions"), so it proves tokenDelegate signing end-to-end.
+# signature to this wallet, so it proves tokenDelegate signing end-to-end.
+# Every run proves that with a random-key control: the same call signed by a
+# throwaway key must get a signer-class rejection ("Must deposit before
+# performing actions") that differs from the wallet's text.
 #
 # Options (manual only — delegations have a 1-day lockup, never from a runner):
 #   ruby scripts/test_12_staking.rb delegate     # delegate 0.1 HYPE
@@ -23,6 +25,19 @@ SUMMARY_KEYS = %w[delegated undelegated totalPendingWithdrawal nPendingWithdrawa
 # random-key control (throwaway key, same call): "Must deposit before performing actions. User: 0x..."
 EXPECTED_REJECTION = 'Insufficient balance to undelegate'
 WIRE_CHECK_WEI = 10**15
+
+def response_text(result)
+  result.is_a?(Hash) ? result['response'].to_s : result.inspect
+end
+
+def expect_ok(result, label)
+  dump_status(result)
+  if result.is_a?(Hash) && result['status'] == 'ok'
+    puts green("#{label} successful!")
+  else
+    fail!("#{label}: expected status ok, got #{result.inspect}")
+  end
+end
 
 sdk = build_sdk
 separator('TEST 12: Staking Status / Delegate / Undelegate')
@@ -43,16 +58,14 @@ if summary.is_a?(Hash) && SUMMARY_KEYS.all? { |k| summary.key?(k) }
   puts "  Total pending withdrawal: #{summary['totalPendingWithdrawal']}"
   puts "  N pending withdrawals:    #{summary['nPendingWithdrawals']}"
 else
-  $test_failed = true
-  puts red("FAILED: delegator_summary missing keys #{SUMMARY_KEYS}: #{summary.inspect}")
+  fail!("delegator_summary missing keys #{SUMMARY_KEYS}: #{summary.inspect}")
 end
 puts
 
 # Show delegations for this validator
 delegations = sdk.info.delegations(sdk.exchange.address)
 unless delegations.is_a?(Array)
-  $test_failed = true
-  puts red("FAILED: delegations is not an Array: #{delegations.inspect}")
+  fail!("delegations is not an Array: #{delegations.inspect}")
   delegations = []
 end
 validator_delegation = delegations.find { |d| d['validator']&.downcase == validator.downcase }
@@ -75,8 +88,7 @@ when 'delegate'
     wei: delegate_amount,
     is_undelegate: false
   )
-  dump_status(result)
-  api_error?(result) || puts(green('Delegation successful!'))
+  expect_ok(result, 'Delegation')
 when 'undelegate'
   puts "Undelegating 0.1 HYPE from #{validator}..."
   result = sdk.exchange.token_delegate(
@@ -84,23 +96,20 @@ when 'undelegate'
     wei: delegate_amount,
     is_undelegate: true
   )
-  dump_status(result)
-  api_error?(result) || puts(green('Undelegation successful!'))
+  expect_ok(result, 'Undelegation')
 else
   puts "Wire check: undelegating an impossible #{WIRE_CHECK_WEI} wei (expecting structured rejection)..."
-  result = sdk.exchange.token_delegate(
-    validator: validator,
-    wei: WIRE_CHECK_WEI,
-    is_undelegate: true
-  )
-  if result.is_a?(Hash) && result['status'] == 'err' &&
-     result['response'].to_s.include?(EXPECTED_REJECTION)
-    puts "  Rejected: #{result['response']}"
-    puts green('  Wire check passed (signature recovered to this wallet; balance-class rejection).')
+  result = sdk.exchange.token_delegate(validator: validator, wei: WIRE_CHECK_WEI, is_undelegate: true)
+  agent_text = response_text(result)
+  if result.is_a?(Hash) && result['status'] == 'err' && agent_text.include?(EXPECTED_REJECTION)
+    puts "  Rejected: #{agent_text}"
   else
-    $test_failed = true
-    puts red("Expected err including #{EXPECTED_REJECTION.inspect}, got: #{result.inspect}")
+    fail!("Expected err including #{EXPECTED_REJECTION.inspect}, got: #{result.inspect}")
   end
+  puts '  Random-key control (same call, throwaway key)...'
+  control = throwaway_sdk.exchange.token_delegate(validator: validator, wei: WIRE_CHECK_WEI, is_undelegate: true)
+  assert_signer_dependent('tokenDelegate', agent_text, response_text(control))
+  puts green('  Wire check passed (signature recovered to this wallet; balance-class rejection).') unless $test_failed
   puts
   puts 'Pass "delegate" or "undelegate" as an argument to perform a real (locking) action.'
 end

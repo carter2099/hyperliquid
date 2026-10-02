@@ -12,39 +12,27 @@
 # Candle pushes are trade-driven (no snapshot on subscribe). On timeout the
 # script asks Info#recent_trades('ETH') whether ETH trades landed during the
 # window: trades occurred but too few candle updates -> FAIL; no testnet ETH
-# trade flow -> INCONCLUSIVE (exit 0, marked line).
+# trade flow -> INCONCLUSIVE (exit 75).
 #
 # No private key required (read-only WebSocket).
 #
 # Usage:
 #   ruby scripts/test_14_ws_candle.rb
 
-require_relative '../lib/hyperliquid'
+require_relative 'test_helpers'
 
-def green(text)
-  "\e[32m#{text}\e[0m"
-end
-
-def red(text)
-  "\e[31m#{text}\e[0m"
-end
-
+TEST_NAME = 'Test 14 WebSocket candle'
 REQUIRED_ETH_1M = 2
 TIMEOUT = 120
 SUBS = [%w[ETH 1m], %w[ETH 15m], %w[BTC 1m]].freeze
 CANDLE_KEYS = %w[t T s i o c h l v n].freeze
 
-puts
-puts '=' * 60
-puts 'TEST 14: WebSocket candle Subscription'
-puts '=' * 60
-puts
-puts 'Network: Testnet'
+sdk = build_public_sdk
+separator('TEST 14: WebSocket candle Subscription')
 puts "Subscribing to #{SUBS.map { |c, i| "#{c}/#{i}" }.join(', ')} candles"
 puts "(need #{REQUIRED_ETH_1M} ETH/1m + 1 ETH/15m updates within #{TIMEOUT}s)"
 puts
 
-sdk = Hyperliquid.new(testnet: true)
 received = Hash.new { |h, k| h[k] = [] }
 routing_errors = []
 mutex = Mutex.new
@@ -89,23 +77,20 @@ puts "Updates received: #{counts}"
 
 if routing_errors.any?
   routing_errors.each { |e| puts red("Routing error: #{e}") }
-  puts red('Test 14 FAILED: candle message routed to the wrong subscription or missing keys')
-  exit 1
+  fail!('candle message routed to the wrong subscription or missing keys')
+  test_passed(TEST_NAME)
 end
 
-if satisfied.call
-  puts green('Test 14 WebSocket candle passed!')
-  exit 0
-end
+test_passed(TEST_NAME) if satisfied.call
 
 if received['ETH/1m'].length >= 1 && received['ETH/15m'].empty?
-  puts red('Test 14 FAILED: same-coin second interval not routed (ETH/1m updated, ETH/15m did not)')
-  exit 1
+  fail!('same-coin second interval not routed (ETH/1m updated, ETH/15m did not)')
+  test_passed(TEST_NAME)
 end
 
 if opened_at_ms.nil?
-  puts red('Test 14 FAILED: WebSocket never opened')
-  exit 1
+  fail!('WebSocket never opened')
+  test_passed(TEST_NAME)
 end
 
 window_start = opened_at_ms + 1000
@@ -115,10 +100,8 @@ blocks = sdk.info.recent_trades('ETH').map { |t| t['time'] }
 eth_updates = received['ETH/1m'].length
 
 if eth_updates < [blocks, REQUIRED_ETH_1M].min
-  puts red("Test 14 FAILED: #{blocks} ETH trade blocks on testnet during the window " \
-           "but only #{eth_updates} candle updates")
-  exit 1
+  fail!("#{blocks} ETH trade blocks on testnet during the window but only #{eth_updates} candle updates")
+  test_passed(TEST_NAME)
 end
 
-puts "\e[33mINCONCLUSIVE: only #{blocks} ETH trade block(s) on testnet in #{TIMEOUT}s — no trade flow to observe\e[0m"
-exit 0
+finish_inconclusive(TEST_NAME, "only #{blocks} ETH trade block(s) on testnet in #{TIMEOUT}s — no trade flow to observe")
