@@ -1543,6 +1543,72 @@ module Hyperliquid
       c_validator_action(unregister: nil)
     end
 
+    # --- HIP-3 perp deployer actions (perpDeploy L1 action) ---
+    # All are L1-signed `perpDeploy` actions; none accept vault_address; expires_after propagates.
+    # Coins are full HIP-3 names ("<dex>:<COIN>"). Decimal args accept String (sent verbatim)
+    # or Numeric (normalized via float_to_wire). Integer args are Integer()-coerced and never scaled.
+
+    # Register a new asset on a HIP-3 perp dex (legacy `registerAsset` variant, Python SDK parity).
+    # Passing `schema:` also creates the dex (first registration). `max_gas: nil` bids the current
+    # deploy-auction price; `max_gas: 0` uses a reserve deployment (check perp_deploy_auction_status first).
+    # @param dex [String] Perp dex name (2-4 lowercase chars)
+    # @param coin [String] Full asset name, e.g. "test:TEST0"
+    # @param sz_decimals [Integer] Size decimals
+    # @param oracle_px [String, Numeric] Initial oracle price
+    # @param margin_table_id [Integer] Margin table id
+    # @param only_isolated [Boolean] Whether the asset is isolated-margin only
+    # @param max_gas [Integer, nil] Max gas in native-token wei; nil = current auction price
+    # @param schema [Hash, nil] New-dex schema:
+    #   { full_name:, collateral_token:, oracle_updater: nil, is_star: (optional) }
+    # @return [Hash] Exchange response
+    def perp_deploy_register_asset(dex:, coin:, sz_decimals:, oracle_px:, margin_table_id:, only_isolated:,
+                                   max_gas: nil, schema: nil)
+      asset_request = perp_deploy_asset_request(coin, sz_decimals, oracle_px, margin_table_id)
+      asset_request[:onlyIsolated] = only_isolated
+      perp_deploy_action(:registerAsset, perp_deploy_register_payload(asset_request, dex, max_gas, schema))
+    end
+
+    # Register a new asset with an explicit margin mode (`registerAsset2` variant).
+    # @param margin_mode [String] "strictIsolated", "noCross", or "normal"
+    # (other params as perp_deploy_register_asset)
+    # @return [Hash] Exchange response
+    def perp_deploy_register_asset2(dex:, coin:, sz_decimals:, oracle_px:, margin_table_id:, margin_mode:,
+                                    max_gas: nil, schema: nil)
+      asset_request = perp_deploy_asset_request(coin, sz_decimals, oracle_px, margin_table_id)
+      asset_request[:marginMode] = margin_mode
+      perp_deploy_action(:registerAsset2, perp_deploy_register_payload(asset_request, dex, max_gas, schema))
+    end
+
+    # Push oracle, mark, and external perp prices (`setOracle` variant; ≥2.5s between calls).
+    # @param dex [String] Perp dex name
+    # @param oracle_pxs [Hash{String=>String,Numeric}] coin => oracle price
+    # @param all_mark_pxs [Array<Hash{String=>String,Numeric}>] 0-2 hashes of coin => mark price
+    # @param external_perp_pxs [Hash{String=>String,Numeric}] coin => external perp price (must include all assets)
+    # @return [Hash] Exchange response
+    def perp_deploy_set_oracle(dex:, oracle_pxs:, all_mark_pxs:, external_perp_pxs:)
+      perp_deploy_action(:setOracle, {
+                           dex: dex,
+                           oraclePxs: sorted_coin_pairs(oracle_pxs) { |px| perp_deploy_decimal(px) },
+                           markPxs: all_mark_pxs.map { |pxs| sorted_coin_pairs(pxs) { |px| perp_deploy_decimal(px) } },
+                           externalPerpPxs: sorted_coin_pairs(external_perp_pxs) { |px| perp_deploy_decimal(px) }
+                         })
+    end
+
+    # Halt or resume trading on a HIP-3 asset (`haltTrading` variant).
+    # @param coin [String] Full asset name
+    # @param is_halted [Boolean] true halts trading, false resumes
+    # @return [Hash] Exchange response
+    def perp_deploy_halt_trading(coin:, is_halted:)
+      perp_deploy_action(:haltTrading, { coin: coin, isHalted: is_halted })
+    end
+
+    # Disable (shut down) a HIP-3 perp dex (`disableDex` variant).
+    # @param dex [String] Name of the perp dex to disable
+    # @return [Hash] Exchange response
+    def perp_deploy_disable_dex(dex:)
+      perp_deploy_action(:disableDex, dex)
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!
@@ -1785,6 +1851,51 @@ module Hyperliquid
     # @return [Hash] Normalized builder config with lowercased address
     def normalize_builder(builder)
       { b: builder[:b].downcase, f: builder[:f] }
+    end
+
+    # Sign and post a `perpDeploy` L1 action: { type: 'perpDeploy', <variant_key> => payload }.
+    def perp_deploy_action(variant_key, payload)
+      nonce = timestamp_ms
+      action = { type: 'perpDeploy', variant_key => payload }
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
+      post_action(action, signature, nonce, nil)
+    end
+
+    def perp_deploy_asset_request(coin, sz_decimals, oracle_px, margin_table_id)
+      { coin: coin, szDecimals: Integer(sz_decimals), oraclePx: perp_deploy_decimal(oracle_px),
+        marginTableId: Integer(margin_table_id) }
+    end
+
+    # Key order maxGas, assetRequest, dex, schema; nil maxGas/schema are sent as null.
+    def perp_deploy_register_payload(asset_request, dex, max_gas, schema)
+      { maxGas: max_gas.nil? ? nil : Integer(max_gas), assetRequest: asset_request, dex: dex,
+        schema: perp_dex_schema_wire(schema) }
+    end
+
+    def perp_dex_schema_wire(schema)
+      return nil if schema.nil?
+
+      wire = {
+        fullName: schema.fetch(:full_name),
+        collateralToken: Integer(schema.fetch(:collateral_token)),
+        oracleUpdater: schema[:oracle_updater]&.downcase
+      }
+      wire[:isStar] = schema[:is_star] if schema.key?(:is_star)
+      wire
+    end
+
+    # Hash (or [coin, value] pairs) -> [[coin, converted], ...] sorted by coin.
+    def sorted_coin_pairs(pairs)
+      pairs.to_h.map { |coin, value| [coin.to_s, yield(value)] }.sort_by(&:first)
+    end
+
+    # String sent verbatim (Python parity); Numeric normalized via float_to_wire.
+    def perp_deploy_decimal(value)
+      case value
+      when String then value
+      when Numeric then float_to_wire(value)
+      else raise ArgumentError, "decimal must be String or Numeric. Got: #{value.class}"
+      end
     end
 
     # Convert order type to wire format

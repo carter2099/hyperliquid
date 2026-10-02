@@ -219,6 +219,16 @@ Signed actions (`POST /exchange`). Requires `Hyperliquid.new(private_key: ...)`.
 
 - `hip3_liquidator_transfer(dex:, ntl:, is_deposit:)` - Deposit to or withdraw from a HIP-3 dex's backstop liquidator; `ntl` is in 1e-6 quote units, multiple of 1_000_000_000
 
+### Perp Deploy (HIP-3)
+
+HIP-3 deployer actions: each method signs one variant of the `perpDeploy` L1 action, which only the dex deployer (or a sub-deployer granted that variant) may send. Coins are full `dex:COIN` names (for example `"test:TEST0"`); the SDK never prefixes or resolves them. Coin-keyed Hash arguments are converted to `[coin, value]` pairs and sorted by coin for you. Decimal arguments take a String (sent verbatim) or a Numeric (normalized like prices). Integer arguments are never scaled: `max_gas` is in native-token wei (HYPE has 8 wei decimals), and open-interest caps and margin-tier `lower_bound` are in 1e-6 collateral units. `max_gas: 0` uses a reserve deployment at the current auction price. `expires_after` is honoured; there is no `vault_address:`. Related Info queries: `perp_deploy_auction_status`, `perp_dexs`, `perp_dex_limits`, `perp_dex_status`.
+
+- `perp_deploy_register_asset(dex:, coin:, sz_decimals:, oracle_px:, margin_table_id:, only_isolated:, max_gas: nil, schema: nil)` - Register an asset (legacy `registerAsset`, Python SDK parity); `max_gas: nil` bids the current auction price; `schema: { full_name:, collateral_token:, oracle_updater: nil }` also creates the dex on its first registration (`oracle_updater` is lowercased; an optional `is_star:` key is passed through)
+- `perp_deploy_register_asset2(dex:, coin:, sz_decimals:, oracle_px:, margin_table_id:, margin_mode:, max_gas: nil, schema: nil)` - Register an asset with `margin_mode:` `'strictIsolated'`, `'noCross'` or `'normal'` (`registerAsset2`); other arguments as `perp_deploy_register_asset`
+- `perp_deploy_set_oracle(dex:, oracle_pxs:, all_mark_pxs:, external_perp_pxs:)` - Push prices: `oracle_pxs` and `external_perp_pxs` are `{ coin => price }` (`external_perp_pxs` must cover every asset); `all_mark_pxs` is an Array of 0-2 such Hashes; at most one call per 2.5s
+- `perp_deploy_halt_trading(coin:, is_halted:)` - Halt (`true`) or resume (`false`) trading on an asset
+- `perp_deploy_disable_dex(dex:)` - Disable (shut down) a perp dex
+
 ### Outcomes (HIP-4)
 
 - `split_outcome(outcome:, amount:)` - Split quote tokens into Yes and No shares

@@ -3356,6 +3356,193 @@ RSpec.describe Hyperliquid::Exchange do
     end
   end
 
+  # Byte-parity fixtures captured 2026-10-01 against hyperliquid-python-sdk 0.24.0 (master 2fdb18f95176),
+  # eth_account 0.13.7, msgpack 1.2.3 — see ~/agent-state/hyperliquid-sdk-fixtures/capture_perp_deploy_signatures.py.
+  # P* fixtures come from the Python SDK's own perp_deploy_* methods; D* are hand-built in live-explorer key order
+  # and signed with the Python SDK's sign_l1_action. Pre-verified 19/19 against the current Ruby Signer.
+  describe 'perpDeploy (HIP-3 deployer actions)' do
+    let(:ok_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
+    let(:fixture_private_key) { '0x1111111111111111111111111111111111111111111111111111111111111111' }
+    let(:fixture_signer) { Hyperliquid::Signing::Signer.new(private_key: fixture_private_key, testnet: false) }
+    let(:fixture_exchange) { described_class.new(client: client, signer: fixture_signer, info: info, testnet: false) }
+    let(:fixture_nonce) { 1_700_000_000_000 }
+
+    before { allow(fixture_exchange).to receive(:timestamp_ms).and_return(fixture_nonce) }
+
+    # Captures the posted body; returns [action JSON string in wire key order, parsed body].
+    def capture_perp_deploy
+      raw = nil
+      stub_request(:post, exchange_endpoint)
+        .with { |req| raw = req.body }
+        .to_return(status: 200, body: ok_response.to_json)
+      result = yield
+      expect(result['status']).to eq('ok')
+      body = JSON.parse(raw)
+      [JSON.generate(body['action']), body]
+    end
+
+    def expect_signature(body, sig_r, sig_s, sig_v)
+      expect(body['signature']).to eq('r' => sig_r, 's' => sig_s, 'v' => sig_v)
+      expect(body['nonce']).to eq(fixture_nonce)
+      expect(body).not_to have_key('vaultAddress')
+    end
+
+    it 'P1: registerAsset with max_gas and no schema matches the Python SDK' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_register_asset(
+          dex: 'test', max_gas: 1_000_000_000_000, coin: 'test:TEST0', sz_decimals: 2,
+          oracle_px: '10', margin_table_id: 10, only_isolated: false
+        )
+      end
+      expect(json).to eq(
+        '{"type":"perpDeploy","registerAsset":{"maxGas":1000000000000,"assetRequest":' \
+        '{"coin":"test:TEST0","szDecimals":2,"oraclePx":"10","marginTableId":10,"onlyIsolated":false},' \
+        '"dex":"test","schema":null}}'
+      )
+      expect_signature(body,
+                       '0x0008115d5c4d25e4f3b59dd1cbab8333160bd910f807d527fd127d81d8af7bb9',
+                       '0x247732d929724cd4cd39290e04494e0bd96a7093572bf7a3fcfa5494f0cce184', 27)
+    end
+
+    it 'P2: registerAsset with schema sends null maxGas and lowercases oracleUpdater' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_register_asset(
+          dex: 'test', coin: 'test:TEST0', sz_decimals: 2, oracle_px: 10, margin_table_id: 10,
+          only_isolated: true,
+          schema: { full_name: 'test dex', collateral_token: 0,
+                    oracle_updater: '0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A' }
+        )
+      end
+      expect(json).to eq(
+        '{"type":"perpDeploy","registerAsset":{"maxGas":null,"assetRequest":' \
+        '{"coin":"test:TEST0","szDecimals":2,"oraclePx":"10","marginTableId":10,"onlyIsolated":true},' \
+        '"dex":"test","schema":{"fullName":"test dex","collateralToken":0,' \
+        '"oracleUpdater":"0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a"}}}'
+      )
+      expect_signature(body,
+                       '0x88f7ad23cfbbf1071abe334c9800c730b2f3bb931efcd96b887c187dda6452fb',
+                       '0x32d59c5e07a8cb4d1496693c43f86e023d988f19b0ef8e5698a5604b14d01f89', 27)
+    end
+
+    it 'D1: registerAsset2 normalizes a numeric oracle_px and sends null schema' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_register_asset2(
+          dex: 'test', coin: 'test:TEST1', sz_decimals: 3, oracle_px: 2.5, margin_table_id: 20,
+          margin_mode: 'strictIsolated'
+        )
+      end
+      expect(json).to eq(
+        '{"type":"perpDeploy","registerAsset2":{"maxGas":null,"assetRequest":' \
+        '{"coin":"test:TEST1","szDecimals":3,"oraclePx":"2.5","marginTableId":20,"marginMode":"strictIsolated"},' \
+        '"dex":"test","schema":null}}'
+      )
+      expect_signature(body,
+                       '0x25f3c3bfbf5d184b7ca6e89cda796c9de6ddd162091cb76c84674283215e480c',
+                       '0x4011bfa29eb8c1fe86f77477470e75e1dbfeffb7efac48ffb288a1ddb0e3cf3b', 27)
+    end
+
+    it 'D2: registerAsset2 with schema sends null oracleUpdater and no isStar' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_register_asset2(
+          dex: 'test', max_gas: 500_000_000, coin: 'test:TEST1', sz_decimals: 3, oracle_px: '2.5',
+          margin_table_id: 20, margin_mode: 'noCross', schema: { full_name: 'test dex', collateral_token: 0 }
+        )
+      end
+      expect(json).to eq(
+        '{"type":"perpDeploy","registerAsset2":{"maxGas":500000000,"assetRequest":' \
+        '{"coin":"test:TEST1","szDecimals":3,"oraclePx":"2.5","marginTableId":20,"marginMode":"noCross"},' \
+        '"dex":"test","schema":{"fullName":"test dex","collateralToken":0,"oracleUpdater":null}}}'
+      )
+      expect(json).not_to include('isStar')
+      expect_signature(body,
+                       '0x2f780e22da1a7e0ac38031e760729d669f078fd1dd9d12d262ec22c0cb5cd8a0',
+                       '0x1800cbaf5709af341ee255b9f6ee0b1869ca30d5c0f63341c4ed8193f36f0660', 27)
+    end
+
+    it 'appends isStar after oracleUpdater when the schema has :is_star' do
+      json, = capture_perp_deploy do
+        exchange.perp_deploy_register_asset2(
+          dex: 'test', coin: 'test:TEST1', sz_decimals: 3, oracle_px: '2.5', margin_table_id: 20,
+          margin_mode: 'noCross', schema: { full_name: 'x', collateral_token: 0, is_star: true }
+        )
+      end
+      expect(json).to include(
+        '"schema":{"fullName":"x","collateralToken":0,"oracleUpdater":null,"isStar":true}'
+      )
+    end
+
+    it 'raises ArgumentError for a non-String, non-Numeric decimal without posting' do
+      expect do
+        exchange.perp_deploy_register_asset(
+          dex: 'test', coin: 'test:TEST0', sz_decimals: 2, oracle_px: :bad, margin_table_id: 10,
+          only_isolated: false
+        )
+      end.to raise_error(ArgumentError, /decimal must be String or Numeric/)
+      expect(a_request(:post, exchange_endpoint)).not_to have_been_made
+    end
+
+    it 'P3: setOracle sorts each price list and normalizes numerics' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_set_oracle(
+          dex: 'test',
+          oracle_pxs: { 'test:TEST1' => 1, 'test:TEST0' => 12.0 },
+          all_mark_pxs: [{ 'test:TEST1' => '3', 'test:TEST0' => '14' }],
+          external_perp_pxs: { 'test:TEST0' => '12.1', 'test:TEST1' => '1.1' }
+        )
+      end
+      expect(json).to eq(
+        '{"type":"perpDeploy","setOracle":{"dex":"test",' \
+        '"oraclePxs":[["test:TEST0","12"],["test:TEST1","1"]],' \
+        '"markPxs":[[["test:TEST0","14"],["test:TEST1","3"]]],' \
+        '"externalPerpPxs":[["test:TEST0","12.1"],["test:TEST1","1.1"]]}}'
+      )
+      expect_signature(body,
+                       '0x29a1917249c8e0b179fdc155f20fb7523900d4c287fa9d9755d914069fd00bdf',
+                       '0x7339a3eea1e3f106f9b79105f2e6d615108f6a8c3b88b1030f8ca3255caef9ba', 27)
+    end
+
+    it 'setOracle with no mark prices sends an empty markPxs list' do
+      json, = capture_perp_deploy do
+        exchange.perp_deploy_set_oracle(
+          dex: 'test', oracle_pxs: { 'test:A' => '1' }, all_mark_pxs: [], external_perp_pxs: { 'test:A' => '1' }
+        )
+      end
+      expect(json).to include('"markPxs":[]')
+    end
+
+    it 'D6: haltTrading sends coin and isHalted' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_halt_trading(coin: 'test:A', is_halted: true)
+      end
+      expect(json).to eq('{"type":"perpDeploy","haltTrading":{"coin":"test:A","isHalted":true}}')
+      expect_signature(body,
+                       '0x23a967f621a19a85e5d7d26e605902e28f92c2f9894b9e573c09d63f9afec93a',
+                       '0x2eba0cf40566517e588dc6f8d939b49ad164141312fb79fd2579ff96e62eaf91', 27)
+    end
+
+    it 'D15: disableDex sends the dex name as a bare string' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_disable_dex(dex: 'test')
+      end
+      expect(json).to eq('{"type":"perpDeploy","disableDex":"test"}')
+      expect_signature(body,
+                       '0x94ec2a17a9ddf3eb620130f783241421d6ba5d4bb3ae05a5a2cbf89c80157c88',
+                       '0x34688c81da1cc2ed1678b0ec0750e484680fc55f6b02579dd19d571696b13fb4', 28)
+    end
+
+    it 'D16: propagates expires_after into the hash and the posted body' do
+      fixture_exchange.expires_after = 1_700_000_060_000
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_halt_trading(coin: 'test:A', is_halted: false)
+      end
+      expect(json).to eq('{"type":"perpDeploy","haltTrading":{"coin":"test:A","isHalted":false}}')
+      expect(body['expiresAfter']).to eq(1_700_000_060_000)
+      expect_signature(body,
+                       '0x6bb02fb51b10d56c6bef6f39c9719a77ce77720440c24108c5ef6d834654e88b',
+                       '0x5e2307268178d684b3cede5b8f5ecc446ac709844fb529e9895e5a2353395409', 28)
+    end
+  end
+
   describe '#c_deposit' do
     let(:c_deposit_response) { { 'status' => 'ok', 'response' => { 'type' => 'default' } } }
 

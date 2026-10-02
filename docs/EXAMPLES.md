@@ -197,6 +197,29 @@ oi_capped = sdk.info.perps_at_open_interest_cap
 auction = sdk.info.perp_deploy_auction_status
 # => { "startTimeSeconds" => ..., "durationSeconds" => ..., "startGas" => "500.0", ... }
 
+# Deploy a HIP-3 perp dex (deployer wallet only; mirrors the Python SDK's examples/perp_deploy.py).
+# The first registration on a new dex passes `schema:` and pays the deploy-auction gas.
+# `auction` comes from perp_deploy_auction_status above; `max_gas: nil` bids its currentGas.
+sdk.exchange.perp_deploy_register_asset2(
+  dex: "test", coin: "test:TEST0", sz_decimals: 2, oracle_px: "10.0", margin_table_id: 10,
+  margin_mode: "noCross",
+  max_gas: 1_000_000_000_000, # native-token wei: 10k HYPE
+  schema: { full_name: "test dex", collateral_token: 0, oracle_updater: sdk.exchange.address }
+)
+# => { "status" => "ok", "response" => { "type" => "default" } }
+
+# Push oracle prices (at most once every 2.5s); coins are full "dex:COIN" names.
+# A real oracle updater runs this continuously.
+3.times do
+  sdk.exchange.perp_deploy_set_oracle(
+    dex: "test",
+    oracle_pxs: { "test:TEST0" => "12.0" },
+    all_mark_pxs: [{ "test:TEST0" => "12.1" }],
+    external_perp_pxs: { "test:TEST0" => "12.0" }
+  )
+  sleep 3
+end
+
 # Retrieve User's Active Asset Data
 aad = sdk.info.active_asset_data(user_address, "APT")
 # => { "user" => user_address, "coin" => "APT", "leverage" => { "type" => "cross", "value" => 3 }, ... }
