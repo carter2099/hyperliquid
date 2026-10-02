@@ -5179,7 +5179,16 @@ RSpec.describe Hyperliquid::Exchange do
                                     { spot: 567, start_px: 2.5, order_sz: 4.25, n_orders: 100 }],
       'register_hyperliquidity_seeded' => [:spot_deploy_register_hyperliquidity,
                                            { spot: 567, start_px: '2.5', order_sz: '4.25', n_orders: 100,
-                                             n_seeded_levels: 10 }]
+                                             n_seeded_levels: 10 }],
+      # SP2 rows
+      'set_deployer_trading_fee_share' => [:spot_deploy_set_deployer_trading_fee_share,
+                                           { token: 1234, share: '0.012%' }],
+      'enable_freeze_privilege' => [:spot_deploy_enable_freeze_privilege, { token: 1234 }],
+      'freeze_user' => [:spot_deploy_freeze_user,
+                        { token: 1234, user: '0xAbCdEf0000000000000000000000000000000002', freeze: true }],
+      'revoke_freeze_privilege' => [:spot_deploy_revoke_freeze_privilege, { token: 1234 }],
+      'enable_quote_token' => [:spot_deploy_enable_quote_token, { token: 1234 }],
+      'disable_quote_token' => [:spot_deploy_disable_quote_token, { token: 1234 }]
     }
 
     expected = {
@@ -5254,6 +5263,50 @@ RSpec.describe Hyperliquid::Exchange do
         r: '0xdfdceba95307de8239457e3bfd12440832c8fb9c1dcf96986c99b9542bc7ffdf',
         s: '0x7736643a9abd96f5fb21b0d84671765f3ead1d3d586388b232c7cc181abdec45',
         v: 28
+      },
+      # SP2 rows
+      'set_deployer_trading_fee_share' => {
+        json: '{"type":"spotDeploy","setDeployerTradingFeeShare":{"token":1234,"share":"0.012%"}}',
+        hash: '0x630c963fb507b10b64659b412007dcccaf69756b727caed0e5c5e64ffc3890e9',
+        r: '0x6ef93b1ddf08d887c9bea2cd0ac45088cec8c316917929b4c94c23fca1ef2c6d',
+        s: '0x7a7a4027278f85a4246f58d0825a719b190bb1c257c5a47f968ca22883fd97ee',
+        v: 28
+      },
+      'enable_freeze_privilege' => {
+        json: '{"type":"spotDeploy","enableFreezePrivilege":{"token":1234}}',
+        hash: '0xccb1580d63a883781b145fe169c575304db2d5a9b9d205c88f25c1e9e9031714',
+        r: '0x5b777418e0389307339176e4c41beb61221e7be37fef5ee3f57e2c184a66f283',
+        s: '0x78606fed675470afa16c0ca7cb4a7780a106280616e77792e3dbf196a10842e6',
+        v: 27
+      },
+      'freeze_user' => {
+        json: '{"type":"spotDeploy","freezeUser":{"token":1234,"user":"0xabcdef0000000000000000000000000000000002","' \
+              'freeze":true}}',
+        hash: '0xcc493b758883341595b3c56e4dcafa76f11879c71342a796ae55d4580ba54271',
+        r: '0x2f6a4f52f30735772e5cf5df0e4c9086feb3fdf293e18225decf6ffdf1e1640a',
+        s: '0x06130ed30b9ea5a2d9fb63083cb6fb79d724ce7e7eedfd070cd2b08140e2af57',
+        v: 27
+      },
+      'revoke_freeze_privilege' => {
+        json: '{"type":"spotDeploy","revokeFreezePrivilege":{"token":1234}}',
+        hash: '0x5ab471246069a064573a44b52964644696cd3120bed934131c1fc447375a26b4',
+        r: '0x33ab3478a07d9eec43b8871d867efd2014a6267501ba2aa1e444e692adacf19d',
+        s: '0x5b389425f68ca39bf82ea5f8d7a859be6db1f956e569bedf70f86df8a6a027ea',
+        v: 27
+      },
+      'enable_quote_token' => {
+        json: '{"type":"spotDeploy","enableQuoteToken":{"token":1234}}',
+        hash: '0x753b4c5b81c085e361cc147af27d4edefa9bc995929cafb31187e1ea07c6b651',
+        r: '0xc0b784d4da2ee407ba7a02befb816b1a07bc8ac4752ce6521fd54faee6382de2',
+        s: '0x39fa8d190745c7fc68fc5c47fcff9ecd8175421a9327cf67366093268c0e3ddf',
+        v: 27
+      },
+      'disable_quote_token' => {
+        json: '{"type":"spotDeploy","disableQuoteToken":{"token":1234}}',
+        hash: '0x9f5772fa573c3a9b85c6bd6529e9449ee7592e7b502a21738ae1de031a0a027c',
+        r: '0xe0b9b27d470e83e67016c0359ef977341e1d81cfdacf800bfa775f5232c8742a',
+        s: '0x27127967f19aa50d6912b9e9a564df776930dc4e64d0f4e826dfac35824820a8',
+        v: 27
       }
     }
 
@@ -5268,6 +5321,17 @@ RSpec.describe Hyperliquid::Exchange do
         action = JSON.parse(fx[:json], symbolize_names: true)
         expect(Hyperliquid::Signing::Signer.compute_action_hash(action, 1_700_000_000_000)).to eq(fx[:hash])
       end
+    end
+
+    it 'enable_quote_token_expires propagates expiresAfter into the hash' do
+      fixture_exchange.expires_after = 1_700_000_060_000
+      fixture_exchange.spot_deploy_enable_quote_token(token: 1234)
+      expect(captured['expiresAfter']).to eq(1_700_000_060_000)
+      expect(captured['signature']).to eq(
+        'r' => '0x17c62d7218235653893afcba20c5b60e84e6c8071e03fb0545dd653359630a7d',
+        's' => '0x3e7a998f305321a510ea121b71be5f821b9529f94adadddd2d84d9a1306327f2',
+        'v' => 28
+      )
     end
   end
 

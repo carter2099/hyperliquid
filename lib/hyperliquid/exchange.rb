@@ -1900,6 +1900,53 @@ module Hyperliquid
       spot_deploy_action(:registerHyperliquidity, register)
     end
 
+    # Set the deployer trading fee share (`spotDeploy.setDeployerTradingFeeShare`, L1).
+    # @param token [Integer] Token index
+    # @param share [String] Percent string, e.g. "0.012%" or "100%" (may only decrease)
+    # @return [Hash] Exchange response
+    def spot_deploy_set_deployer_trading_fee_share(token:, share:)
+      spot_deploy_action(:setDeployerTradingFeeShare, { token: Integer(token), share: share })
+    end
+
+    # Enable the freeze privilege (`spotDeploy.enableFreezePrivilege`, L1).
+    # Must be sent before genesis (server: "Genesis error: genesis already happened").
+    # @param token [Integer] Token index
+    # @return [Hash] Exchange response
+    def spot_deploy_enable_freeze_privilege(token:)
+      spot_deploy_action(:enableFreezePrivilege, { token: Integer(token) })
+    end
+
+    # Freeze or unfreeze a user's balance of the token (`spotDeploy.freezeUser`, L1).
+    # @param token [Integer] Token index
+    # @param user [String] User address (lowercased)
+    # @param freeze [Boolean] true to freeze, false to unfreeze
+    # @return [Hash] Exchange response
+    def spot_deploy_freeze_user(token:, user:, freeze:)
+      spot_deploy_action(:freezeUser, { token: Integer(token), user: user.downcase, freeze: freeze })
+    end
+
+    # Permanently give up the freeze privilege (`spotDeploy.revokeFreezePrivilege`, L1).
+    # @param token [Integer] Token index
+    # @return [Hash] Exchange response
+    def spot_deploy_revoke_freeze_privilege(token:)
+      spot_deploy_action(:revokeFreezePrivilege, { token: Integer(token) })
+    end
+
+    # Make the token a permissionless quote token (`spotDeploy.enableQuoteToken`, L1).
+    # Irreversible per protocol docs; requires zero deployer fee share and quote-token staking.
+    # @param token [Integer] Token index
+    # @return [Hash] Exchange response
+    def spot_deploy_enable_quote_token(token:)
+      spot_deploy_action(:enableQuoteToken, { token: Integer(token) })
+    end
+
+    # Disable the token as a quote token (`spotDeploy.disableQuoteToken`, L1).
+    # @param token [Integer] Token index
+    # @return [Hash] Exchange response
+    def spot_deploy_disable_quote_token(token:)
+      spot_deploy_action(:disableQuoteToken, { token: Integer(token) })
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!

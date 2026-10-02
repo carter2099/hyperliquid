@@ -274,6 +274,12 @@ All are L1 `spotDeploy` actions; `expires_after` is honored; no `vault_address`.
 - `spot_deploy_genesis(token:, max_supply:, no_hyperliquidity: false)` - Finalize genesis; wei amounts are Integer or String
 - `spot_deploy_register_spot(base_token:, quote_token:)` - Register a spot pair; `response.data` is the spot index
 - `spot_deploy_register_hyperliquidity(spot:, start_px:, order_sz:, n_orders:, n_seeded_levels: nil)` - Seed Hyperliquidity for a spot pair
+- `spot_deploy_set_deployer_trading_fee_share(token:, share:)` - Set the deployer fee share (percent String, may only decrease)
+- `spot_deploy_enable_freeze_privilege(token:)` - Enable freezing (before genesis)
+- `spot_deploy_freeze_user(token:, user:, freeze:)` - Freeze or unfreeze a user
+- `spot_deploy_revoke_freeze_privilege(token:)` - Permanently give up the freeze privilege
+- `spot_deploy_enable_quote_token(token:)` - Make the token a permissionless quote token (irreversible)
+- `spot_deploy_disable_quote_token(token:)` - Disable the token as a quote token
 
 ### Rate Limits and Nonces
 

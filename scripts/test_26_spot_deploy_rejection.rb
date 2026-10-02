@@ -23,10 +23,10 @@ PROBES = [
   # SP1
   [:spot_deploy_genesis, { token: 0, max_supply: '1' }],
   [:spot_deploy_user_genesis, { token: 0, user_and_wei: [], existing_token_and_wei: [],
-                                blacklist_users: [['0x0000000000000000000000000000000000000001', false]] }]
-  # SP2: append
-  #   [:spot_deploy_set_deployer_trading_fee_share, { token: 0, share: '100%' }],
-  #   [:spot_deploy_freeze_user, { token: 0, user: '0x0000000000000000000000000000000000000001', freeze: false }]
+                                blacklist_users: [['0x0000000000000000000000000000000000000001', false]] }],
+  # SP2
+  [:spot_deploy_set_deployer_trading_fee_share, { token: 0, share: '100%' }],
+  [:spot_deploy_freeze_user, { token: 0, user: '0x0000000000000000000000000000000000000001', freeze: false }]
   # SP3: append
   #   [:spot_deploy_enable_aligned_quote_token, { token: 0 }],
   #   [:spot_deploy_request_evm_contract, { token: 0, address: '0x0000000000000000000000000000000000000001',
