@@ -1705,24 +1705,23 @@ RSpec.describe Hyperliquid::Info do
   describe '#aligned_quote_token_info' do
     let(:token) { 1328 }
 
-    it 'requests aligned quote token info for a token index' do
-      expected_response = {
-        'isAligned' => true,
-        'firstAlignedTime' => 1_700_000_000_000,
-        'evmMintedSupply' => '1000000.5',
-        'dailyAmountOwed' => [
-          ['2026-04-24', '12.34'],
-          ['2026-04-25', '15.67']
-        ],
-        'predictedRate' => '0.0125'
-      }
+    around do |example|
+      previous = Warning[:deprecated]
+      Warning[:deprecated] = true
+      example.run
+    ensure
+      Warning[:deprecated] = previous
+    end
 
+    it 'emits a deprecation warning and still posts the request' do
       stub_request(:post, info_endpoint)
         .with(body: { type: 'alignedQuoteTokenInfo', token: token }.to_json)
-        .to_return(status: 200, body: expected_response.to_json)
+        .to_return(status: 200, body: { 'isAligned' => true }.to_json)
 
-      result = info.aligned_quote_token_info(token)
-      expect(result).to eq(expected_response)
+      result = nil
+      expect { result = info.aligned_quote_token_info(token) }
+        .to output(/aligned_quote_token_info is deprecated.*removed in 2\.0\.0/).to_stderr
+      expect(result).to eq('isAligned' => true)
     end
   end
 

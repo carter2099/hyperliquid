@@ -93,7 +93,7 @@ Predicate methods follow Ruby style (`vip?`, `connected?`, `testnet?`) — not `
 
 ### CI
 
-GitHub Actions (`.github/workflows/main.yml`): runs `bundle exec rake` (tests + lint) on the Ruby matrix defined in that workflow, for pushes to `main` and on all PRs. The release workflow creates GitHub releases from `CHANGELOG.md` on version tags. Dependabot checks Bundler and GitHub Actions dependencies weekly with a 14-day default cooldown; Bundler major updates use a 30-day cooldown.
+GitHub Actions (`.github/workflows/main.yml`): runs `bundle exec rake` (tests + lint) on Ruby 3.3 and 3.4 for pushes to `main` and `dev` and on all PRs. The `Ruby 3.3` and `Ruby 3.4` job names are required status checks in the `steward-auto-merge-gate` ruleset on `main` — never rename the job or drop those versions without updating that ruleset. The release workflow creates GitHub releases from `CHANGELOG.md` on version tags. Dependabot checks Bundler and GitHub Actions dependencies weekly with a 14-day default cooldown; Bundler major updates use a 30-day cooldown.
 
 ### rbsecp256k1 git source
 
@@ -101,7 +101,7 @@ The `Gemfile` pins `rbsecp256k1` to Carter's fork (`carter2099/rbsecp256k1`, ful
 
 ## Release Flow
 
-Releases happen from `main`. Day-to-day work lands on `dev`, then `dev` is merged into `main` and the version commit is pushed. `CHANGELOG.md` follows Keep-a-Changelog conventions; `lib/hyperliquid/version.rb` is the single source of version truth (gemspec reads it). Releases are atomic: only after the `Ruby` workflow is green on main and the gem is built is the RubyGems OTP requested; `gem push` goes first and the `vX.Y.Z` tag is pushed only after it succeeds. The tag push triggers the GitHub release workflow, so a failed gem push leaves no tag and no GitHub Release.
+Releases happen from `main`. Day-to-day work lands on `dev`, then `dev` is merged into `main` and the version commit is pushed. `CHANGELOG.md` follows Keep-a-Changelog conventions; `lib/hyperliquid/version.rb` is the single source of version truth (gemspec reads it). Releases are atomic: only after the `Ruby` workflow is green on main and the gem is built is the RubyGems OTP requested; `gem push` goes first and the `vX.Y.Z` tag is pushed only after it succeeds. The tag push triggers the GitHub release workflow, so a failed gem push leaves no tag and no GitHub Release. The gemspec `spec.files` is an allowlist (`lib/`, `docs/`, `README.md`, `CHANGELOG.md`, `LICENSE.txt`, `SECURITY.md`); new top-level files are not packaged unless added there. RubyGems ships file modes verbatim, so the release flow runs `git ls-files -z | xargs -0 chmod a+r` before `gem build` and checks the built gem for `-rw-------` entries (1.9.2 shipped `CHANGELOG.md`, `CLAUDE.md` and `lib/hyperliquid/version.rb` as `0600`).
 
 ## Additional Docs
 
