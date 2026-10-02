@@ -1660,6 +1660,50 @@ module Hyperliquid
       perp_deploy_action(:setOpenInterestCaps, sorted_coin_pairs(caps) { |cap| cap.nil? ? nil : Integer(cap) })
     end
 
+    # Set the fee recipient of a HIP-3 perp dex (`setFeeRecipient` variant).
+    # @param dex [String] Perp dex name
+    # @param fee_recipient [String] Fee recipient address (lowercased)
+    # @return [Hash] Exchange response
+    def perp_deploy_set_fee_recipient(dex:, fee_recipient:)
+      perp_deploy_action(:setFeeRecipient, { dex: dex, feeRecipient: fee_recipient.downcase })
+    end
+
+    # Per-asset deployer fee share + growth mode (`setDeployerFees`; mainnet: one change per 30 days).
+    # @param fees [Hash{String=>Hash}] coin => { scale: String|Numeric, growth_mode: Boolean };
+    #   scale 0..3, or <10 with growth mode
+    # @return [Hash] Exchange response
+    def perp_deploy_set_deployer_fees(fees:)
+      perp_deploy_action(:setDeployerFees, sorted_coin_pairs(fees) do |fee|
+        { scale: perp_deploy_decimal(fee.fetch(:scale)), growthMode: fee.fetch(:growth_mode) }
+      end)
+    end
+
+    # Grant or revoke sub-deployer permissions (`setSubDeployers` variant); entry order is preserved.
+    # @param dex [String] Perp dex name
+    # @param sub_deployers [Array<Hash>] { variant:, user:, allowed: Boolean }; variant is a String
+    #   (e.g. "setOracle") or a Hash (e.g. { hip3Star: "order" }) passed through verbatim; user is lowercased
+    # @return [Hash] Exchange response
+    def perp_deploy_set_sub_deployers(dex:, sub_deployers:)
+      entries = sub_deployers.map do |entry|
+        { variant: entry.fetch(:variant), user: entry.fetch(:user).downcase, allowed: entry.fetch(:allowed) }
+      end
+      perp_deploy_action(:setSubDeployers, { dex: dex, subDeployers: entries })
+    end
+
+    # Set an asset's annotation (`setPerpAnnotation` variant).
+    # @param coin [String] Full asset name
+    # @param category [String] ≤15 chars
+    # @param description [String] ≤400 chars
+    # @param display_name [String, nil] ≤9 chars; nil sends null
+    # @param keywords [Array<String>] ≤2 keywords, each ≤10 chars
+    # @return [Hash] Exchange response
+    def perp_deploy_set_perp_annotation(coin:, category:, description:, display_name: nil, keywords: [])
+      perp_deploy_action(:setPerpAnnotation, {
+                           coin: coin, category: category, description: description,
+                           displayName: display_name, keywords: keywords
+                         })
+    end
+
     # Disable (shut down) a HIP-3 perp dex (`disableDex` variant).
     # @param dex [String] Name of the perp dex to disable
     # @return [Hash] Exchange response

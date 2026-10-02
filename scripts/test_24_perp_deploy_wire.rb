@@ -102,4 +102,22 @@ check_wire('perp_deploy_set_open_interest_caps') do
   sdk.exchange.perp_deploy_set_open_interest_caps(caps: { coin => 1_000_000 })
 end
 
+check_wire('perp_deploy_set_fee_recipient') do
+  sdk.exchange.perp_deploy_set_fee_recipient(dex: dex, fee_recipient: sdk.exchange.address)
+end
+
+check_wire('perp_deploy_set_deployer_fees') do
+  sdk.exchange.perp_deploy_set_deployer_fees(fees: { coin => { scale: '1', growth_mode: false } })
+end
+
+check_wire('perp_deploy_set_sub_deployers') do
+  sdk.exchange.perp_deploy_set_sub_deployers(
+    dex: dex, sub_deployers: [{ variant: 'setOracle', user: sdk.exchange.address, allowed: false }]
+  )
+end
+
+check_wire('perp_deploy_set_perp_annotation') do
+  sdk.exchange.perp_deploy_set_perp_annotation(coin: coin, category: 'test', description: 'wire check', keywords: [])
+end
+
 test_passed('Test 24 perp_deploy wire check')

@@ -234,6 +234,10 @@ HIP-3 deployer actions: each method signs one variant of the `perpDeploy` L1 act
 - `perp_deploy_set_margin_table_ids(margin_table_ids:)` - Assign margin tables: `{ coin => margin_table_id }` (non-zero Integer ids)
 - `perp_deploy_set_margin_modes(margin_modes:)` - Set margin modes: `{ coin => mode }` with `'strictIsolated'`, `'noCross'` or `'normal'`
 - `perp_deploy_set_open_interest_caps(caps:)` - Set open interest caps: `{ coin => cap }` in 1e-6 collateral units (at least 1_000_000); a `nil` cap removes the custom cap
+- `perp_deploy_set_fee_recipient(dex:, fee_recipient:)` - Set the dex fee recipient address (lowercased)
+- `perp_deploy_set_deployer_fees(fees:)` - Set per-asset deployer fees: `{ coin => { scale:, growth_mode: } }`; `scale` is a decimal (0-3, or below 10 with growth mode), `growth_mode` a Boolean; on mainnet at most one change per 30 days
+- `perp_deploy_set_sub_deployers(dex:, sub_deployers:)` - Grant or revoke sub-deployer permissions: an Array of `{ variant:, user:, allowed: }` Hashes, sent in the given order; `variant` is a variant name String (for example `'setOracle'`) or a Hash (for example `{ hip3Star: 'order' }`) passed through verbatim; `user` is lowercased
+- `perp_deploy_set_perp_annotation(coin:, category:, description:, display_name: nil, keywords: [])` - Annotate an asset: `category` up to 15 chars, `description` up to 400, `display_name` up to 9 (`nil` sends null), up to 2 `keywords` of up to 10 chars each
 - `perp_deploy_disable_dex(dex:)` - Disable (shut down) a perp dex
 
 ### Outcomes (HIP-4)

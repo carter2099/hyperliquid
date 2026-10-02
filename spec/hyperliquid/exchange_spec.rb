@@ -3602,6 +3602,84 @@ RSpec.describe Hyperliquid::Exchange do
                        '0x77a48e15a935cdb8681591a064c63c6607e4c6049a21bd393dfafca6dd342faa', 27)
     end
 
+    it 'D9: setFeeRecipient lowercases the recipient' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_set_fee_recipient(
+          dex: 'test', fee_recipient: '0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A'
+        )
+      end
+      expect(json).to eq(
+        '{"type":"perpDeploy","setFeeRecipient":{"dex":"test",' \
+        '"feeRecipient":"0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a"}}'
+      )
+      expect_signature(body,
+                       '0xa0bd1cf078ace3162be390db3c33b2e36548cfc76202a83ee8754e1af5fc09d7',
+                       '0x1447f036b2f1927d558267d3f1e3404fb44d51235b19531d096e4a9b37bf91b9', 28)
+    end
+
+    it 'D13: setDeployerFees sorts by coin and normalizes scale' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_set_deployer_fees(
+          fees: { 'test:B' => { scale: '3.01', growth_mode: true }, 'test:A' => { scale: 0.5, growth_mode: false } }
+        )
+      end
+      expect(json).to eq(
+        '{"type":"perpDeploy","setDeployerFees":[["test:A",{"scale":"0.5","growthMode":false}],' \
+        '["test:B",{"scale":"3.01","growthMode":true}]]}'
+      )
+      expect_signature(body,
+                       '0xbe7b0c152491cbb0bf81a18459057dc0ec00e5879c67725e48a3722f6703fe0f',
+                       '0x5bad12e9690590368c26e2b9c531044ae0e4bff0ccc235ebb929e064a998ea5c', 27)
+    end
+
+    it 'D11: setSubDeployers keeps caller order and lowercases user' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_set_sub_deployers(
+          dex: 'test',
+          sub_deployers: [
+            { variant: 'setOracle', user: '0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A', allowed: true },
+            { variant: 'haltTrading', user: '0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A', allowed: false }
+          ]
+        )
+      end
+      expect(json).to eq(
+        '{"type":"perpDeploy","setSubDeployers":{"dex":"test","subDeployers":[' \
+        '{"variant":"setOracle","user":"0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a","allowed":true},' \
+        '{"variant":"haltTrading","user":"0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a","allowed":false}]}}'
+      )
+      expect_signature(body,
+                       '0x25086d86dd87241723d5211a37eaf9043f3f193b1a14119788946321b4db840f',
+                       '0x4e29652c1d7289876412253e0a3daabf6cae35ff206f4f51f486f6b76b0182ae', 27)
+    end
+
+    it 'setSubDeployers passes a Hash variant through verbatim' do
+      json, = capture_perp_deploy do
+        exchange.perp_deploy_set_sub_deployers(
+          dex: 'test',
+          sub_deployers: [{ variant: { hip3Star: 'modifyApproval' }, user: '0xABCDEF0000000000000000000000000000000001',
+                            allowed: true }]
+        )
+      end
+      expect(json).to include(
+        '{"variant":{"hip3Star":"modifyApproval"},"user":"0xabcdef0000000000000000000000000000000001","allowed":true}'
+      )
+    end
+
+    it 'D14: setPerpAnnotation sends a null displayName by default' do
+      json, body = capture_perp_deploy do
+        fixture_exchange.perp_deploy_set_perp_annotation(
+          coin: 'test:A', category: 'stocks', description: 'Test asset', keywords: %w[test demo]
+        )
+      end
+      expect(json).to eq(
+        '{"type":"perpDeploy","setPerpAnnotation":{"coin":"test:A","category":"stocks",' \
+        '"description":"Test asset","displayName":null,"keywords":["test","demo"]}}'
+      )
+      expect_signature(body,
+                       '0x693fa311a645b9115ec314b6146ccf4cf80bec1fc99353976a49aec2bb372279',
+                       '0x7c8586f6b9c1b2b28e598f61f4b07f21569cb13a38c34084ddcd69e9ea497c54', 27)
+    end
+
     it 'D15: disableDex sends the dex name as a bare string' do
       json, body = capture_perp_deploy do
         fixture_exchange.perp_deploy_disable_dex(dex: 'test')
