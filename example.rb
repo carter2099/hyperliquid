@@ -132,7 +132,7 @@ puts "(These examples are commented out to prevent accidental execution)\n"
 #   result = sdk.exchange.cancel_by_cloid(coin: 'BTC', cloid: '0x...')
 #
 # Bulk cancel multiple orders:
-#   result = sdk.exchange.bulk_cancel([
+#   result = sdk.exchange.bulk_cancel(cancels: [
 #     { coin: 'BTC', oid: 123 },
 #     { coin: 'ETH', oid: 456 }
 #   ])

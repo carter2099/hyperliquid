@@ -341,7 +341,7 @@ module Hyperliquid
     end
 
     # Schedule automatic cancellation of all orders
-    # @param time [Integer, nil] UTC timestamp in milliseconds to cancel at (nil to activate with server default)
+    # @param time [Integer, nil] UTC timestamp in milliseconds to cancel at (nil removes the scheduled cancel)
     # @param vault_address [String, nil] Vault address for vault trading (optional)
     # @return [Hash] Schedule cancel response
     def schedule_cancel(time: nil, vault_address: nil)

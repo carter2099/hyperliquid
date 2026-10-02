@@ -36,3 +36,5 @@ end
 | `Hyperliquid::RateLimitError` | 429 errors |
 | `Hyperliquid::NetworkError` | Connection issues |
 | `Hyperliquid::TimeoutError` | Request timeouts |
+| `Hyperliquid::WebSocketError` | Unsupported WebSocket subscription type |
+| `Hyperliquid::ConfigurationError` | Missing configuration, e.g. explorer endpoint not set |
