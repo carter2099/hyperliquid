@@ -1,0 +1,1264 @@
+{
+  "private_key": "0x0123456789012345678901234567890123456789012345678901234567890123",
+  "source": "hyperliquid-python-sdk 0.24.0 (2fdb18f9517675ea03695a0962bd19eece9c83f0)",
+  "vectors": [
+    {
+      "chain": "Mainnet",
+      "constant": "USD_SEND_TYPES",
+      "message": {
+        "amount": "1.5",
+        "destination": "0x5e9ee1089755c3435139848e47e6635505d5a13a",
+        "time": 1700000000000
+      },
+      "primary_type": "HyperliquidTransaction:UsdSend",
+      "r": "0x1a6a3ef1edbffd18970616ebecbc1bad5df88e1227932324752f6a7beff2cd46",
+      "s": "0x1db20cf570420990bc880a6f28df698a5e8312045b1fcd2ed72bc1d96c2d2d43",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_usd_transfer_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "destination",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "string"
+        },
+        {
+          "name": "time",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Testnet",
+      "constant": "USD_SEND_TYPES",
+      "message": {
+        "amount": "1.5",
+        "destination": "0x5e9ee1089755c3435139848e47e6635505d5a13a",
+        "time": 1700000000000
+      },
+      "primary_type": "HyperliquidTransaction:UsdSend",
+      "r": "0x64f42ebe7723ee1564bfc23c3c6ac44d46e89900d13402b72fd10e8d2d6cc71b",
+      "s": "0x33c47b5c2f6a8f10e8edea275f436056a6e918532709b1b1b5ea65e33f292da7",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_usd_transfer_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "destination",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "string"
+        },
+        {
+          "name": "time",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "SPOT_SEND_TYPES",
+      "message": {
+        "amount": "100",
+        "destination": "0x5e9ee1089755c3435139848e47e6635505d5a13a",
+        "time": 1700000000000,
+        "token": "PURR:0xc4bf3f870c0e9465323c0b6ed28096c2"
+      },
+      "primary_type": "HyperliquidTransaction:SpotSend",
+      "r": "0x7fd3e377d7113a7ce1430059dc06b9c20bd654266b1549823de1af98a02faa84",
+      "s": "0x4a907cfaaf6b71c5e3f59f5120fb2ffa13468da889ad1f245c2a165d0cc80c7b",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_spot_transfer_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "destination",
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "string"
+        },
+        {
+          "name": "time",
+          "type": "uint64"
+        }
+      ],
+      "v": 28
+    },
+    {
+      "chain": "Testnet",
+      "constant": "SPOT_SEND_TYPES",
+      "message": {
+        "amount": "100",
+        "destination": "0x5e9ee1089755c3435139848e47e6635505d5a13a",
+        "time": 1700000000000,
+        "token": "PURR:0xc4bf3f870c0e9465323c0b6ed28096c2"
+      },
+      "primary_type": "HyperliquidTransaction:SpotSend",
+      "r": "0x07d443ffe90cf5c1f2bf6f18fa891c878ecdc0b3ebd557ad50ea98885ba95742",
+      "s": "0x22b1fdf9ea7018b1d2db75d4154b6d060b57a7e0e84c6832a6ac37635a22fc93",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_spot_transfer_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "destination",
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "string"
+        },
+        {
+          "name": "time",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "USD_CLASS_TRANSFER_TYPES",
+      "message": {
+        "amount": "2.25",
+        "nonce": 1700000000000,
+        "toPerp": true
+      },
+      "primary_type": "HyperliquidTransaction:UsdClassTransfer",
+      "r": "0xcfb80b359f27153cab6a4e72fc71ba119d69d41a71c664b78eabb12d14d55b71",
+      "s": "0x57fb2881ed3415a1e72bd41427460874ac2ce282f8e0048c3dc038e5bfaa9c59",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_usd_class_transfer_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "string"
+        },
+        {
+          "name": "toPerp",
+          "type": "bool"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Testnet",
+      "constant": "USD_CLASS_TRANSFER_TYPES",
+      "message": {
+        "amount": "2.25",
+        "nonce": 1700000000000,
+        "toPerp": true
+      },
+      "primary_type": "HyperliquidTransaction:UsdClassTransfer",
+      "r": "0xd26ca0ea0cb066922eedf6bcacbf8906426b3176cc26ae42e7b2bc4d85d1f596",
+      "s": "0x0390a054b5bc93823034cb87e06029c043ef97e10421c22a1d000ff8b34d48bd",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_usd_class_transfer_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "string"
+        },
+        {
+          "name": "toPerp",
+          "type": "bool"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "WITHDRAW_TYPES",
+      "message": {
+        "amount": "10",
+        "destination": "0x5e9ee1089755c3435139848e47e6635505d5a13a",
+        "time": 1700000000000
+      },
+      "primary_type": "HyperliquidTransaction:Withdraw",
+      "r": "0x70b0ef8af74df351550977a11dbb33e1924db6e2126ca9da01e4459cee52cf58",
+      "s": "0x484365ce146e6360a077c1e45ffc497101fe7679c158d3c0796a6a4f2d153278",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_withdraw_from_bridge_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "destination",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "string"
+        },
+        {
+          "name": "time",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Testnet",
+      "constant": "WITHDRAW_TYPES",
+      "message": {
+        "amount": "10",
+        "destination": "0x5e9ee1089755c3435139848e47e6635505d5a13a",
+        "time": 1700000000000
+      },
+      "primary_type": "HyperliquidTransaction:Withdraw",
+      "r": "0x93e49ce162ac6f4206561490b149bb12326ee3149e992832431bcbd1d21768ab",
+      "s": "0x226dad5323f94a6de16ffb6eec3e37eb169c458198bcd4dcaff63b6593bfbbff",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_withdraw_from_bridge_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "destination",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "string"
+        },
+        {
+          "name": "time",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "SEND_ASSET_TYPES",
+      "message": {
+        "amount": "3",
+        "destination": "0x5e9ee1089755c3435139848e47e6635505d5a13a",
+        "destinationDex": "spot",
+        "fromSubAccount": "",
+        "nonce": 1700000000000,
+        "sourceDex": "",
+        "token": "USDC"
+      },
+      "primary_type": "HyperliquidTransaction:SendAsset",
+      "r": "0x5859f441418dc45e0f7eee8542e6198324b7985c584fbdfab5b03acd382439ba",
+      "s": "0x4542a7634abec532d62f3a1585076e5f12027ef7f646a10a2cb369a593cd4d96",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_send_asset_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "destination",
+          "type": "string"
+        },
+        {
+          "name": "sourceDex",
+          "type": "string"
+        },
+        {
+          "name": "destinationDex",
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "string"
+        },
+        {
+          "name": "fromSubAccount",
+          "type": "string"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 28
+    },
+    {
+      "chain": "Testnet",
+      "constant": "SEND_ASSET_TYPES",
+      "message": {
+        "amount": "3",
+        "destination": "0x5e9ee1089755c3435139848e47e6635505d5a13a",
+        "destinationDex": "spot",
+        "fromSubAccount": "",
+        "nonce": 1700000000000,
+        "sourceDex": "",
+        "token": "USDC"
+      },
+      "primary_type": "HyperliquidTransaction:SendAsset",
+      "r": "0x4ae849ddf71670b352740004ac2404605c284b4eeb17185893f7b23bd1a4816b",
+      "s": "0x551f5ae7b7c7d4eaa091db0b2cfc5b00a27d5073f1cf860020a2dded81d5c838",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_send_asset_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "destination",
+          "type": "string"
+        },
+        {
+          "name": "sourceDex",
+          "type": "string"
+        },
+        {
+          "name": "destinationDex",
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "string"
+        },
+        {
+          "name": "fromSubAccount",
+          "type": "string"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "APPROVE_AGENT_TYPES",
+      "message": {
+        "agentAddress": "0x0000000000000000000000000000000000000abc",
+        "agentName": "parity",
+        "nonce": 1700000000000
+      },
+      "primary_type": "HyperliquidTransaction:ApproveAgent",
+      "r": "0x5496504a6fd4d5dbae99fc9b78941f2698c70264c5a88df30dd97cfa163dd3e7",
+      "s": "0x7ce6a795df5023df8cf09737d9071136dd420028d8f28b3159d0e30dd209a0a6",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_agent",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "agentAddress",
+          "type": "address"
+        },
+        {
+          "name": "agentName",
+          "type": "string"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 28
+    },
+    {
+      "chain": "Testnet",
+      "constant": "APPROVE_AGENT_TYPES",
+      "message": {
+        "agentAddress": "0x0000000000000000000000000000000000000abc",
+        "agentName": "parity",
+        "nonce": 1700000000000
+      },
+      "primary_type": "HyperliquidTransaction:ApproveAgent",
+      "r": "0x6531ad4836561e548299a38dd6f2884f63dfa73c3d1c1c3342fd414ec0420427",
+      "s": "0x4b932d1cac0ad6cfcb3a7a8d1bc29dce0a1d94120c07dd4e6b17110e15f47360",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_agent",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "agentAddress",
+          "type": "address"
+        },
+        {
+          "name": "agentName",
+          "type": "string"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "APPROVE_BUILDER_FEE_TYPES",
+      "message": {
+        "builder": "0x0000000000000000000000000000000000000abc",
+        "maxFeeRate": "0.001%",
+        "nonce": 1700000000000
+      },
+      "primary_type": "HyperliquidTransaction:ApproveBuilderFee",
+      "r": "0xd6ef9b05063ffeb02e0ac23440cceabf133ea91a002af08a8667dd0d0898d9c9",
+      "s": "0x0f4916a1eb3670d178dbf95f0fbd40d5a7dbeeaa4d18017df5dd52ffc3a1ecdb",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_approve_builder_fee",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "maxFeeRate",
+          "type": "string"
+        },
+        {
+          "name": "builder",
+          "type": "address"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 28
+    },
+    {
+      "chain": "Testnet",
+      "constant": "APPROVE_BUILDER_FEE_TYPES",
+      "message": {
+        "builder": "0x0000000000000000000000000000000000000abc",
+        "maxFeeRate": "0.001%",
+        "nonce": 1700000000000
+      },
+      "primary_type": "HyperliquidTransaction:ApproveBuilderFee",
+      "r": "0xe130ce9188307822697f678d66aacaf3bc729376a48e57791959e8168c099aa1",
+      "s": "0x1ff62453af0ae2c43cb0aa4934e71765dd1045d89190063058f59abb7980dd9c",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_approve_builder_fee",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "maxFeeRate",
+          "type": "string"
+        },
+        {
+          "name": "builder",
+          "type": "address"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "TOKEN_DELEGATE_TYPES",
+      "message": {
+        "isUndelegate": false,
+        "nonce": 1700000000000,
+        "validator": "0x0000000000000000000000000000000000000abc",
+        "wei": 100000000
+      },
+      "primary_type": "HyperliquidTransaction:TokenDelegate",
+      "r": "0x0fde25834dec7d9fe95d10ff1e2f23d7ced03aae57c2637637bfcdf323918f55",
+      "s": "0x6df71188cfec4fa12524c057d6df49a61c31608cf96dc05bf6b219aa02ee3258",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_token_delegate_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "validator",
+          "type": "address"
+        },
+        {
+          "name": "wei",
+          "type": "uint64"
+        },
+        {
+          "name": "isUndelegate",
+          "type": "bool"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 28
+    },
+    {
+      "chain": "Testnet",
+      "constant": "TOKEN_DELEGATE_TYPES",
+      "message": {
+        "isUndelegate": false,
+        "nonce": 1700000000000,
+        "validator": "0x0000000000000000000000000000000000000abc",
+        "wei": 100000000
+      },
+      "primary_type": "HyperliquidTransaction:TokenDelegate",
+      "r": "0x3c28281fabe3e68e0a7e51a60863a7aa627d0589c07c1b726e668f253e8f1619",
+      "s": "0x48a96c65b59c98222c8ebe31432d617e2c95b9c3fc570012ba3280986597dc9c",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_token_delegate_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "validator",
+          "type": "address"
+        },
+        {
+          "name": "wei",
+          "type": "uint64"
+        },
+        {
+          "name": "isUndelegate",
+          "type": "bool"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "USER_DEX_ABSTRACTION_TYPES",
+      "message": {
+        "enabled": true,
+        "nonce": 1700000000000,
+        "user": "0x5e9ee1089755c3435139848e47e6635505d5a13a"
+      },
+      "primary_type": "HyperliquidTransaction:UserDexAbstraction",
+      "r": "0x2ced5c5561f3aa87fdd39655082a30de86133458a9dc456bdf0a1e125cfeadb1",
+      "s": "0x2147d908677a03ece096fce643501bb0c001e9574959ee6992cb04710faa6d1d",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_user_dex_abstraction_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "name": "enabled",
+          "type": "bool"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 28
+    },
+    {
+      "chain": "Testnet",
+      "constant": "USER_DEX_ABSTRACTION_TYPES",
+      "message": {
+        "enabled": true,
+        "nonce": 1700000000000,
+        "user": "0x5e9ee1089755c3435139848e47e6635505d5a13a"
+      },
+      "primary_type": "HyperliquidTransaction:UserDexAbstraction",
+      "r": "0x575896e1ae7307faef4bee049402ba3c8f6ea2fb78549a776724c0baf93700bb",
+      "s": "0x348de7f369713ce21c35133a30f8d929156e620a7573c5da456418c21b5e595f",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_user_dex_abstraction_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "name": "enabled",
+          "type": "bool"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "CONVERT_TO_MULTI_SIG_USER_TYPES",
+      "message": {
+        "nonce": 1700000000000,
+        "signers": "{\"authorizedUsers\":[\"0x0000000000000000000000000000000000000abc\",\"0x5e9ee1089755c3435139848e47e6635505d5a13a\"],\"threshold\":1}"
+      },
+      "primary_type": "HyperliquidTransaction:ConvertToMultiSigUser",
+      "r": "0x0fd61ba047e5e2eec3e18fa6263ed5f5451a37d2a34db23975cfdac422da747e",
+      "s": "0x63f9d69468e6efb5d47260ec8b997b6ce01ab1f625845e5d81cd84114790aa11",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_convert_to_multi_sig_user_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "signers",
+          "type": "string"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Testnet",
+      "constant": "CONVERT_TO_MULTI_SIG_USER_TYPES",
+      "message": {
+        "nonce": 1700000000000,
+        "signers": "{\"authorizedUsers\":[\"0x0000000000000000000000000000000000000abc\",\"0x5e9ee1089755c3435139848e47e6635505d5a13a\"],\"threshold\":1}"
+      },
+      "primary_type": "HyperliquidTransaction:ConvertToMultiSigUser",
+      "r": "0x20af9e9478f3938f08e3fe0956b00a1a1a2fdd27244ae485528f38f7c2b285db",
+      "s": "0x3424c5125367b695463e4a16e639a1b2c7f7c58b06de2806d88cbcce8d9f90fe",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_convert_to_multi_sig_user_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "signers",
+          "type": "string"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "USER_SET_ABSTRACTION_TYPES",
+      "message": {
+        "abstraction": "unifiedAccount",
+        "nonce": 1700000000000,
+        "user": "0x5e9ee1089755c3435139848e47e6635505d5a13a"
+      },
+      "primary_type": "HyperliquidTransaction:UserSetAbstraction",
+      "r": "0x984629fe91fd3b4104e8579eacd7ace258f70a79742598409e3685c3793919ec",
+      "s": "0x056fb8404cc7468a826a1e5ec53661f8651581f796e214adb8b348863cbb0d97",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_user_set_abstraction_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "name": "abstraction",
+          "type": "string"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 28
+    },
+    {
+      "chain": "Testnet",
+      "constant": "USER_SET_ABSTRACTION_TYPES",
+      "message": {
+        "abstraction": "unifiedAccount",
+        "nonce": 1700000000000,
+        "user": "0x5e9ee1089755c3435139848e47e6635505d5a13a"
+      },
+      "primary_type": "HyperliquidTransaction:UserSetAbstraction",
+      "r": "0xee7be37e47a1ad42268aa9f107115d1546e61b4103207442bd55c5dadc3ae42d",
+      "s": "0x0684a557acd67d9bfcaa0250c6b9adc84c2c899ee46a8976eaf37a18eaeee926",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_user_set_abstraction_action",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "name": "abstraction",
+          "type": "string"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 28
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "MULTI_SIG_TYPES",
+      "message": {
+        "multiSigActionHash": "0xef5dcef9775ebb2c5a6553314e66a6a57bd7e9b2319a869a8b17f08fa48bdcaf",
+        "nonce": 1700000000000
+      },
+      "primary_type": "HyperliquidTransaction:SendMultiSig",
+      "r": "0x7a9b0959af397ab8a263afe94ff3251baa29ea1a78b11a3e7abc85efbf2e03bf",
+      "s": "0x420ddb53ddf5b818efcba8c37d41872929fcdd3dc9dd90c7716a58809371b55e",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_user_signed_action(MULTI_SIG_ENVELOPE_SIGN_TYPES)",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "multiSigActionHash",
+          "type": "bytes32"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 28
+    },
+    {
+      "chain": "Testnet",
+      "constant": "MULTI_SIG_TYPES",
+      "message": {
+        "multiSigActionHash": "0xef5dcef9775ebb2c5a6553314e66a6a57bd7e9b2319a869a8b17f08fa48bdcaf",
+        "nonce": 1700000000000
+      },
+      "primary_type": "HyperliquidTransaction:SendMultiSig",
+      "r": "0x23bd7a50097c4e7b5473804bd0c125b7af68b23583b48c36a4d5e5bc9385f67e",
+      "s": "0x14225cb7f3b33a087f248dac6d5f334856042b04ebf7f760688f2480cb3d039b",
+      "signature_chain_id": "0x66eee",
+      "source": "python-sdk sign_user_signed_action(MULTI_SIG_ENVELOPE_SIGN_TYPES)",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "multiSigActionHash",
+          "type": "bytes32"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 28
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "LINK_STAKING_USER_TYPES",
+      "message": {
+        "isFinalize": true,
+        "nonce": 1700000000000,
+        "user": "0x5e9ee1089755c3435139848e47e6635505d5a13a"
+      },
+      "primary_type": "HyperliquidTransaction:LinkStakingUser",
+      "r": "0x753448e085d7d6a7eb9669851f6648b14afd0e3c6539a9ad2e9a6f603787f396",
+      "s": "0x340ed48eda5a8826f8827b99126c5bd48e8c17e89f7ac493a1e866932fce36de",
+      "signature_chain_id": "0x66eee",
+      "source": "ts-sdk @nktkas/hyperliquid 0.33.1 esm/api/exchange/_methods/linkStakingUser.js",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "name": "isFinalize",
+          "type": "bool"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Testnet",
+      "constant": "LINK_STAKING_USER_TYPES",
+      "message": {
+        "isFinalize": true,
+        "nonce": 1700000000000,
+        "user": "0x5e9ee1089755c3435139848e47e6635505d5a13a"
+      },
+      "primary_type": "HyperliquidTransaction:LinkStakingUser",
+      "r": "0x9231f6ac4d07107b2c2143a49ba392dbe8cfcf01f2612565ac53f99060a831ae",
+      "s": "0x73e31ffa544479647327ec95411af6a7f434f9d8c102f15611d6e17a5f95dcf6",
+      "signature_chain_id": "0x66eee",
+      "source": "ts-sdk @nktkas/hyperliquid 0.33.1 esm/api/exchange/_methods/linkStakingUser.js",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "name": "isFinalize",
+          "type": "bool"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 28
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "STAKING_LINK_DISABLE_TRADING_USER_TYPES",
+      "message": {
+        "nonce": 1700000000000,
+        "tradingUser": "0x5e9ee1089755c3435139848e47e6635505d5a13a"
+      },
+      "primary_type": "HyperliquidTransaction:StakingLinkDisableTradingUser",
+      "r": "0x5d09c9b4f1dfbc36e477c82fbcf07b9c8172d86bab9974c563a833ab466f9cbb",
+      "s": "0x52566ad4a4e8f90ceba327c9432ad34140825aa6b9ce31de23ac62f3c5e70c76",
+      "signature_chain_id": "0x66eee",
+      "source": "ts-sdk @nktkas/hyperliquid 0.33.1 esm/api/exchange/_methods/stakingLinkDisableTradingUser.js",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "tradingUser",
+          "type": "address"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 28
+    },
+    {
+      "chain": "Testnet",
+      "constant": "STAKING_LINK_DISABLE_TRADING_USER_TYPES",
+      "message": {
+        "nonce": 1700000000000,
+        "tradingUser": "0x5e9ee1089755c3435139848e47e6635505d5a13a"
+      },
+      "primary_type": "HyperliquidTransaction:StakingLinkDisableTradingUser",
+      "r": "0x66805f1fea75594af5895372e0637782a4f18f5fb4250afb1337abc661c09a36",
+      "s": "0x5d743c59f5a3300ce51b5c8fa2703468c49b20fc08fb271b17642c9cc3a765ef",
+      "signature_chain_id": "0x66eee",
+      "source": "ts-sdk @nktkas/hyperliquid 0.33.1 esm/api/exchange/_methods/stakingLinkDisableTradingUser.js",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "tradingUser",
+          "type": "address"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 28
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "USER_PORTFOLIO_MARGIN_TYPES",
+      "message": {
+        "enabled": false,
+        "nonce": 1700000000000,
+        "user": "0x5e9ee1089755c3435139848e47e6635505d5a13a"
+      },
+      "primary_type": "HyperliquidTransaction:UserPortfolioMargin",
+      "r": "0xe1a7bad6253e4fbdba370ea73387bd90cf339b1eb4c4376186c75d717ec0d12a",
+      "s": "0x66efa36ad10ff41daf43c859d9580c521d5f8191d642d52285cd14c5df877913",
+      "signature_chain_id": "0x66eee",
+      "source": "ts-sdk @nktkas/hyperliquid 0.33.1 esm/api/exchange/_methods/userPortfolioMargin.js",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "name": "enabled",
+          "type": "bool"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Testnet",
+      "constant": "USER_PORTFOLIO_MARGIN_TYPES",
+      "message": {
+        "enabled": false,
+        "nonce": 1700000000000,
+        "user": "0x5e9ee1089755c3435139848e47e6635505d5a13a"
+      },
+      "primary_type": "HyperliquidTransaction:UserPortfolioMargin",
+      "r": "0x90b98b1eae8fefb2b9b0dd0a5b0ceb5d1a710cf8cdd6455c0dd96beadd80681d",
+      "s": "0x75c0ebd788d49c28bd520443f19f7cba0c303ac4c4ce9759324b21d82950e943",
+      "signature_chain_id": "0x66eee",
+      "source": "ts-sdk @nktkas/hyperliquid 0.33.1 esm/api/exchange/_methods/userPortfolioMargin.js",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "name": "enabled",
+          "type": "bool"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "C_DEPOSIT_TYPES",
+      "message": {
+        "nonce": 1700000000000,
+        "wei": 250000000
+      },
+      "primary_type": "HyperliquidTransaction:CDeposit",
+      "r": "0x20f80d2a65dfce402ef02d1adea6c2f2dc382b5e96f514685be98af7d6270139",
+      "s": "0x4eb5eb62b0133d09c39f71af041c8aecd83691dc4f36695a8cf5f98cc8b73af1",
+      "signature_chain_id": "0x66eee",
+      "source": "ts-sdk @nktkas/hyperliquid 0.33.1 esm/api/exchange/_methods/cDeposit.js",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "wei",
+          "type": "uint64"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Testnet",
+      "constant": "C_DEPOSIT_TYPES",
+      "message": {
+        "nonce": 1700000000000,
+        "wei": 250000000
+      },
+      "primary_type": "HyperliquidTransaction:CDeposit",
+      "r": "0x509d9732c0fa8034d2297b1141614021816eae05699b98409ef6000fddbbb268",
+      "s": "0x631d747a537efa93fdcc9b2c7e1ffddd32de2480604d63e55978b487f2826afe",
+      "signature_chain_id": "0x66eee",
+      "source": "ts-sdk @nktkas/hyperliquid 0.33.1 esm/api/exchange/_methods/cDeposit.js",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "wei",
+          "type": "uint64"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "C_WITHDRAW_TYPES",
+      "message": {
+        "nonce": 1700000000000,
+        "wei": 125000000
+      },
+      "primary_type": "HyperliquidTransaction:CWithdraw",
+      "r": "0xb57fd70158f245c05d8f7d5059582573cf4a55d4b5b00f8bced122e4cbdc1570",
+      "s": "0x7eff225015371fa5a1e2f3b8939d96a719edbd1c44b04c9fc32114ba584cdbac",
+      "signature_chain_id": "0x66eee",
+      "source": "ts-sdk @nktkas/hyperliquid 0.33.1 esm/api/exchange/_methods/cWithdraw.js",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "wei",
+          "type": "uint64"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 28
+    },
+    {
+      "chain": "Testnet",
+      "constant": "C_WITHDRAW_TYPES",
+      "message": {
+        "nonce": 1700000000000,
+        "wei": 125000000
+      },
+      "primary_type": "HyperliquidTransaction:CWithdraw",
+      "r": "0x1118b53bb00b789e780905eee3b104161aad0977d1e5d3e53351e235d49b0b76",
+      "s": "0x09911b025d7b0a8ff184d03265899689d1a509737565d11804c5f1b6ea743a41",
+      "signature_chain_id": "0x66eee",
+      "source": "ts-sdk @nktkas/hyperliquid 0.33.1 esm/api/exchange/_methods/cWithdraw.js",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "wei",
+          "type": "uint64"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 27
+    },
+    {
+      "chain": "Mainnet",
+      "constant": "SEND_TO_EVM_WITH_DATA_TYPES",
+      "message": {
+        "addressEncoding": "hex",
+        "amount": "1",
+        "data": "0xdeadbeef",
+        "destinationChainId": 998,
+        "destinationRecipient": "0x0000000000000000000000000000000000000abc",
+        "gasLimit": 200000,
+        "nonce": 1700000000000,
+        "sourceDex": "spot",
+        "token": "USDC"
+      },
+      "primary_type": "HyperliquidTransaction:SendToEvmWithData",
+      "r": "0x80551b5515333e3281f6aeff8f61c3fbdbd6f87275eb7fce8fd2badcb4a3ec34",
+      "s": "0x43a3083c788557870e6dfa5b7053f53428b88c871905944a995a150d9b7d025f",
+      "signature_chain_id": "0x66eee",
+      "source": "ts-sdk @nktkas/hyperliquid 0.33.1 esm/api/exchange/_methods/sendToEvmWithData.js",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "string"
+        },
+        {
+          "name": "sourceDex",
+          "type": "string"
+        },
+        {
+          "name": "destinationRecipient",
+          "type": "string"
+        },
+        {
+          "name": "addressEncoding",
+          "type": "string"
+        },
+        {
+          "name": "destinationChainId",
+          "type": "uint32"
+        },
+        {
+          "name": "gasLimit",
+          "type": "uint64"
+        },
+        {
+          "name": "data",
+          "type": "bytes"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 28
+    },
+    {
+      "chain": "Testnet",
+      "constant": "SEND_TO_EVM_WITH_DATA_TYPES",
+      "message": {
+        "addressEncoding": "hex",
+        "amount": "1",
+        "data": "0xdeadbeef",
+        "destinationChainId": 998,
+        "destinationRecipient": "0x0000000000000000000000000000000000000abc",
+        "gasLimit": 200000,
+        "nonce": 1700000000000,
+        "sourceDex": "spot",
+        "token": "USDC"
+      },
+      "primary_type": "HyperliquidTransaction:SendToEvmWithData",
+      "r": "0xbed2353526c3a8e6919c06729407eed6125492f8001a5b8062af60ef9005cae1",
+      "s": "0x3ffd351d5e0daea2cba693833f3ee52c340cfd22f4dccc14c7ddbda962ed5f92",
+      "signature_chain_id": "0x66eee",
+      "source": "ts-sdk @nktkas/hyperliquid 0.33.1 esm/api/exchange/_methods/sendToEvmWithData.js",
+      "types": [
+        {
+          "name": "hyperliquidChain",
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "string"
+        },
+        {
+          "name": "sourceDex",
+          "type": "string"
+        },
+        {
+          "name": "destinationRecipient",
+          "type": "string"
+        },
+        {
+          "name": "addressEncoding",
+          "type": "string"
+        },
+        {
+          "name": "destinationChainId",
+          "type": "uint32"
+        },
+        {
+          "name": "gasLimit",
+          "type": "uint64"
+        },
+        {
+          "name": "data",
+          "type": "bytes"
+        },
+        {
+          "name": "nonce",
+          "type": "uint64"
+        }
+      ],
+      "v": 28
+    }
+  ]
+}

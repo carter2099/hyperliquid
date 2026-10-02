@@ -1,92 +1,89 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Integration test for Explorer WebSocket subscription
-# Connects to testnet explorer WS, subscribes to explorerBlock, and collects 3 block events
+# Test 20: Explorer WebSocket subscription
 #
-# Usage: ruby test_20_explorer_ws.rb
+# Connects to the testnet explorer WS, subscribes to explorerBlock, and collects 3 block
+# events within 60 s. Every block must carry height/hash/numTxs/proposer/blockTime.
+#   3 blocks          -> PASS
+#   1-2 blocks        -> INCONCLUSIVE (the WS path works; testnet explorer was slow)
+#   0 blocks          -> FAIL
+#
+# No private key required (read-only WebSocket).
+#
+# Usage:
+#   ruby scripts/test_20_explorer_ws.rb
 
 require_relative 'test_helpers'
 
-puts '=' * 70
-puts 'test_20: Explorer WebSocket subscription'
-puts '=' * 70
+NAME = 'Test 20 explorer WebSocket'
+MAX_BLOCKS = 3
+TIMEOUT_SECONDS = 60
+REQUIRED_FIELDS = %w[height hash numTxs proposer blockTime].freeze
 
-# Initialize SDK with testnet
-sdk = Hyperliquid::SDK.new(testnet: true)
+separator('TEST 20: Explorer WebSocket subscription')
 
-puts "\n1. Testing explorer WebSocket connection and subscription..."
+sdk = build_public_sdk
+
+puts '1. Testing explorer WebSocket connection and subscription...'
 
 blocks_received = []
-max_blocks = 3
-timeout_seconds = 60
+mutex = Mutex.new
 start_time = Time.now
 
-puts "   Subscribing to explorerBlock channel (expecting #{max_blocks} blocks within #{timeout_seconds}s)..."
-puts "   Explorer WS URL: wss://rpc.hyperliquid-testnet.xyz/ws"
+puts "   Subscribing to explorerBlock channel (expecting #{MAX_BLOCKS} blocks within #{TIMEOUT_SECONDS}s)..."
 
-# Subscribe to explorer blocks
+# Explorer messages arrive as arrays of blocks
 sub_id = sdk.ws.subscribe_explorer_block do |block_array|
-  # Explorer messages arrive as arrays
-  block_array.each do |block|
-    blocks_received << block
-    elapsed = Time.now - start_time
-    puts "   Block ##{blocks_received.size}: height=#{block['height']} hash=#{block['hash']} " \
-         "numTxs=#{block['numTxs']} proposer=#{block['proposer'][0..10]}... (#{elapsed.round(1)}s elapsed)"
+  (block_array.is_a?(Array) ? block_array : [block_array]).each do |block|
+    count = mutex.synchronize do
+      next nil if blocks_received.size >= MAX_BLOCKS
 
-    break if blocks_received.size >= max_blocks
+      blocks_received << block
+      blocks_received.size
+    end
+    break unless count
+
+    summary = block.is_a?(Hash) ? "height=#{block['height']} hash=#{block['hash']} numTxs=#{block['numTxs']}" : block.inspect
+    puts "   Block ##{count}: #{summary} (#{(Time.now - start_time).round(1)}s elapsed)"
   end
 end
 
 puts "   Subscription ID: #{sub_id}"
 
-# Wait for blocks with timeout
-puts "\n2. Waiting for block events..."
+puts '2. Waiting for block events...'
 loop do
-  break if blocks_received.size >= max_blocks
-
-  elapsed = Time.now - start_time
-  if elapsed > timeout_seconds
-    puts "\n   ⚠ Timeout: Only received #{blocks_received.size}/#{max_blocks} blocks after #{timeout_seconds}s"
-    puts '   This may indicate testnet explorer is not producing blocks or WS connection issues'
-    break
-  end
+  break if mutex.synchronize { blocks_received.size } >= MAX_BLOCKS
+  break if Time.now - start_time > TIMEOUT_SECONDS
 
   sleep 0.5
 end
 
-# Cleanup
-puts "\n3. Cleanup..."
+puts '3. Cleanup...'
 sdk.ws.unsubscribe(sub_id)
-puts "   Unsubscribed from #{sub_id}"
-
 sdk.ws.close
 puts '   WebSocket connection closed'
 
-# Verify results
-puts "\n4. Verification..."
-if blocks_received.empty?
-  puts '   ❌ FAIL: No blocks received'
-  puts '   Explorer WebSocket may not be working on testnet, or connection failed'
-  exit 1
+puts '4. Verification...'
+blocks = mutex.synchronize { blocks_received.dup }
+
+if blocks.empty?
+  fail!("No explorer blocks received within #{TIMEOUT_SECONDS}s (explorer WS connection or subscription broken)")
+  test_passed(NAME)
 end
 
-puts "   ✓ Received #{blocks_received.size} block(s)"
-
-# Verify block structure
-blocks_received.each_with_index do |block, idx|
-  required_fields = %w[height hash numTxs proposer blockTime]
-  missing = required_fields - block.keys
-  unless missing.empty?
-    puts "   ⚠ Block ##{idx + 1} missing fields: #{missing.join(', ')}"
+blocks.each_with_index do |block, idx|
+  unless block.is_a?(Hash)
+    fail!("Block ##{idx + 1} is not a Hash: #{block.inspect}")
+    next
   end
+  missing = REQUIRED_FIELDS - block.keys
+  fail!("Block ##{idx + 1} missing fields: #{missing.join(', ')}") unless missing.empty?
 end
 
-if blocks_received.size >= max_blocks
-  puts "   ✓ PASS: Successfully received #{max_blocks} explorer blocks"
-  exit 0
-else
-  puts "   ⚠ PARTIAL: Received #{blocks_received.size}/#{max_blocks} blocks"
-  puts '   This is acceptable if testnet explorer is slow, but should be investigated'
-  exit 0 # Don't fail the test suite for partial results
+if blocks.size < MAX_BLOCKS
+  finish_inconclusive(NAME, "received #{blocks.size}/#{MAX_BLOCKS} explorer blocks within #{TIMEOUT_SECONDS}s")
 end
+
+puts green("   Received #{MAX_BLOCKS} well-formed explorer blocks")
+test_passed(NAME)

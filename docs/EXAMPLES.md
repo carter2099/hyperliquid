@@ -134,6 +134,20 @@ signers = sdk.info.user_to_multi_sig_signers(user_address)
 # Get dex abstraction config for a user
 dex_abstraction = sdk.info.user_dex_abstraction(user_address)
 # => { "enabled" => true }
+
+# Fills in a time range, newest first, with partial fills of one crossing order merged
+fills = sdk.info.user_fills_by_time(user_address, start_time_ms, nil, aggregate_by_time: true, reversed: true)
+
+# Recent trades and a block by height
+sdk.info.recent_trades('BTC')
+sdk.info.block_details(123_456)
+
+# Vaults created in the last 2 hours, and vaults a user leads
+sdk.info.vault_summaries
+sdk.info.leading_vaults(user_address)
+
+# Margin table (dex: '' is the main dex)
+sdk.info.margin_table(1, dex: '')
 ```
 
 **Note:** `l2_book` and `candles_snapshot` work for both Perpetuals and Spot. For spot, use `"{BASE}/USDC"` when available (e.g., `"PURR/USDC"`). Otherwise, use the index alias `"@{index}"` from `spot_meta["universe"]`.
@@ -183,6 +197,29 @@ oi_capped = sdk.info.perps_at_open_interest_cap
 auction = sdk.info.perp_deploy_auction_status
 # => { "startTimeSeconds" => ..., "durationSeconds" => ..., "startGas" => "500.0", ... }
 
+# Deploy a HIP-3 perp dex (deployer wallet only; mirrors the Python SDK's examples/perp_deploy.py).
+# The first registration on a new dex passes `schema:` and pays the deploy-auction gas.
+# `auction` comes from perp_deploy_auction_status above; `max_gas: nil` bids its currentGas.
+sdk.exchange.perp_deploy_register_asset2(
+  dex: "test", coin: "test:TEST0", sz_decimals: 2, oracle_px: "10.0", margin_table_id: 10,
+  margin_mode: "noCross",
+  max_gas: 1_000_000_000_000, # native-token wei: 10k HYPE
+  schema: { full_name: "test dex", collateral_token: 0, oracle_updater: sdk.exchange.address }
+)
+# => { "status" => "ok", "response" => { "type" => "default" } }
+
+# Push oracle prices (at most once every 2.5s); coins are full "dex:COIN" names.
+# A real oracle updater runs this continuously.
+3.times do
+  sdk.exchange.perp_deploy_set_oracle(
+    dex: "test",
+    oracle_pxs: { "test:TEST0" => "12.0" },
+    all_mark_pxs: [{ "test:TEST0" => "12.1" }],
+    external_perp_pxs: { "test:TEST0" => "12.0" }
+  )
+  sleep 3
+end
+
 # Retrieve User's Active Asset Data
 aad = sdk.info.active_asset_data(user_address, "APT")
 # => { "user" => user_address, "coin" => "APT", "leverage" => { "type" => "cross", "value" => 3 }, ... }
@@ -218,6 +255,31 @@ pair_status = sdk.info.spot_pair_deploy_auction_status
 # Retrieve information about a token by onchain id in 34-character hexadecimal format
 details = sdk.info.token_details("0x00000000000000000000000000000000")
 # => { "name" => "TEST", "maxSupply" => "...", "midPx" => "...", ... }
+```
+
+### HIP-2 Borrow/Lend
+
+```ruby
+sdk.info.all_borrow_lend_reserve_states
+sdk.info.borrow_lend_reserve_state(0)               # token index 0 = USDC
+sdk.info.borrow_lend_user_state(user_address)
+sdk.info.user_borrow_lend_interest(user_address, start_time_ms)
+```
+
+### HIP-4 Outcomes
+
+```ruby
+sdk.info.outcome_meta
+sdk.info.outcome_templates
+sdk.info.settled_outcome(outcome: 5)                # nil until settled
+```
+
+### Explorer RPC
+
+```ruby
+# Routed to rpc.hyperliquid.xyz/explorer (rpc.hyperliquid-testnet.xyz with testnet: true)
+txs = sdk.info.user_details(user_address)
+sdk.info.tx_details('0x' + 'ab' * 32)               # a 66-character transaction hash
 ```
 
 ## Exchange API (Trading)
@@ -356,7 +418,7 @@ sdk.exchange.market_close(coin: 'BTC', size: 0.01, slippage: 0.03)
 cancel_time = (Time.now.to_f * 1000).to_i + 60_000  # 60 seconds from now
 sdk.exchange.schedule_cancel(time: cancel_time)
 
-# Activate schedule cancel without specifying a time (server default)
+# Remove the scheduled cancel
 sdk.exchange.schedule_cancel
 ```
 
@@ -408,6 +470,34 @@ sdk.exchange.order(
 )
 ```
 
+### TWAP and Trailing Stop Orders
+
+```ruby
+# Buy 1 ETH over 30 minutes
+result = sdk.exchange.twap_order(coin: 'ETH', is_buy: true, size: 1, reduce_only: false,
+                                 minutes: 30, randomize: true)
+twap_id = result.dig('response', 'data', 'status', 'running', 'twapId')
+sdk.exchange.twap_cancel(coin: 'ETH', twap_id: twap_id)
+
+# Reduce-only trailing sell of 0.01 BTC, 1.5% retracement, active once the price reaches 100000
+sdk.exchange.trailing_stop(coin: 'BTC', is_buy: false, size: 0.01, reduce_only: true,
+                           retracement: { pct: '1.5%' }, activation_px: '100000')
+```
+
+### Fast Cancel, Always-Place Modify, Order Expiry
+
+```ruby
+sdk.exchange.cancel(coin: 'BTC', oid: 123, fast: true)
+sdk.exchange.modify_order(oid: 123, coin: 'BTC', is_buy: true, size: 0.01, limit_px: 95_000,
+                          always_place: true)
+
+# Reject L1 actions that reach the exchange after this time (ms); nil clears it.
+# Leave it nil around user-signed actions such as usd_send.
+sdk.exchange.expires_after = (Time.now.to_f * 1000).to_i + 10_000
+sdk.exchange.order(coin: 'BTC', is_buy: true, size: 0.01, limit_px: 90_000)
+sdk.exchange.expires_after = nil
+```
+
 ### Transfers & Account Management
 
 ```ruby
@@ -421,7 +511,7 @@ sdk.exchange.usd_send(
 sdk.exchange.spot_send(
   amount: '50',
   destination: '0x...',
-  token: 'PURR'
+  token: 'PURR:0xc4bf3f870c0e9465323c0b6ed28096c2' # testnet PURR; mainnet is PURR:0xc1fb593aeffbeb02f85e0308e9956a90 (see info.spot_meta)
 )
 
 # Move USDC between perp and spot accounts
@@ -441,6 +531,16 @@ sdk.exchange.send_asset(
   destination_dex: 'dex2',
   token: 'USDC',
   amount: '100'
+)
+
+# Move USDC between perp and spot for a sub-account
+sdk.exchange.usd_class_transfer(amount: 10, to_perp: true, sub_account: '0x...')
+
+# Send USDC to HyperEVM with calldata for an ICoreReceiveWithData contract
+sdk.exchange.send_to_evm_with_data(
+  token: 'USDC', amount: '5', source_dex: 'spot',
+  destination_recipient: '0x...', address_encoding: 'hex',
+  destination_chain_id: 998, gas_limit: 200_000, data: '0x'
 )
 ```
 
@@ -490,7 +590,53 @@ sdk.exchange.vault_transfer(
   is_deposit: false,
   usd: 50
 )
+
+# Create a vault (at least 100 USD), then manage it as leader
+sdk.exchange.create_vault(name: 'My Vault', description: 'Trend following on BTC', initial_usd: 100)
+sdk.exchange.vault_modify(vault_address: '0x...', allow_deposits: false)
+sdk.exchange.vault_distribute(vault_address: '0x...', usd: 25)
 ```
+
+### HIP-2 Borrow/Lend and HIP-4 Outcomes
+
+```ruby
+sdk.exchange.borrow_lend(operation: 'supply', token: 0, amount: '100')
+sdk.exchange.borrow_lend(operation: 'withdraw', token: 0)          # amount nil = full position
+
+sdk.exchange.split_outcome(outcome: 5, amount: '10')               # 10 quote -> 10 Yes + 10 No
+sdk.exchange.merge_outcome(outcome: 5)                             # merge the maximum back
+```
+
+### Multi-Sig
+
+```ruby
+# 1. Once: turn the multi-sig account into a 2-of-3 multi-sig user
+owner = Hyperliquid.new(testnet: true, private_key: ENV['MULTI_SIG_OWNER_KEY'])
+owner.exchange.convert_to_multi_sig_user(authorized_users: [addr_a, addr_b, addr_c], threshold: 2)
+
+# 2. Each co-signer signs the same inner action and nonce, with the submitter as outer_signer
+multi_sig_user = owner.exchange.address
+submitter = Hyperliquid.new(testnet: true, private_key: ENV['SIGNER_A_KEY'])
+nonce = (Time.now.to_f * 1000).to_i
+inner_action = {
+  type: 'order',
+  orders: [{ a: 4, b: true, p: '1100', s: '0.2', r: false, t: { limit: { tif: 'Gtc' } } }],
+  grouping: 'na'
+}
+signatures = [ENV['SIGNER_A_KEY'], ENV['SIGNER_B_KEY']].map do |key|
+  Hyperliquid::Signing::MultiSig.sign_as_co_signer_l1(
+    signer: Hyperliquid::Signing::Signer.new(private_key: key, testnet: true),
+    inner_action: inner_action, multi_sig_user: multi_sig_user,
+    outer_signer: submitter.exchange.address, nonce: nonce
+  )
+end
+
+# 3. The submitter posts the envelope with the same nonce
+submitter.exchange.multi_sig(multi_sig_user: multi_sig_user, inner_action: inner_action,
+                             signatures: signatures, nonce: nonce)
+```
+
+The inner action is the wire-format action body (here an order for asset 4). For a user-signed inner action, co-signers call `sign_as_co_signer_user_signed` with its EIP-712 primary type and type constant, e.g. `primary_type: 'HyperliquidTransaction:SendAsset', sign_types: Hyperliquid::Signing::EIP712::SEND_ASSET_TYPES`.
 
 ### Referral
 
@@ -579,6 +725,39 @@ sdk.exchange.agent_enable_dex_abstraction(vault_address: '0x...')
 # Check current DEX abstraction status
 status = sdk.info.user_dex_abstraction(sdk.exchange.address)
 # => { "enabled" => true }
+```
+
+### HIP-4 Outcome Deployment
+
+For an activated outcome deployer (or a sub-deployer acting for its venue). Responses come back unmodified, so check `status`.
+
+```ruby
+venue = 'abc'
+
+# How many outcomes can this venue still deploy?
+limits = sdk.info.outcome_deployer_limits(venue)
+# => { "nDailyOutcomesRemaining" => 10, "nActiveOutcomesRemaining" => 90 }
+
+# Deploy a standalone Yes/No outcome; keywords are sorted by the SDK
+result = sdk.exchange.register_standalone_outcome_from_template(
+  venue: venue,
+  template_id: 'binaryPrice',
+  keyword_to_value: { perp: 'BTC', priceDescription: 'the Hyperliquid BTC perp trade',
+                      seconds: 90, threshold: 84_793, time: '20261002-1900' },
+  deployer_fee_scale: '1'
+)
+raise result['response'].to_s unless result['status'] == 'ok'
+
+# Settle it later: name, description and side names must match outcome_meta exactly
+outcome = sdk.info.outcome_meta['outcomes'].reverse.find { |o| o['venue'] == venue }
+sdk.exchange.settle_outcome(
+  venue: venue,
+  outcome: outcome['outcome'],
+  settle_fraction: '1', # first side (Yes) pays out in full
+  name: outcome['name'],
+  description: outcome['description'],
+  side_names: outcome['sideSpecs'].map { |s| s['name'] }
+)
 ```
 
 ## WebSocket
@@ -688,6 +867,60 @@ sleep 60
 sdk.ws.close
 ```
 
+### clearinghouseState (per dex)
+
+```ruby
+sdk = Hyperliquid.new(testnet: true)
+user = '0x...'
+
+# Main dex (omit dex:) and a HIP-3 dex are separate subscriptions
+sdk.ws.subscribe({ type: 'clearinghouseState', user: user }) do |data|
+  puts "main dex account value: #{data['clearinghouseState']['marginSummary']['accountValue']}"
+end
+
+sdk.ws.subscribe({ type: 'clearinghouseState', user: user, dex: 'xyz' }) do |data|
+  puts "#{data['dex']} positions: #{data['clearinghouseState']['assetPositions'].length}"
+end
+
+sleep 10
+sdk.ws.close
+```
+
+### activeAssetCtx (Asset Context)
+
+```ruby
+sdk = Hyperliquid.new(testnet: true)
+
+# Perp, HIP-3 ('xyz:XYZ100') or spot ('PURR/USDC', '@107') coins
+sdk.ws.subscribe({ type: 'activeAssetCtx', coin: 'BTC' }) do |data|
+  puts "#{data['coin']} mark=#{data['ctx']['markPx']} funding=#{data['ctx']['funding']}"
+end
+
+sdk.ws.subscribe({ type: 'activeAssetCtx', coin: 'PURR/USDC' }) do |data|
+  puts "#{data['coin']} mark=#{data['ctx']['markPx']}"
+end
+
+sleep 10
+sdk.ws.close
+```
+
+### fastAssetCtxs (mark/mid prices, compressed)
+
+```ruby
+sdk = Hyperliquid.new(testnet: true)
+cache = {}
+
+# First frame: snapshot of every coin. Later frames: only changed coins/fields.
+# Frames arrive base64 + raw DEFLATE; the SDK decodes them before the callback.
+sdk.ws.subscribe({ type: 'fastAssetCtxs' }) do |ctxs|
+  cache.merge!(ctxs) { |_coin, old, new| old.merge(new) }
+  puts "BTC mark=#{cache.dig('BTC', 'markPx')} mid=#{cache.dig('BTC', 'midPx')} (#{cache.size} coins)"
+end
+
+sleep 10
+sdk.ws.close
+```
+
 ### Multiple Subscriptions
 
 ```ruby
@@ -703,6 +936,24 @@ end
 
 sdk.ws.subscribe({ type: 'trades', coin: 'ETH' }) do |trades|
   puts "ETH trade: #{trades.first['px']}" if trades.any?
+end
+
+sleep 10
+sdk.ws.close
+```
+
+### Explorer Blocks and Transactions
+
+```ruby
+sdk = Hyperliquid.new(testnet: true)
+
+# Separate connection to rpc.hyperliquid(-testnet).xyz/ws; each message is an Array
+sdk.ws.subscribe_explorer_block do |blocks|
+  blocks.each { |b| puts "block #{b['height']} with #{b['numTxs']} txs" }
+end
+
+sdk.ws.subscribe_explorer_txs do |txs|
+  txs.each { |tx| puts "#{tx['user']} #{tx.dig('action', 'type')} #{tx['hash']}" }
 end
 
 sleep 10

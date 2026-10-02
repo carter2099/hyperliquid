@@ -3,8 +3,7 @@ AllCops:
   TargetRubyVersion: 3.3
   SuggestExtensions: false
   Exclude:
-    - 'test_*.rb'  # Exclude ad-hoc integration test scripts
-    - 'scripts/**/*'  # Exclude integration test scripts
+    - 'scripts/**/*'  # Integration scripts: linted for Lint+Security only by `rake rubocop:scripts`
     - 'local/**/*'  # Exclude local test scripts
     - 'vendor/**/*'  # Exclude vendored gems (CI bundles here)
 
@@ -31,17 +30,6 @@ Metrics/ParameterLists:
   Exclude:
     - 'lib/hyperliquid/exchange.rb'
     - 'lib/hyperliquid/signing/multi_sig.rb'
-
-# Allow higher complexity for order type conversion logic and WS message handling
-Metrics/CyclomaticComplexity:
-  Exclude:
-    - 'lib/hyperliquid/exchange.rb'
-    - 'lib/hyperliquid/ws/client.rb'
-
-Metrics/PerceivedComplexity:
-  Exclude:
-    - 'lib/hyperliquid/exchange.rb'
-    - 'lib/hyperliquid/ws/client.rb'
 
 # Empty blocks are intentional in specs (no-op callbacks for subscription tests)
 Lint/EmptyBlock:

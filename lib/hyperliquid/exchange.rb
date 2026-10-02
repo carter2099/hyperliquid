@@ -34,6 +34,12 @@ module Hyperliquid
       @signer.address
     end
 
+    # Redacted representation: never exposes the signer's private key.
+    # @return [String]
+    def inspect
+      "#<#{self.class.name} address=#{address} testnet=#{@testnet} expires_after=#{@expires_after.inspect}>"
+    end
+
     # Place a single order
     # @param coin [String] Asset symbol (e.g., "BTC")
     # @param is_buy [Boolean] True for buy, false for sell
@@ -341,7 +347,7 @@ module Hyperliquid
     end
 
     # Schedule automatic cancellation of all orders
-    # @param time [Integer, nil] UTC timestamp in milliseconds to cancel at (nil to activate with server default)
+    # @param time [Integer, nil] UTC timestamp in milliseconds to cancel at (nil removes the scheduled cancel)
     # @param vault_address [String, nil] Vault address for vault trading (optional)
     # @return [Hash] Schedule cancel response
     def schedule_cancel(time: nil, vault_address: nil)
@@ -517,7 +523,7 @@ module Hyperliquid
     def create_sub_account(name:)
       nonce = timestamp_ms
       action = { type: 'createSubAccount', name: name }
-      signature = @signer.sign_l1_action(action, nonce)
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
       post_action(action, signature, nonce, nil)
     end
 
@@ -534,7 +540,7 @@ module Hyperliquid
         isDeposit: is_deposit,
         usd: float_to_usd_int(usd)
       }
-      signature = @signer.sign_l1_action(action, nonce)
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
       post_action(action, signature, nonce, nil)
     end
 
@@ -553,7 +559,7 @@ module Hyperliquid
         token: token,
         amount: amount.to_s
       }
-      signature = @signer.sign_l1_action(action, nonce)
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
       post_action(action, signature, nonce, nil)
     end
 
@@ -570,7 +576,7 @@ module Hyperliquid
         isDeposit: is_deposit,
         usd: float_to_usd_int(usd)
       }
-      signature = @signer.sign_l1_action(action, nonce)
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
       post_action(action, signature, nonce, nil)
     end
 
@@ -580,7 +586,7 @@ module Hyperliquid
     def set_referrer(code:)
       nonce = timestamp_ms
       action = { type: 'setReferrer', code: code }
-      signature = @signer.sign_l1_action(action, nonce)
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
       post_action(action, signature, nonce, nil)
     end
 
@@ -712,7 +718,8 @@ module Hyperliquid
     # Set the abstraction mode for a user (`userSetAbstraction` user-signed action).
     # The `user` address is lowercased to match the Python SDK and protocol expectations.
     # @param user [String] Wallet address whose abstraction is being set
-    # @param abstraction [String] One of 'u' (unified), 'p' (portfolio margin), 'i' (isolated/disabled)
+    # @param abstraction [String] One of 'unifiedAccount', 'portfolioMargin', 'disabled'
+    #   (long form; the L1 agentSetAbstraction uses 'u'/'p'/'i')
     # @return [Hash] Exchange response
     def user_set_abstraction(user:, abstraction:)
       nonce = timestamp_ms
@@ -1269,6 +1276,35 @@ module Hyperliquid
       post_action(action, signature, nonce, vault_address)
     end
 
+    # Place a trailing stop order (`trailingStop` L1 action).
+    # @param coin [String] Asset symbol
+    # @param is_buy [Boolean] True for buy/long, false for sell/short
+    # @param size [String, Numeric] Order size (base currency units)
+    # @param reduce_only [Boolean] Reduce-only flag
+    # @param retracement [Hash] Trailing retracement config, passed through verbatim:
+    #   { pct: "<percent String, e.g. '1.234%'>" } or { px: "<price String>" }
+    # @param activation_px [String, nil] Activation price; nil sends null (no activation threshold)
+    # @param vault_address [String, nil] Vault address if acting on behalf of a vault
+    # @return [Hash] Exchange response — on success `response.data.oid`
+    def trailing_stop(coin:, is_buy:, size:, reduce_only:, retracement:, activation_px: nil, vault_address: nil)
+      nonce = timestamp_ms
+      action = {
+        type: 'trailingStop',
+        asset: asset_index(coin),
+        isBuy: is_buy,
+        sz: float_to_wire(size),
+        reduceOnly: reduce_only,
+        retracement: retracement,
+        activationPx: activation_px
+      }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        vault_address: vault_address,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, vault_address)
+    end
+
     # Reserve additional rate-limited actions for a fee (`reserveRequestWeight` L1 action).
     # @param weight [Integer] Amount of request weight to reserve
     # @param destination [String, nil] Address of an existing user to reserve the weight for; nil omits the field
@@ -1360,18 +1396,130 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
-    # Activate or deactivate the signer as an outcome deployer
-    # (`activateOutcomeDeployer` L1 action, HIP-4).
-    # @param is_deactivate [Boolean] True to deactivate, false to activate
+    # Activate the signer as a HIP-4 outcome deployer and claim a venue name
+    # (`activateOutcomeDeployer` L1 action, activate variant). Irreversible in practice:
+    # the stake is locked for the minimum staking duration and the venue name stays
+    # reserved forever. Requires Standard account abstraction ("disabled").
+    # @param venue_name [String] Venue to claim (2-4 lowercase ASCII letters; server-validated)
     # @return [Hash] Exchange response
-    def activate_outcome_deployer(is_deactivate:)
-      nonce = timestamp_ms
-      action = { type: 'activateOutcomeDeployer', isDeactivate: is_deactivate }
-      signature = @signer.sign_l1_action(
-        action, nonce,
-        expires_after: @expires_after
+    def activate_outcome_deployer(venue_name:)
+      outcome_deployer_activation({ activate: { venueName: venue_name } })
+    end
+
+    # Permanently deactivate the signer as a HIP-4 outcome deployer
+    # (`activateOutcomeDeployer` L1 action, deactivate variant). Requires the minimum
+    # staking duration to have elapsed and no active outcomes; the account can never
+    # activate again and its venue name stays reserved.
+    # @return [Hash] Exchange response
+    def deactivate_outcome_deployer
+      outcome_deployer_activation({ deactivate: nil })
+    end
+
+    # HIP-4: deploy a standalone YES/NO outcome from a standalone-outcome template
+    # (`outcomeDeploy` L1 action, registerStandaloneOutcomeFromTemplate operation).
+    # The response is passed through unmodified; callers must check its `status`.
+    # @param venue [String] Deployer venue (sub-deployers pass the venue they act for)
+    # @param template_id [String] Template id (see Info#outcome_templates)
+    # @param keyword_to_value [Hash, Array<Array(String, String)>] One value per template
+    #   keyword; keys/values are stringified and sorted by keyword before signing
+    # @param deployer_fee_scale [String, Numeric] Decimal in [0, 10]; Strings are sent verbatim
+    # @return [Hash] Exchange response
+    def register_standalone_outcome_from_template(venue:, template_id:, keyword_to_value:, deployer_fee_scale:)
+      instance = outcome_template_instance(template_id, keyword_to_value, deployer_fee_scale)
+      outcome_deploy_action(venue, { registerStandaloneOutcomeFromTemplate: instance })
+    end
+
+    # HIP-4: deploy a question plus its named outcomes in one action
+    # (`outcomeDeploy` L1 action, registerQuestionFromTemplate operation). The protocol
+    # also creates the question's fallback outcome.
+    # @param venue [String] Deployer venue
+    # @param template_id [String] Question template id
+    # @param keyword_to_value [Hash, Array] Question template keyword values (sorted by the SDK)
+    # @param deployer_fee_scale [String, Numeric] Decimal in [0, 10], applies to every outcome of the question
+    # @param named_outcomes [Array<Hash>] Each `{ template_id:, keyword_to_value: }`; order preserved
+    # @return [Hash] Exchange response
+    def register_question_from_template(venue:, template_id:, keyword_to_value:, deployer_fee_scale:, named_outcomes:)
+      outcome_deploy_action(
+        venue,
+        { registerQuestionFromTemplate: {
+          questionTemplateInstance: outcome_template_instance(template_id, keyword_to_value, deployer_fee_scale),
+          namedOutcomeTemplateInstances: named_outcomes.map do |named|
+            outcome_template_instance(named.fetch(:template_id), named.fetch(:keyword_to_value))
+          end
+        } }
       )
-      post_action(action, signature, nonce, nil)
+    end
+
+    # HIP-4: add one named outcome to a live template-deployed question
+    # (`outcomeDeploy` L1 action, registerAndAssociateNamedOutcomeFromTemplate operation).
+    # @param venue [String] Deployer venue
+    # @param question [Integer] Question identifier
+    # @param template_id [String] Question-outcome template id (parent must be the question's template)
+    # @param keyword_to_value [Hash, Array] Template keyword values (sorted by the SDK)
+    # @return [Hash] Exchange response
+    def register_and_associate_named_outcome_from_template(venue:, question:, template_id:, keyword_to_value:)
+      outcome_deploy_action(
+        venue,
+        { registerAndAssociateNamedOutcomeFromTemplate: {
+          question: question.to_i,
+          namedOutcomeTemplateInstance: outcome_template_instance(template_id, keyword_to_value)
+        } }
+      )
+    end
+
+    # HIP-4: settle one outcome of the venue (`outcomeDeploy` L1 action, settleOutcome operation).
+    # `name`, `description` and `side_names` must exactly match the outcome (copy them from
+    # Info#outcome_meta: name, description, sideSpecs[].name).
+    # @param venue [String] Deployer venue
+    # @param outcome [Integer] Outcome identifier
+    # @param settle_fraction [String, Numeric] Payout fraction of the first side in [0, 1]
+    # @param name [String] Outcome name
+    # @param description [String] Outcome description
+    # @param side_names [Array<String>] The two side names
+    # @param details [String] Settlement details (protocol currently requires '')
+    # @return [Hash] Exchange response
+    def settle_outcome(venue:, outcome:, settle_fraction:, name:, description:, side_names:, details: '')
+      settlement = outcome_settlement(outcome: outcome, settle_fraction: settle_fraction, name: name,
+                                      description: description, side_names: side_names, details: details)
+      outcome_deploy_action(venue, { settleOutcome: settlement })
+    end
+
+    # HIP-4: settle all remaining named outcomes of a question in one action
+    # (`outcomeDeploy` L1 action, settleQuestion2 operation; the original settleQuestion
+    # is discontinued). Exactly one settlement must use fraction "1", the rest "0".
+    # @param venue [String] Deployer venue
+    # @param question [Integer] Question identifier
+    # @param name [String] Question name (must match outcome_meta)
+    # @param description [String] Question description (must match outcome_meta)
+    # @param settlements [Array<Hash>] Each `{ outcome:, settle_fraction:, name:, description:,
+    #   side_names:, details: '' }` with Symbol keys; order preserved
+    # @return [Hash] Exchange response
+    def settle_question(venue:, question:, name:, description:, settlements:)
+      outcome_deploy_action(
+        venue,
+        { settleQuestion2: {
+          question: question.to_i,
+          outcomeSettlements: settlements.map { |s| outcome_settlement(**s) },
+          nameAndDescription: [name, description]
+        } }
+      )
+    end
+
+    # HIP-4: grant or revoke sub-deployer permissions per operation
+    # (`outcomeDeploy` L1 action, setSubDeployers operation).
+    # @param venue [String] Deployer venue
+    # @param changes [Array<Hash>] Each `{ variant:, user:, allowed: }` where variant is the camelCase
+    #   wire name (registerStandaloneOutcomeFromTemplate, registerQuestionFromTemplate,
+    #   registerAndAssociateNamedOutcomeFromTemplate, settleOutcome, or settleQuestion — which
+    #   authorizes settle_question); user is lowercased; order preserved
+    # @return [Hash] Exchange response
+    def set_outcome_sub_deployers(venue:, changes:)
+      outcome_deploy_action(
+        venue,
+        { setSubDeployers: changes.map do |change|
+          { variant: change.fetch(:variant).to_s, user: change.fetch(:user).downcase, allowed: change.fetch(:allowed) }
+        end }
+      )
     end
 
     # Finalize the link between a HyperCore spot token and an ERC-20 contract on
@@ -1425,6 +1573,520 @@ module Hyperliquid
       post_action(action, signature, nonce, nil)
     end
 
+    # Validator operators: jail the signer's own validator (`CSignerAction` L1 action, jailSelf variant).
+    # Must be signed by the validator's registered signer key.
+    # @return [Hash] Exchange response
+    def c_signer_jail_self
+      c_signer_action(:jailSelf)
+    end
+
+    # Validator operators: unjail the signer's own validator (`CSignerAction` L1 action, unjailSelf variant).
+    # Must be signed by the validator's registered signer key.
+    # @return [Hash] Exchange response
+    def c_signer_unjail_self
+      c_signer_action(:unjailSelf)
+    end
+
+    # Validator operators: vote on the risk-free rate for the aligned quote asset
+    # (`validatorL1Stream` L1 action).
+    # @param risk_free_rate [String, Numeric] Rate as a decimal (e.g. "0.04" for 4%); normalised via float_to_wire
+    # @return [Hash] Exchange response
+    def validator_l1_stream(risk_free_rate:)
+      nonce = timestamp_ms
+      action = { type: 'validatorL1Stream', riskFreeRate: float_to_wire(risk_free_rate) }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Validator operators: register a new validator (`CValidatorAction` L1 action, register variant).
+    # Signed by the validator (owner) key. Wire keys are protocol-literal snake_case.
+    # @param node_ip [String] Validator node IP address (sent as { Ip: node_ip })
+    # @param name [String] Validator name
+    # @param description [String] Validator description
+    # @param delegations_disabled [Boolean] Whether delegations are disabled
+    # @param commission_bps [Integer] Commission in basis points
+    # @param signer [String] Signer address (lowercased)
+    # @param unjailed [Boolean] Initial jail status (true = unjailed)
+    # @param initial_wei [Integer] Initial self-stake in wei
+    # @return [Hash] Exchange response
+    def c_validator_register(node_ip:, name:, description:, delegations_disabled:, commission_bps:,
+                             signer:, unjailed:, initial_wei:)
+      c_validator_action(
+        register: {
+          profile: {
+            node_ip: { Ip: node_ip },
+            name: name,
+            description: description,
+            delegations_disabled: delegations_disabled,
+            commission_bps: Integer(commission_bps),
+            signer: signer.downcase
+          },
+          unjailed: unjailed,
+          initial_wei: Integer(initial_wei)
+        }
+      )
+    end
+
+    # Validator operators: change the validator profile (`CValidatorAction` L1 action, changeProfile variant).
+    # Every field is always sent; nil means "leave unchanged" (sent as JSON null).
+    # @param unjailed [Boolean] Desired jail status (required)
+    # @param node_ip [String, nil] New node IP (sent as { Ip: node_ip }) or nil
+    # @param name [String, nil] New name or nil
+    # @param description [String, nil] New description or nil
+    # @param disable_delegations [Boolean, nil] Enable/disable delegations, or nil
+    # @param commission_bps [Integer, nil] New commission in basis points, or nil
+    # @param signer [String, nil] New signer address (lowercased), or nil
+    # @return [Hash] Exchange response
+    def c_validator_change_profile(unjailed:, node_ip: nil, name: nil, description: nil,
+                                   disable_delegations: nil, commission_bps: nil, signer: nil)
+      c_validator_action(
+        changeProfile: {
+          node_ip: node_ip.nil? ? nil : { Ip: node_ip },
+          name: name,
+          description: description,
+          unjailed: unjailed,
+          disable_delegations: disable_delegations,
+          commission_bps: commission_bps.nil? ? nil : Integer(commission_bps),
+          signer: signer&.downcase
+        }
+      )
+    end
+
+    # Validator operators: unregister the validator (`CValidatorAction` L1 action, unregister variant).
+    # @return [Hash] Exchange response
+    def c_validator_unregister
+      c_validator_action(unregister: nil)
+    end
+
+    # --- HIP-3 perp deployer actions (perpDeploy L1 action) ---
+    # All are L1-signed `perpDeploy` actions; none accept vault_address; expires_after propagates.
+    # Coins are full HIP-3 names ("<dex>:<COIN>"). Decimal args accept String (sent verbatim)
+    # or Numeric (normalized via float_to_wire). Integer args are Integer()-coerced and never scaled.
+
+    # Register a new asset on a HIP-3 perp dex (legacy `registerAsset` variant, Python SDK parity).
+    # Passing `schema:` also creates the dex (first registration). `max_gas: nil` bids the current
+    # deploy-auction price; `max_gas: 0` uses a reserve deployment (check perp_deploy_auction_status first).
+    # @param dex [String] Perp dex name (2-4 lowercase chars)
+    # @param coin [String] Full asset name, e.g. "test:TEST0"
+    # @param sz_decimals [Integer] Size decimals
+    # @param oracle_px [String, Numeric] Initial oracle price
+    # @param margin_table_id [Integer] Margin table id
+    # @param only_isolated [Boolean] Whether the asset is isolated-margin only
+    # @param max_gas [Integer, nil] Max gas in native-token wei; nil = current auction price
+    # @param schema [Hash, nil] New-dex schema:
+    #   { full_name:, collateral_token:, oracle_updater: nil, is_star: (optional) }
+    # @return [Hash] Exchange response
+    def perp_deploy_register_asset(dex:, coin:, sz_decimals:, oracle_px:, margin_table_id:, only_isolated:,
+                                   max_gas: nil, schema: nil)
+      asset_request = perp_deploy_asset_request(coin, sz_decimals, oracle_px, margin_table_id)
+      asset_request[:onlyIsolated] = only_isolated
+      perp_deploy_action(:registerAsset, perp_deploy_register_payload(asset_request, dex, max_gas, schema))
+    end
+
+    # Register a new asset with an explicit margin mode (`registerAsset2` variant).
+    # @param margin_mode [String] "strictIsolated", "noCross", or "normal"
+    # (other params as perp_deploy_register_asset)
+    # @return [Hash] Exchange response
+    def perp_deploy_register_asset2(dex:, coin:, sz_decimals:, oracle_px:, margin_table_id:, margin_mode:,
+                                    max_gas: nil, schema: nil)
+      asset_request = perp_deploy_asset_request(coin, sz_decimals, oracle_px, margin_table_id)
+      asset_request[:marginMode] = margin_mode
+      perp_deploy_action(:registerAsset2, perp_deploy_register_payload(asset_request, dex, max_gas, schema))
+    end
+
+    # Push oracle, mark, and external perp prices (`setOracle` variant; ≥2.5s between calls).
+    # @param dex [String] Perp dex name
+    # @param oracle_pxs [Hash{String=>String,Numeric}] coin => oracle price
+    # @param all_mark_pxs [Array<Hash{String=>String,Numeric}>] 0-2 hashes of coin => mark price
+    # @param external_perp_pxs [Hash{String=>String,Numeric}] coin => external perp price (must include all assets)
+    # @return [Hash] Exchange response
+    def perp_deploy_set_oracle(dex:, oracle_pxs:, all_mark_pxs:, external_perp_pxs:)
+      perp_deploy_action(:setOracle, {
+                           dex: dex,
+                           oraclePxs: sorted_coin_pairs(oracle_pxs) { |px| perp_deploy_decimal(px) },
+                           markPxs: all_mark_pxs.map { |pxs| sorted_coin_pairs(pxs) { |px| perp_deploy_decimal(px) } },
+                           externalPerpPxs: sorted_coin_pairs(external_perp_pxs) { |px| perp_deploy_decimal(px) }
+                         })
+    end
+
+    # Set per-asset funding multipliers (`setFundingMultipliers` variant).
+    # @param multipliers [Hash{String=>String,Numeric}] coin => funding multiplier (0-10)
+    # @return [Hash] Exchange response
+    def perp_deploy_set_funding_multipliers(multipliers:)
+      perp_deploy_action(:setFundingMultipliers, sorted_coin_pairs(multipliers) { |v| perp_deploy_decimal(v) })
+    end
+
+    # Set per-asset funding interest rates (`setFundingInterestRates` variant).
+    # @param rates [Hash{String=>String,Numeric}] coin => 8h interest rate (-0.01..0.01)
+    # @return [Hash] Exchange response
+    def perp_deploy_set_funding_interest_rates(rates:)
+      perp_deploy_action(:setFundingInterestRates, sorted_coin_pairs(rates) { |v| perp_deploy_decimal(v) })
+    end
+
+    # Set per-asset funding clamps (`setFundingClamps` variant).
+    # @param clamps [Hash{String=>String,Numeric}] coin => 8h funding clamp (0..0.01; default 0.0003)
+    # @return [Hash] Exchange response
+    def perp_deploy_set_funding_clamps(clamps:)
+      perp_deploy_action(:setFundingClamps, sorted_coin_pairs(clamps) { |v| perp_deploy_decimal(v) })
+    end
+
+    # Halt or resume trading on a HIP-3 asset (`haltTrading` variant).
+    # @param coin [String] Full asset name
+    # @param is_halted [Boolean] true halts trading, false resumes
+    # @return [Hash] Exchange response
+    def perp_deploy_halt_trading(coin:, is_halted:)
+      perp_deploy_action(:haltTrading, { coin: coin, isHalted: is_halted })
+    end
+
+    # Insert a margin table on a HIP-3 perp dex (`insertMarginTable` variant).
+    # Integer() coercion: Floats truncate; Strings use Ruby literal prefixes ('0x10' == 16).
+    # @param dex [String] Perp dex name
+    # @param description [String] Margin table description
+    # @param margin_tiers [Array<Hash>] ≤3 tiers { lower_bound: Integer (1e-6 collateral units), max_leverage: 1..50 },
+    #   increasing lower_bound / decreasing max_leverage; order preserved
+    # @return [Hash] Exchange response
+    def perp_deploy_insert_margin_table(dex:, description:, margin_tiers:)
+      tiers = margin_tiers.map do |tier|
+        { lowerBound: Integer(tier.fetch(:lower_bound)), maxLeverage: Integer(tier.fetch(:max_leverage)) }
+      end
+      perp_deploy_action(:insertMarginTable,
+                         { dex: dex, marginTable: { description: description, marginTiers: tiers } })
+    end
+
+    # Assign margin tables to assets (`setMarginTableIds` variant).
+    # @param margin_table_ids [Hash{String=>Integer}] coin => non-zero margin table id
+    # @return [Hash] Exchange response
+    def perp_deploy_set_margin_table_ids(margin_table_ids:)
+      perp_deploy_action(:setMarginTableIds, sorted_coin_pairs(margin_table_ids) { |id| Integer(id) })
+    end
+
+    # Set per-asset margin modes (`setMarginModes` variant); modes are passed through verbatim.
+    # @param margin_modes [Hash{String=>String}] coin => "strictIsolated" | "noCross" | "normal"
+    # @return [Hash] Exchange response
+    def perp_deploy_set_margin_modes(margin_modes:)
+      perp_deploy_action(:setMarginModes, sorted_coin_pairs(margin_modes) { |mode| mode })
+    end
+
+    # Set per-asset open interest caps (`setOpenInterestCaps` variant; caps ≥ 1_000_000).
+    # @param caps [Hash{String=>Integer,nil}] coin => OI cap notional in 1e-6 collateral units;
+    #   nil removes the custom cap
+    # @return [Hash] Exchange response
+    def perp_deploy_set_open_interest_caps(caps:)
+      perp_deploy_action(:setOpenInterestCaps, sorted_coin_pairs(caps) { |cap| cap.nil? ? nil : Integer(cap) })
+    end
+
+    # Set the fee recipient of a HIP-3 perp dex (`setFeeRecipient` variant).
+    # @param dex [String] Perp dex name
+    # @param fee_recipient [String] Fee recipient address (lowercased)
+    # @return [Hash] Exchange response
+    def perp_deploy_set_fee_recipient(dex:, fee_recipient:)
+      perp_deploy_action(:setFeeRecipient, { dex: dex, feeRecipient: fee_recipient.downcase })
+    end
+
+    # Per-asset deployer fee share + growth mode (`setDeployerFees`; mainnet: one change per 30 days).
+    # @param fees [Hash{String=>Hash}] coin => { scale: String|Numeric, growth_mode: Boolean };
+    #   scale 0..3, or <10 with growth mode
+    # @return [Hash] Exchange response
+    def perp_deploy_set_deployer_fees(fees:)
+      perp_deploy_action(:setDeployerFees, sorted_coin_pairs(fees) do |fee|
+        { scale: perp_deploy_decimal(fee.fetch(:scale)), growthMode: fee.fetch(:growth_mode) }
+      end)
+    end
+
+    # Grant or revoke sub-deployer permissions (`setSubDeployers` variant); entry order is preserved.
+    # @param dex [String] Perp dex name
+    # @param sub_deployers [Array<Hash>] { variant:, user:, allowed: Boolean }; variant is a String
+    #   (e.g. "setOracle") or a Hash (e.g. { hip3Star: "order" }) passed through verbatim; user is lowercased
+    # @return [Hash] Exchange response
+    def perp_deploy_set_sub_deployers(dex:, sub_deployers:)
+      entries = sub_deployers.map do |entry|
+        { variant: entry.fetch(:variant), user: entry.fetch(:user).downcase, allowed: entry.fetch(:allowed) }
+      end
+      perp_deploy_action(:setSubDeployers, { dex: dex, subDeployers: entries })
+    end
+
+    # Set an asset's annotation (`setPerpAnnotation` variant).
+    # @param coin [String] Full asset name
+    # @param category [String] ≤15 chars
+    # @param description [String] ≤400 chars
+    # @param display_name [String, nil] ≤9 chars; nil sends null
+    # @param keywords [Array<String>] ≤2 keywords, each ≤10 chars
+    # @return [Hash] Exchange response
+    def perp_deploy_set_perp_annotation(coin:, category:, description:, display_name: nil, keywords: [])
+      perp_deploy_action(:setPerpAnnotation, {
+                           coin: coin, category: category, description: description,
+                           displayName: display_name, keywords: keywords
+                         })
+    end
+
+    # Disable (shut down) a HIP-3 perp dex (`disableDex` variant).
+    # @param dex [String] Name of the perp dex to disable
+    # @return [Hash] Exchange response
+    def perp_deploy_disable_dex(dex:)
+      perp_deploy_action(:disableDex, dex)
+    end
+
+    # ---- Spot deploy (HIP-1 / HIP-2): one `spotDeploy` L1 action, one method per variant ----
+
+    # Register a new spot token via the deploy gas auction (`spotDeploy.registerToken2`, L1).
+    # On success `response.data` is the new token index.
+    # @param token_name [String] Token ticker
+    # @param sz_decimals [Integer] Size decimals
+    # @param wei_decimals [Integer] Wei decimals
+    # @param max_gas [Integer] Maximum auction gas the deployer will pay (HYPE wei units)
+    # @param full_name [String, nil] Optional full name (omitted when nil)
+    # Integer params accept an Integer or an integer String (coerced with Integer(); Floats are truncated).
+    # @return [Hash] Exchange response
+    def spot_deploy_register_token(token_name:, sz_decimals:, wei_decimals:, max_gas:, full_name: nil)
+      register_token = {
+        spec: { name: token_name, szDecimals: Integer(sz_decimals), weiDecimals: Integer(wei_decimals) },
+        maxGas: Integer(max_gas)
+      }
+      register_token[:fullName] = full_name unless full_name.nil?
+      spot_deploy_action(:registerToken2, register_token)
+    end
+
+    # Assign genesis balances for a deployed token (`spotDeploy.userGenesis`, L1). Repeatable.
+    # @param token [Integer] Token index
+    # @param user_and_wei [Array<Array(String, Integer|String)>] [[address, wei], ...]
+    # @param existing_token_and_wei [Array<Array(Integer, Integer|String)>] [[token, wei], ...]
+    # @param blacklist_users [Array<Array(String, Boolean)>, nil] Omitted when nil. The server rejects it
+    #   (even []) unless both other lists are empty.
+    # @return [Hash] Exchange response
+    def spot_deploy_user_genesis(token:, user_and_wei:, existing_token_and_wei:, blacklist_users: nil)
+      user_genesis = {
+        token: Integer(token),
+        userAndWei: user_and_wei.map { |user, wei| [user.downcase, wei_to_wire(wei)] },
+        existingTokenAndWei: existing_token_and_wei.map { |existing, wei| [Integer(existing), wei_to_wire(wei)] }
+      }
+      unless blacklist_users.nil?
+        user_genesis[:blacklistUsers] = blacklist_users.map { |user, blacklist| [user.downcase, blacklist] }
+      end
+      spot_deploy_action(:userGenesis, user_genesis)
+    end
+
+    # Finalize genesis for a deployed token (`spotDeploy.genesis`, L1).
+    # @param token [Integer] Token index
+    # @param max_supply [Integer, String] Maximum supply in wei (Float raises ArgumentError)
+    # @param no_hyperliquidity [Boolean] Send `noHyperliquidity: true` (omitted when false)
+    # @return [Hash] Exchange response
+    def spot_deploy_genesis(token:, max_supply:, no_hyperliquidity: false)
+      genesis = { token: Integer(token), maxSupply: wei_to_wire(max_supply) }
+      genesis[:noHyperliquidity] = true if no_hyperliquidity
+      spot_deploy_action(:genesis, genesis)
+    end
+
+    # Register a spot pair (`spotDeploy.registerSpot`, L1).
+    # On success `response.data` is the new spot (pair) index.
+    # @param base_token [Integer] Base token index
+    # @param quote_token [Integer] Quote token index
+    # @return [Hash] Exchange response
+    def spot_deploy_register_spot(base_token:, quote_token:)
+      spot_deploy_action(:registerSpot, { tokens: [Integer(base_token), Integer(quote_token)] })
+    end
+
+    # Seed Hyperliquidity for a spot pair (`spotDeploy.registerHyperliquidity`, L1).
+    # @param spot [Integer] Spot (pair) index
+    # @param start_px [Float, String] Starting price
+    # @param order_sz [Float, String] Size of each order
+    # @param n_orders [Integer] Number of orders
+    # @param n_seeded_levels [Integer, nil] Number of seeded levels (omitted when nil)
+    # @return [Hash] Exchange response
+    def spot_deploy_register_hyperliquidity(spot:, start_px:, order_sz:, n_orders:, n_seeded_levels: nil)
+      register = {
+        spot: Integer(spot),
+        startPx: float_to_wire(start_px),
+        orderSz: float_to_wire(order_sz),
+        nOrders: Integer(n_orders)
+      }
+      register[:nSeededLevels] = Integer(n_seeded_levels) unless n_seeded_levels.nil?
+      spot_deploy_action(:registerHyperliquidity, register)
+    end
+
+    # Set the deployer trading fee share (`spotDeploy.setDeployerTradingFeeShare`, L1).
+    # @param token [Integer] Token index
+    # @param share [String] Percent string, e.g. "0.012%" or "100%" (may only decrease)
+    # @return [Hash] Exchange response
+    def spot_deploy_set_deployer_trading_fee_share(token:, share:)
+      spot_deploy_action(:setDeployerTradingFeeShare, { token: Integer(token), share: share })
+    end
+
+    # Enable the freeze privilege (`spotDeploy.enableFreezePrivilege`, L1).
+    # Must be sent before genesis (server: "Genesis error: genesis already happened").
+    # @param token [Integer] Token index
+    # @return [Hash] Exchange response
+    def spot_deploy_enable_freeze_privilege(token:)
+      spot_deploy_action(:enableFreezePrivilege, { token: Integer(token) })
+    end
+
+    # Freeze or unfreeze a user's balance of the token (`spotDeploy.freezeUser`, L1).
+    # @param token [Integer] Token index
+    # @param user [String] User address (lowercased)
+    # @param freeze [Boolean] true to freeze, false to unfreeze
+    # @return [Hash] Exchange response
+    def spot_deploy_freeze_user(token:, user:, freeze:)
+      spot_deploy_action(:freezeUser, { token: Integer(token), user: user.downcase, freeze: freeze })
+    end
+
+    # Permanently give up the freeze privilege (`spotDeploy.revokeFreezePrivilege`, L1).
+    # @param token [Integer] Token index
+    # @return [Hash] Exchange response
+    def spot_deploy_revoke_freeze_privilege(token:)
+      spot_deploy_action(:revokeFreezePrivilege, { token: Integer(token) })
+    end
+
+    # Make the token a permissionless quote token (`spotDeploy.enableQuoteToken`, L1).
+    # Irreversible per protocol docs; requires zero deployer fee share and quote-token staking.
+    # @param token [Integer] Token index
+    # @return [Hash] Exchange response
+    def spot_deploy_enable_quote_token(token:)
+      spot_deploy_action(:enableQuoteToken, { token: Integer(token) })
+    end
+
+    # Disable the token as a quote token (`spotDeploy.disableQuoteToken`, L1).
+    # @param token [Integer] Token index
+    # @return [Hash] Exchange response
+    def spot_deploy_disable_quote_token(token:)
+      spot_deploy_action(:disableQuoteToken, { token: Integer(token) })
+    end
+
+    # Request linking a Core spot token to an ERC-20 on HyperEVM (`spotDeploy.requestEvmContract`, L1);
+    # finalize with #finalize_evm_contract.
+    # @param token [Integer] Token index
+    # @param address [String] ERC-20 contract address (lowercased)
+    # @param evm_extra_wei_decimals [Integer] EVM wei decimals minus Core wei decimals, in [-2, 18]
+    # @return [Hash] Exchange response
+    def spot_deploy_request_evm_contract(token:, address:, evm_extra_wei_decimals:)
+      request = {
+        token: Integer(token),
+        address: address.downcase,
+        evmExtraWeiDecimals: Integer(evm_extra_wei_decimals)
+      }
+      spot_deploy_action(:requestEvmContract, request)
+    end
+
+    # Set the token annotation (`spotDeploy.setTokenAnnotation`, L1). Changeable at most once per day.
+    # @param token [Integer] Token index
+    # @param category [String] Category
+    # @param description [String] Description
+    # @param keywords [Array<String>] Keywords
+    # @param display_name [String, nil] Display name; nil is sent as JSON null
+    # @return [Hash] Exchange response
+    def spot_deploy_set_token_annotation(token:, category:, description:, keywords:, display_name: nil)
+      annotation = { category: category, description: description, displayName: display_name, keywords: keywords }
+      spot_deploy_action(:setTokenAnnotation, { token: Integer(token), annotation: annotation })
+    end
+
+    # Set the deployer label (`spotDeploy.setDeployerLabel`, L1).
+    # Settable once per deployer; 2-4 lowercase chars, unique across deployers and perp dexs.
+    # @param label [String] Label
+    # @return [Hash] Exchange response
+    def spot_deploy_set_deployer_label(label:)
+      spot_deploy_action(:setDeployerLabel, { label: label })
+    end
+
+    # HIP-3* (testnet-only) star operations — perpDeploy action, star variant
+
+    # Add (true) or remove (false) a user on a HIP-3* venue's allow-list
+    # (`perpDeploy` L1 action, star proxy modifyApproval). Testnet-only.
+    # @param dex [String] HIP-3* perp dex name
+    # @param user [String] Proxied user address (lowercased)
+    # @param approved [Boolean] true adds the user, false removes them and clears their flags
+    # @return [Hash] Exchange response
+    def star_modify_approval(dex:, user:, approved:)
+      star_proxy_action(dex, user, { modifyApproval: approved })
+    end
+
+    # Allow or disallow a user to deposit to/withdraw from a HIP-3* venue's backstop liquidator
+    # (`perpDeploy` L1 action, star proxy modifyBackstopLiquidatorApproval). Testnet-only.
+    # @param dex [String] HIP-3* perp dex name
+    # @param user [String] Proxied user address (lowercased)
+    # @param allowed [Boolean] Allow the user to deposit to/withdraw from the venue's backstop liquidator
+    # @return [Hash] Exchange response
+    def star_modify_backstop_liquidator_approval(dex:, user:, allowed:)
+      star_proxy_action(dex, user, { modifyBackstopLiquidatorApproval: allowed })
+    end
+
+    # Set or clear reduce-only mode for an approved user on a HIP-3* venue
+    # (`perpDeploy` L1 action, star proxy setReduceOnly). Testnet-only.
+    # @param dex [String] HIP-3* perp dex name
+    # @param user [String] Proxied user address (lowercased)
+    # @param reduce_only [Boolean] Restrict an approved user to reducing positions on the venue
+    # @return [Hash] Exchange response
+    def star_set_reduce_only(dex:, user:, reduce_only:)
+      star_proxy_action(dex, user, { setReduceOnly: reduce_only })
+    end
+
+    # Cancel a user's resting orders on a HIP-3* venue
+    # (`perpDeploy` L1 action, star proxy cancel). Testnet-only.
+    # @param dex [String] HIP-3* perp dex name
+    # @param user [String] Proxied user address (lowercased)
+    # @param cancels [Array<Hash>] Array of { coin:, oid: } (the user's resting orders)
+    # @return [Hash] Exchange response
+    def star_cancel(dex:, user:, cancels:)
+      cancel_wires = cancels.map { |c| { a: asset_index(c[:coin]), o: c[:oid] } }
+      star_proxy_action(dex, user, { cancel: { cancels: cancel_wires } })
+    end
+
+    # Cancel all of a user's orders and TWAPs on a HIP-3* venue, optionally per coin
+    # (`perpDeploy` L1 action, star proxy cancelAll). Testnet-only.
+    # @param dex [String] HIP-3* perp dex name
+    # @param user [String] Proxied user address (lowercased)
+    # @param coins [Array<String>, nil] Coins to cancel orders/TWAPs for (1-10); nil cancels all (sends null)
+    # @return [Hash] Exchange response
+    def star_cancel_all(dex:, user:, coins: nil)
+      assets = coins&.map { |coin| asset_index(coin) }
+      star_proxy_action(dex, user, { cancelAll: { assets: assets } })
+    end
+
+    # Place orders on behalf of a user on a HIP-3* venue
+    # (`perpDeploy` L1 action, star proxy order). Testnet-only.
+    # @param dex [String] HIP-3* perp dex name
+    # @param user [String] Proxied user address (lowercased)
+    # @param orders [Array<Hash>] bulk_orders-shaped hashes (:coin, :is_buy, :size, :limit_px,
+    #   :order_type, :reduce_only, :cloid); :reduce_only defaults to true (server requires reduce-only)
+    # @param grouping [String] Order grouping (default "na")
+    # @return [Hash] Exchange response
+    def star_order(dex:, user:, orders:, grouping: 'na')
+      order_wires = orders.map do |o|
+        build_order_wire(
+          coin: o[:coin],
+          is_buy: o[:is_buy],
+          size: o[:size],
+          limit_px: o[:limit_px],
+          order_type: o[:order_type] || { limit: { tif: 'Gtc' } },
+          reduce_only: o.fetch(:reduce_only, true),
+          cloid: o[:cloid]
+        )
+      end
+      star_proxy_action(dex, user, { order: { orders: order_wires, grouping: grouping } })
+    end
+
+    # Send collateral from a user to another address on the same HIP-3* venue
+    # (`perpDeploy` L1 action, star proxy sendAsset). Testnet-only.
+    # @param dex [String] HIP-3* perp dex name
+    # @param user [String] Proxied (sending) user address (lowercased)
+    # @param destination [String] Recipient address on the same venue (lowercased)
+    # @param amount [String, Numeric] Collateral amount; Strings sent verbatim, Numerics via float_to_wire
+    #   (perp_deploy_decimal)
+    # @return [Hash] Exchange response
+    def star_send_asset(dex:, user:, destination:, amount:)
+      send_asset = { destination: destination.downcase, amount: perp_deploy_decimal(amount) }
+      star_proxy_action(dex, user, { sendAsset: send_asset })
+    end
+
+    # Set HIP-3* spot oracle prices (`perpDeploy` L1 action, star setOracle). Testnet-only.
+    # @param dex [String] HIP-3* perp dex name
+    # @param oracle_pxs [Hash{String=>String,Numeric}] Dex-prefixed coin => price; sorted by coin.
+    #   Strings are sent verbatim, Numerics normalized via float_to_wire (perp_deploy_decimal)
+    # @return [Hash] Exchange response
+    def star_set_oracle(dex:, oracle_pxs:)
+      star_action(dex, { setOracle: { oraclePxs: sorted_coin_pairs(oracle_pxs) { |px| perp_deploy_decimal(px) } } })
+    end
+
     # Clear the asset metadata cache
     # Call this if metadata has been updated
     def reload_metadata!
@@ -1449,7 +2111,7 @@ module Hyperliquid
 
     # Get current timestamp in milliseconds
     def timestamp_ms
-      (Time.now.to_f * 1000).to_i
+      Process.clock_gettime(Process::CLOCK_REALTIME, :millisecond)
     end
 
     # Find a position for a coin
@@ -1527,9 +2189,17 @@ module Hyperliquid
       end
     end
 
+    # spotMeta carries szDecimals on tokens[], not on universe[] pairs; a pair's
+    # size decimals are its base token's (pair['tokens'][0], matched by token index).
     def load_spot_assets
-      @info.spot_meta['universe'].each_with_index do |pair, index|
-        cache_asset(pair['name'], index + SPOT_ASSET_THRESHOLD, pair['szDecimals'] || 0, is_spot: true)
+      spot_meta = @info.spot_meta
+      tokens_by_index = spot_meta['tokens'].to_h { |token| [token['index'], token] }
+      spot_meta['universe'].each_with_index do |pair, index|
+        base_index = pair['tokens'][0]
+        base_token = tokens_by_index[base_index]
+        raise Error, "spotMeta pair #{pair['name']} references unknown base token index #{base_index}" unless base_token
+
+        cache_asset(pair['name'], index + SPOT_ASSET_THRESHOLD, base_token['szDecimals'], is_spot: true)
       end
     end
 
@@ -1584,6 +2254,64 @@ module Hyperliquid
       normalized.sub(/(\.\d*?)0+\z/, '\1').sub(/\.\z/, '')
     end
 
+    # Sign and post a HIP-4 `outcomeDeploy` L1 action. Key order type, venue, operation is load-bearing.
+    def outcome_deploy_action(venue, operation)
+      nonce = timestamp_ms
+      action = { type: 'outcomeDeploy', venue: venue, operation: operation }
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Sign and post an `activateOutcomeDeployer` L1 action with the given enum variant.
+    def outcome_deployer_activation(variant)
+      nonce = timestamp_ms
+      action = { type: 'activateOutcomeDeployer' }.merge(variant)
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Template instance { id, keywordToValue[, deployerFeeScale] } (fee scale only on
+    # standalone/question instances, never on named-outcome instances).
+    def outcome_template_instance(template_id, keyword_to_value, deployer_fee_scale = nil)
+      instance = { id: template_id, keywordToValue: outcome_keyword_pairs(keyword_to_value) }
+      instance[:deployerFeeScale] = outcome_decimal_wire(deployer_fee_scale) unless deployer_fee_scale.nil?
+      instance
+    end
+
+    # Hash or [[k, v], ...] -> [[String, String], ...] sorted by keyword (signed list must be sorted).
+    def outcome_keyword_pairs(keyword_to_value)
+      keyword_to_value.to_a.map { |keyword, value| [keyword.to_s, value.to_s] }.sort_by(&:first)
+    end
+
+    # Decimal string for HIP-4 fee scales / settle fractions: Strings verbatim, Numerics via float_to_wire.
+    def outcome_decimal_wire(value)
+      value.is_a?(String) ? value : float_to_wire(value)
+    end
+
+    # One settlement entry; key order outcome, settleFraction, details, nameAndDescription, sideNames.
+    def outcome_settlement(outcome:, settle_fraction:, name:, description:, side_names:, details: '')
+      {
+        outcome: outcome.to_i,
+        settleFraction: outcome_decimal_wire(settle_fraction),
+        details: details,
+        nameAndDescription: [name, description],
+        sideNames: side_names.map(&:to_s)
+      }
+    end
+
+    # Convert an integer wei amount to its wire string. Integers are stringified exactly and
+    # Strings pass through verbatim. Floats are rejected (Float#to_s gives "1.0e+16" / "100.0" forms).
+    # @param value [Integer, String] Amount in wei
+    # @return [String]
+    # @raise [ArgumentError] For any other type
+    def wei_to_wire(value)
+      case value
+      when Integer then value.to_s
+      when String then value
+      else raise ArgumentError, "wei amount must be an Integer or String, got #{value.inspect}"
+      end
+    end
+
     # Calculate slippage price for market orders
     # Maintains parity with official Python SDK
     # 1. Apply slippage to mid price
@@ -1611,8 +2339,9 @@ module Hyperliquid
       base_decimals = is_spot ? 8 : 6
       decimal_places = [base_decimals - sz_decimals, 0].max
 
-      # Round to decimal places
-      rounded = sig_figs_price.round(decimal_places)
+      # Round to decimal places like Python's round(): correctly rounded on the exact binary value, ties to
+      # even (Float#round rounds ties half-up and misrounds e.g. 2.675 -> 2.68)
+      rounded = sig_figs_price.to_r.round(decimal_places, half: :even).to_f
 
       # Format with fixed decimal places
       format("%.#{decimal_places}f", rounded)
@@ -1669,6 +2398,62 @@ module Hyperliquid
       { b: builder[:b].downcase, f: builder[:f] }
     end
 
+    # Sign and post a `perpDeploy` L1 action: { type: 'perpDeploy', <variant_key> => payload }.
+    def perp_deploy_action(variant_key, payload)
+      nonce = timestamp_ms
+      action = { type: 'perpDeploy', variant_key => payload }
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
+      post_action(action, signature, nonce, nil)
+    end
+
+    def perp_deploy_asset_request(coin, sz_decimals, oracle_px, margin_table_id)
+      { coin: coin, szDecimals: Integer(sz_decimals), oraclePx: perp_deploy_decimal(oracle_px),
+        marginTableId: Integer(margin_table_id) }
+    end
+
+    # Key order maxGas, assetRequest, dex, schema; nil maxGas/schema are sent as null.
+    def perp_deploy_register_payload(asset_request, dex, max_gas, schema)
+      { maxGas: max_gas.nil? ? nil : Integer(max_gas), assetRequest: asset_request, dex: dex,
+        schema: perp_dex_schema_wire(schema) }
+    end
+
+    def perp_dex_schema_wire(schema)
+      return nil if schema.nil?
+
+      wire = {
+        fullName: schema.fetch(:full_name),
+        collateralToken: Integer(schema.fetch(:collateral_token)),
+        oracleUpdater: schema[:oracle_updater]&.downcase
+      }
+      wire[:isStar] = schema[:is_star] if schema.key?(:is_star)
+      wire
+    end
+
+    # Hash (or [coin, value] pairs) -> [[coin, converted], ...] sorted by coin.
+    def sorted_coin_pairs(pairs)
+      pairs.to_h.map { |coin, value| [coin.to_s, yield(value)] }.sort_by(&:first)
+    end
+
+    # String sent verbatim (Python parity); Numeric normalized via float_to_wire.
+    def perp_deploy_decimal(value)
+      case value
+      when String then value
+      when Numeric then float_to_wire(value)
+      else raise ArgumentError, "decimal must be String or Numeric. Got: #{value.class}"
+      end
+    end
+
+    # HIP-3* star operation envelope: { type: 'perpDeploy', star: { dex:, operation: } }
+    def star_action(dex, operation)
+      perp_deploy_action(:star, { dex: dex, operation: operation })
+    end
+
+    # HIP-3* proxied user operation: operation { proxy: [user, proxy_operation] }
+    def star_proxy_action(dex, user, proxy_operation)
+      star_action(dex, { proxy: [user.downcase, proxy_operation] })
+    end
+
+    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     # Convert order type to wire format
     # @param order_type [Hash] Order type configuration
     # @return [Hash] Wire format order type
@@ -1695,6 +2480,43 @@ module Hyperliquid
       else
         raise ArgumentError, 'order_type must specify :limit or :trigger'
       end
+    end
+    # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+
+    # Build, sign, and post a `CSignerAction` L1 action whose variant key carries null.
+    # @param variant [Symbol] :jailSelf or :unjailSelf
+    def c_signer_action(variant)
+      nonce = timestamp_ms
+      action = { type: 'CSignerAction', variant => nil }
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Build, sign, and post a `CValidatorAction` L1 action. `type` is always the first key.
+    # @param variant_body [Hash] Exactly one of { register: {...} }, { changeProfile: {...} }, { unregister: nil }
+    def c_validator_action(variant_body)
+      nonce = timestamp_ms
+      action = { type: 'CValidatorAction' }.merge(variant_body)
+      signature = @signer.sign_l1_action(
+        action, nonce,
+        expires_after: @expires_after
+      )
+      post_action(action, signature, nonce, nil)
+    end
+
+    # Build, sign (L1), and post a `spotDeploy` action with a single variant key.
+    # `type` must be inserted first: msgpack preserves Hash order and the server hashes it.
+    # @param variant [Symbol] Variant key, e.g. :registerToken2
+    # @param payload [Hash, Array] Variant payload
+    # @return [Hash] Exchange response
+    def spot_deploy_action(variant, payload)
+      nonce = timestamp_ms
+      action = { type: 'spotDeploy', variant => payload }
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
+      post_action(action, signature, nonce, nil)
     end
 
     # Post an action to the exchange endpoint

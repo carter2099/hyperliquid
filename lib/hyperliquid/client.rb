@@ -7,7 +7,15 @@ require 'json'
 module Hyperliquid
   # HTTP client for making requests to Hyperliquid API
   class Client
-    # Default retry configuration for API requests
+    # Paths whose POSTs are read-only queries and therefore safe to replay. Everything else,
+    # notably Constants::EXCHANGE_ENDPOINT (a replayed signed action can execute twice), is
+    # never retried.
+    RETRYABLE_PATHS = [Constants::INFO_ENDPOINT, Constants::EXPLORER_ENDPOINT].freeze
+
+    # Retry configuration applied when retry_enabled is true. Every SDK request is a POST,
+    # which faraday-retry treats as non-idempotent, so `methods: []` disables its method
+    # allowlist and `retry_if` decides per request path instead. Faraday::RetriableResponse
+    # must be listed for retry_statuses to trigger a retry.
     DEFAULT_RETRY_OPTIONS = {
       max: 2,
       interval: 0.5,
@@ -16,14 +24,19 @@ module Hyperliquid
       retry_statuses: [429, 502, 503, 504],
       exceptions: [
         Faraday::ConnectionFailed,
-        Faraday::TimeoutError
-      ]
+        Faraday::TimeoutError,
+        Faraday::RetriableResponse
+      ],
+      methods: [],
+      retry_if: ->(env, _exception) { RETRYABLE_PATHS.include?(env.url.path) }
     }.freeze
 
     # Initialize a new HTTP client
     # @param base_url [String] The base URL for the default API (info/exchange)
-    # @param timeout [Integer] Request timeout in seconds (default: Constants::DEFAULT_TIMEOUT)
-    # @param retry_enabled [Boolean] Whether to enable retry logic (default: false)
+    # @param timeout [Numeric] Per-phase (connect, write, read) timeout in seconds
+    #   (default: Constants::DEFAULT_TIMEOUT)
+    # @param retry_enabled [Boolean] Retry /info and /explorer reads on transient failures
+    #   (default: false); /exchange is never retried. See DEFAULT_RETRY_OPTIONS.
     # @param explorer_base_url [String, nil] Optional base URL for the explorer RPC (used by
     #   tx_details / user_details). When nil, calls with target: :explorer raise ConfigurationError.
     def initialize(base_url:, timeout: Constants::DEFAULT_TIMEOUT, retry_enabled: false,
@@ -57,10 +70,6 @@ module Hyperliquid
       end
 
       handle_response(response)
-    rescue Faraday::RetriableResponse => e
-      # After retries are exhausted, Faraday throws a RetriableResponse
-      # Catch and handle that here to bubble up the actual network error
-      handle_response(e.response)
     rescue Faraday::ConnectionFailed => e
       raise NetworkError, "Connection failed: #{e.message}"
     rescue Faraday::TimeoutError => e
@@ -86,8 +95,8 @@ module Hyperliquid
 
     def build_connection(base_url)
       Faraday.new(url: base_url) do |conn|
+        # One value for open/read/write: a separate read_timeout would override it for reads.
         conn.options.timeout = @timeout
-        conn.options.read_timeout = Constants::DEFAULT_READ_TIMEOUT
         conn.request :retry, DEFAULT_RETRY_OPTIONS if @retry_enabled
       end
     end

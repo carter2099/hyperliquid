@@ -84,5 +84,11 @@ module Hyperliquid
     def base_url
       @testnet ? Constants::TESTNET_API_URL : Constants::MAINNET_API_URL
     end
+
+    # Redacted representation: never exposes the private key.
+    # @return [String]
+    def inspect
+      "#<#{self.class.name} testnet=#{@testnet} base_url=#{base_url} exchange=#{@exchange.inspect}>"
+    end
   end
 end

@@ -2,11 +2,43 @@
 
 require 'ws_lite'
 require 'json'
+require 'zlib'
 
 module Hyperliquid
   module WS
     # Managed WebSocket client for subscribing to real-time data channels
     class Client
+      # Routing fields per subscription type. Identifier = [type, *field values].join(':').
+      # user/coin are downcased; dex nil => '' (server canonicalizes an omitted dex to ""); interval verbatim.
+      ROUTING_KEYS = {
+        'allMids' => [], 'orderUpdates' => [], 'userEvents' => [],
+        'notification' => [],
+        'allDexsAssetCtxs' => [], 'outcomeMetaUpdates' => [], 'spotAssetCtxs' => [], 'fastAssetCtxs' => [],
+        'l2Book' => %i[coin], 'trades' => %i[coin], 'bbo' => %i[coin],
+        'activeAssetCtx' => %i[coin],
+        'candle' => %i[coin interval],
+        'userFills' => %i[user], 'userFundings' => %i[user],
+        'userNonFundingLedgerUpdates' => %i[user], 'userTwapSliceFills' => %i[user],
+        'userTwapHistory' => %i[user], 'userHistoricalOrders' => %i[user],
+        'allDexsClearinghouseState' => %i[user], 'webData3' => %i[user],
+        'spotState' => %i[user],
+        'clearinghouseState' => %i[user dex], 'openOrders' => %i[user dex], 'twapStates' => %i[user dex],
+        'activeAssetData' => %i[user coin],
+        'assetCtxs' => %i[dex]
+      }.freeze
+
+      # Server channel names that differ from the subscription type.
+      CHANNEL_ALIASES = {
+        'user' => 'userEvents',
+        'activeSpotAssetCtx' => 'activeAssetCtx'
+      }.freeze
+
+      # Payload omits this subscription field, so two subscriptions differing in it cannot be told apart.
+      EXCLUSIVE_FIELDS = {
+        'orderUpdates' => :user, 'userEvents' => :user, 'userFills' => :aggregateByTime,
+        'notification' => :user, 'spotState' => :ignorePortfolioMargin
+      }.freeze
+
       attr_reader :dropped_message_count, :explorer_dropped_message_count
 
       def initialize(testnet: false, max_queue_size: Constants::WS_MAX_QUEUE_SIZE, reconnect: true,
@@ -34,10 +66,11 @@ module Hyperliquid
         @closing = false
         @dispatch_thread = nil
         @ping_thread = nil
-        @pending_subscriptions = []
         @lifecycle_callbacks = {}
         @reconnect_attempts = 0
+        @reconnect_generation = 0
         @connection_id = 0
+        @closed_connection_id = nil
       end
 
       def init_explorer_ws_state(explorer_ws_url)
@@ -46,15 +79,15 @@ module Hyperliquid
         @explorer_connected = false
         @explorer_closing = false
         @explorer_connection_id = 0
+        @explorer_closed_connection_id = nil
         @explorer_reconnect_attempts = 0
+        @explorer_reconnect_generation = 0
         @explorer_subscriptions = {}
         @explorer_subscription_msgs = {}
-        @explorer_next_id = 0
         @explorer_queue = Queue.new
         @explorer_dropped_message_count = 0
         @explorer_dispatch_thread = nil
         @explorer_ping_thread = nil
-        @explorer_pending_subscriptions = []
       end
 
       public
@@ -62,6 +95,9 @@ module Hyperliquid
       def connect
         @closing = false
         @reconnect_attempts = 0
+        # Supersedes any backoff thread still sleeping from before (e.g. close, then connect).
+        @reconnect_generation += 1
+        @queue = Queue.new if @queue.closed?
         establish_connection
         start_dispatch_thread
         start_ping_thread
@@ -75,6 +111,7 @@ module Hyperliquid
         sub_id = nil
 
         @mutex.synchronize do
+          ensure_exclusive!(subscription, identifier)
           sub_id = @next_id
           @next_id += 1
 
@@ -86,8 +123,7 @@ module Hyperliquid
         if @connected
           send_subscribe(subscription)
         else
-          @mutex.synchronize { @pending_subscriptions << subscription }
-          connect unless @ws
+          connect unless @ws # handle_open sends every registered subscription
         end
 
         sub_id
@@ -107,6 +143,7 @@ module Hyperliquid
         subscribe_explorer({ type: 'explorerTxs' }, 'explorerTxs', &)
       end
 
+      # rubocop:disable-next Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def unsubscribe(subscription_id)
         sub_msg = nil
         should_send = false
@@ -147,14 +184,16 @@ module Hyperliquid
         @connected = false
         @explorer_closing = true
         @explorer_connected = false
+        @reconnect_generation += 1
+        @explorer_reconnect_generation += 1
 
         @ping_thread&.kill
         @ping_thread = nil
         @explorer_ping_thread&.kill
         @explorer_ping_thread = nil
 
-        @queue&.close if @queue.respond_to?(:close)
-        @explorer_queue&.close if @explorer_queue.respond_to?(:close)
+        @queue.close
+        @explorer_queue.close
 
         @dispatch_thread&.join(5)
         @dispatch_thread = nil
@@ -191,7 +230,7 @@ module Hyperliquid
           ws.on :open do
             next if client.send(:stale_connection?, active_id)
 
-            client.send(:handle_open)
+            client.send(:handle_open, ws)
           end
 
           ws.on :message do |msg|
@@ -206,11 +245,10 @@ module Hyperliquid
             client.send(:handle_error, e)
           end
 
-          ws.on :close do |e|
-            next if client.send(:stale_connection?, active_id)
-
-            client.send(:handle_close, e)
-          end
+          # ws_lite 1.0.x emits its internal :__close for every close, but on a server-initiated
+          # close its read thread kills itself before emitting :close. Listen to both.
+          ws.on(:__close) { |e| client.send(:handle_socket_close, active_id, e) }
+          ws.on(:close) { |e| client.send(:handle_socket_close, active_id, e) }
         end
       end
 
@@ -218,14 +256,25 @@ module Hyperliquid
         id != @connection_id
       end
 
-      def handle_open
+      # Handles each live connection's close once, whichever close event reports it first.
+      def handle_socket_close(id, event)
+        return if stale_connection?(id) || @closed_connection_id == id
+
+        @closed_connection_id = id
+        handle_close(event)
+      end
+
+      # Takes the socket from the :open event: on reconnect the read thread can emit :open before
+      # establish_connection has assigned @ws, and the replayed subscriptions must go to this socket.
+      def handle_open(socket)
+        @ws = socket
         @connected = true
         @reconnect_attempts = 0
-        flush_pending_subscriptions
         replay_subscriptions
         @lifecycle_callbacks[:open]&.call
       end
 
+      # rubocop:disable-next Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def handle_message(raw)
         return if raw.nil? || raw.empty?
 
@@ -238,10 +287,37 @@ module Hyperliquid
         return if channel == 'pong'
         return unless channel
 
-        identifier = compute_identifier(channel, data['data'])
+        payload = data['data']
+        if channel == 'fastAssetCtxs'
+          payload = decode_compressed_payload(payload)
+          return if payload.nil?
+        end
+
+        identifier = compute_identifier(channel, payload)
         return unless identifier
 
-        enqueue_message(identifier, data['data'])
+        enqueue_message(identifier, payload)
+      end
+
+      # fastAssetCtxs frames carry `data` as base64(raw DEFLATE, RFC 1951) of a UTF-8 JSON
+      # document. Returns the parsed JSON, or nil (after warning) when the payload cannot be
+      # decoded so a bad frame is dropped without raising into the ws_lite read thread.
+      def decode_compressed_payload(encoded)
+        unless encoded.is_a?(String)
+          warn "[Hyperliquid::WS] Failed to decode compressed message: expected String, got #{encoded.class}"
+          return nil
+        end
+
+        inflater = Zlib::Inflate.new(-Zlib::MAX_WBITS)
+        json = inflater.inflate(encoded.unpack1('m0'))
+        raise Zlib::BufError, 'truncated DEFLATE stream' unless inflater.finished?
+
+        JSON.parse(json.force_encoding(Encoding::UTF_8))
+      rescue ArgumentError, Zlib::Error, JSON::ParserError => e
+        warn "[Hyperliquid::WS] Failed to decode compressed message: #{e.class}: #{e.message}"
+        nil
+      ensure
+        inflater&.close
       end
 
       def handle_error(error)
@@ -264,35 +340,64 @@ module Hyperliquid
       end
 
       def compute_identifier(channel, data)
-        case channel
-        when 'l2Book'        then "l2Book:#{data['coin'].downcase}"
-        when 'trades'        then data.is_a?(Array) && data[0] ? "trades:#{data[0]['coin'].downcase}" : nil
-        when 'bbo'           then "bbo:#{data['coin'].downcase}"
-        when 'candle'        then "candle:#{data['s'].downcase}:#{data['i']}"
-        when 'allMids'       then 'allMids'
-        when 'orderUpdates'  then 'orderUpdates'
-        when 'userEvents'    then "userEvents:#{data['user'].downcase}"
-        when 'userFills'     then "userFills:#{data['user'].downcase}"
-        when 'userFundings'  then "userFundings:#{data['user'].downcase}"
+        type = CHANNEL_ALIASES.fetch(channel, channel)
+        keys = ROUTING_KEYS[type]
+        return unless keys
+        return type if keys.empty?
+
+        fields = message_routing_fields(type, data)
+        fields && routing_identifier(type, fields)
+      end
+
+      def message_routing_fields(type, data)
+        case type
+        when 'trades'   then data.is_a?(Array) && data[0] ? { coin: data[0]['coin'] } : nil
+        when 'candle'   then { coin: data['s'], interval: data['i'] }
+        when 'webData3' then { user: data['userState']['user'] }
+        else { coin: data['coin'], user: data['user'], dex: data['dex'] }
         end
       end
 
       def subscription_identifier(subscription)
         type = sub_field(subscription, 'type')
-        case type
-        when 'l2Book'        then "l2Book:#{sub_field(subscription, 'coin').downcase}"
-        when 'trades'        then "trades:#{sub_field(subscription, 'coin').downcase}"
-        when 'bbo'           then "bbo:#{sub_field(subscription, 'coin').downcase}"
-        when 'candle'
-          "candle:#{sub_field(subscription, 'coin').downcase}:#{sub_field(subscription, 'interval')}"
-        when 'allMids'       then 'allMids'
-        when 'orderUpdates'  then 'orderUpdates'
-        when 'userEvents'    then "userEvents:#{sub_field(subscription, 'user').downcase}"
-        when 'userFills'     then "userFills:#{sub_field(subscription, 'user').downcase}"
-        when 'userFundings'  then "userFundings:#{sub_field(subscription, 'user').downcase}"
-        else
-          raise Hyperliquid::WebSocketError, "Unsupported subscription type: #{type}"
+        keys = ROUTING_KEYS[type]
+        raise Hyperliquid::WebSocketError, "Unsupported subscription type: #{type}" unless keys
+
+        routing_identifier(type, keys.to_h { |key| [key, sub_field(subscription, key.to_s)] })
+      end
+
+      def routing_identifier(type, fields)
+        parts = ROUTING_KEYS.fetch(type).map do |key|
+          value = fields[key]
+          case key
+          when :dex      then value.to_s.downcase
+          when :interval then value
+          else value.downcase
+          end
         end
+        [type, *parts].join(':')
+      end
+
+      def ensure_exclusive!(subscription, identifier)
+        type = sub_field(subscription, 'type')
+        field = EXCLUSIVE_FIELDS[type]
+        return unless field
+
+        existing = @subscription_msgs.each_value.find { |msg| msg[:identifier] == identifier }
+        return unless existing
+
+        mine = exclusive_value(subscription, field)
+        theirs = exclusive_value(existing[:subscription], field)
+        return if mine == theirs
+
+        raise Hyperliquid::WebSocketError,
+              "#{type} messages do not include #{field}; already subscribed with #{field}=#{theirs.inspect} " \
+              "on this connection (requested #{mine.inspect}). Unsubscribe first or use a separate WS::Client."
+      end
+
+      def exclusive_value(subscription, field)
+        value = sub_field(subscription, field.to_s)
+        field == :user ? value.to_s.downcase : value == true
       end
 
       def sub_field(subscription, key)
@@ -311,6 +416,8 @@ module Hyperliquid
           end
         end
         @queue.push({ identifier: identifier, data: data })
+      rescue ClosedQueueError
+        nil # close raced an in-flight frame; drop it instead of raising into the socket thread
       end
 
       def start_dispatch_thread
@@ -349,16 +456,6 @@ module Hyperliquid
         @ping_thread.report_on_exception = false
       end
 
-      def flush_pending_subscriptions
-        pending = @mutex.synchronize do
-          subs = @pending_subscriptions.dup
-          @pending_subscriptions.clear
-          subs
-        end
-
-        pending.each { |sub| send_subscribe(sub) }
-      end
-
       def send_subscribe(subscription)
         send_json({ method: 'subscribe', subscription: subscription })
       end
@@ -374,15 +471,16 @@ module Hyperliquid
       end
 
       def attempt_reconnect
+        generation = @reconnect_generation
         Thread.new do
           loop do
-            break if @closing
+            break if reconnect_cancelled?(generation)
 
             delay = [2**@reconnect_attempts, 30].min
             @reconnect_attempts += 1
             sleep delay
 
-            break if @closing
+            break if reconnect_cancelled?(generation)
 
             begin
               establish_connection
@@ -392,6 +490,11 @@ module Hyperliquid
             end
           end
         end
+      end
+
+      # True once close or a later connect has superseded the backoff loop started at `generation`.
+      def reconnect_cancelled?(generation)
+        @closing || generation != @reconnect_generation
       end
 
       def replay_subscriptions
@@ -407,8 +510,8 @@ module Hyperliquid
         sub_id = nil
 
         @mutex.synchronize do
-          sub_id = @explorer_next_id
-          @explorer_next_id += 1
+          sub_id = @next_id
+          @next_id += 1
 
           @explorer_subscriptions[identifier] ||= []
           @explorer_subscriptions[identifier] << { id: sub_id, callback: callback }
@@ -418,13 +521,20 @@ module Hyperliquid
         if @explorer_connected
           send_explorer_subscribe(subscription)
         else
-          @mutex.synchronize { @explorer_pending_subscriptions << subscription }
-          establish_explorer_connection unless @explorer_ws
-          start_explorer_dispatch_thread unless @explorer_dispatch_thread
-          start_explorer_ping_thread unless @explorer_ping_thread
+          connect_explorer unless @explorer_ws # handle_explorer_open sends every registered subscription
         end
 
         sub_id
+      end
+
+      def connect_explorer
+        @explorer_closing = false
+        @explorer_reconnect_attempts = 0
+        @explorer_reconnect_generation += 1
+        @explorer_queue = Queue.new if @explorer_queue.closed?
+        establish_explorer_connection
+        start_explorer_dispatch_thread
+        start_explorer_ping_thread
       end
 
       def establish_explorer_connection
@@ -437,7 +547,7 @@ module Hyperliquid
           ws.on :open do
             next if client.send(:stale_explorer_connection?, active_id)
 
-            client.send(:handle_explorer_open)
+            client.send(:handle_explorer_open, ws)
           end
 
           ws.on :message do |msg|
@@ -452,11 +562,9 @@ module Hyperliquid
             client.send(:handle_explorer_error, e)
           end
 
-          ws.on :close do |e|
-            next if client.send(:stale_explorer_connection?, active_id)
-
-            client.send(:handle_explorer_close, e)
-          end
+          # See establish_connection: ws_lite 1.0.x may report a close only as :__close.
+          ws.on(:__close) { |e| client.send(:handle_explorer_socket_close, active_id, e) }
+          ws.on(:close) { |e| client.send(:handle_explorer_socket_close, active_id, e) }
         end
       end
 
@@ -464,13 +572,21 @@ module Hyperliquid
         id != @explorer_connection_id
       end
 
-      def handle_explorer_open
+      def handle_explorer_socket_close(id, event)
+        return if stale_explorer_connection?(id) || @explorer_closed_connection_id == id
+
+        @explorer_closed_connection_id = id
+        handle_explorer_close(event)
+      end
+
+      def handle_explorer_open(socket)
+        @explorer_ws = socket
         @explorer_connected = true
         @explorer_reconnect_attempts = 0
-        flush_explorer_pending_subscriptions
         replay_explorer_subscriptions
       end
 
+      # rubocop:disable-next Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def handle_explorer_message(raw)
         return if raw.nil? || raw.empty?
         return if raw.start_with?('Websocket connection established')
@@ -497,6 +613,7 @@ module Hyperliquid
         enqueue_explorer_message(identifier, data)
       end
 
+      # rubocop:disable-next Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def identify_explorer_array(data)
         first = data.first
         return unless first.is_a?(Hash)
@@ -538,6 +655,8 @@ module Hyperliquid
           end
         end
         @explorer_queue.push({ identifier: identifier, data: data })
+      rescue ClosedQueueError
+        nil # close raced an in-flight frame; drop it instead of raising into the socket thread
       end
 
       def start_explorer_dispatch_thread
@@ -576,16 +695,6 @@ module Hyperliquid
         @explorer_ping_thread.report_on_exception = false
       end
 
-      def flush_explorer_pending_subscriptions
-        pending = @mutex.synchronize do
-          subs = @explorer_pending_subscriptions.dup
-          @explorer_pending_subscriptions.clear
-          subs
-        end
-
-        pending.each { |sub| send_explorer_subscribe(sub) }
-      end
-
       def send_explorer_subscribe(subscription)
         send_explorer_json({ method: 'subscribe', subscription: subscription })
       end
@@ -601,15 +710,16 @@ module Hyperliquid
       end
 
       def attempt_explorer_reconnect
+        generation = @explorer_reconnect_generation
         Thread.new do
           loop do
-            break if @explorer_closing
+            break if explorer_reconnect_cancelled?(generation)
 
             delay = [2**@explorer_reconnect_attempts, 30].min
             @explorer_reconnect_attempts += 1
             sleep delay
 
-            break if @explorer_closing
+            break if explorer_reconnect_cancelled?(generation)
 
             begin
               establish_explorer_connection
@@ -619,6 +729,10 @@ module Hyperliquid
             end
           end
         end
+      end
+
+      def explorer_reconnect_cancelled?(generation)
+        @explorer_closing || generation != @explorer_reconnect_generation
       end
 
       def replay_explorer_subscriptions

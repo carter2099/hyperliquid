@@ -482,6 +482,17 @@ module Hyperliquid
       @client.post(Constants::INFO_ENDPOINT, { type: 'perpDexLimits', dex: dex })
     end
 
+    # Retrieve a user's approval state on every HIP-3* (testnet-only) venue where the user
+    # has been approved
+    # @param user [String] Wallet address
+    # @return [Hash] { "dexToState" => [[dex, state_or_nil], ...] } — an Array of
+    #   [dex name, { "isReduceOnly", "isBackstopLiquidatorDepositAllowed" }] pairs; state is nil
+    #   on venues that later removed the user. (GitBook shows dexToState as an object; the
+    #   server actually returns pairs.)
+    def user_star_state(user)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'userStarState', user: user })
+    end
+
     # Retrieve perp DEX status (e.g. total net deposit) for a builder-deployed dex
     # @param dex [String] Perp dex name; the empty string represents the first perp dex
     # @return [Hash] Keys: totalNetDeposit (String)
@@ -511,9 +522,11 @@ module Hyperliquid
     end
 
     # Retrieve prediction market outcome metadata
-    # @return [Hash] Hash with outcomes (each with outcome, name, description, sideSpecs)
-    #   and questions (each with question, name, description, fallbackOutcome,
-    #   namedOutcomes, settledNamedOutcomes)
+    # @return [Hash] Hash with outcomes (each with outcome, name, description, sideSpecs,
+    #   quoteToken, and for deployer outcomes venue/deployerFeeScale), questions (each with
+    #   question, name, description, fallbackOutcome, namedOutcomes, settledNamedOutcomes),
+    #   deployers (each with deployer, venue, subDeployers as [variant, [addresses]] pairs)
+    #   and feeScale
     def outcome_meta
       @client.post(Constants::INFO_ENDPOINT, { type: 'outcomeMeta' })
     end
@@ -531,6 +544,13 @@ module Hyperliquid
     #   keywords (array of [name, type] where type is "dateTime", "date", "string", or "hlPerp")
     def outcome_templates
       @client.post(Constants::INFO_ENDPOINT, { type: 'outcomeTemplates' })
+    end
+
+    # Retrieve deployer limits for a HIP-4 outcome venue
+    # @param venue [String] HIP-4 deployer venue name (2-4 lowercase ASCII letters)
+    # @return [Hash] Hash with nDailyOutcomesRemaining and nActiveOutcomesRemaining
+    def outcome_deployer_limits(venue)
+      @client.post(Constants::INFO_ENDPOINT, { type: 'outcomeDeployerLimits', venue: venue })
     end
 
     # Retrieve USDC transfer routing configuration
@@ -613,14 +633,6 @@ module Hyperliquid
     # @return [Hash] Token details
     def token_details(token_id)
       @client.post(Constants::INFO_ENDPOINT, { type: 'tokenDetails', tokenId: token_id })
-    end
-
-    # Get supply, rate, and pending payment information for an aligned quote token
-    # @param token [Integer] Token index
-    # @return [Hash] Hash with isAligned, firstAlignedTime, evmMintedSupply,
-    #   dailyAmountOwed (array of [date, amount] tuples), predictedRate
-    def aligned_quote_token_info(token)
-      @client.post(Constants::INFO_ENDPOINT, { type: 'alignedQuoteTokenInfo', token: token })
     end
 
     # ============================

@@ -1,0 +1,22 @@
+Signer address (sanity check, must match Ruby): 0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A
+
+=== Fixture A: outer signer over noop inner action, no co-signers ===
+  multiSigActionHash: 0x897feed4f5053a54739850d8af2354f592b667b27cab36a917afe8333fec2156
+  r: 0x673bd8bb32fd0d3faa1fc7282ad6af724ddd069b3a36441d879fa0a2a40abc31
+  s: 0x303b2f9c475130962e6b34f82eac3a91c52a2c860f57eabd1d7c99fffb10f0eb
+  v: 27
+
+=== Fixture B: outer signer over order inner action, with one co-signer L1 sig populated ===
+  co-signer L1 hash:   0x30a569c84057985e731fdace8bcd3f7e265c0b135a239c4e6b819509c20e8192
+  co-signer L1 r: 0x9635450d1274007c5b83f819654b4994af3e76d732f99c677ed82058eae640d4
+  co-signer L1 s: 0x7b8beeb8dc6e70adde2df6defe73fea946d061ae1255482c1e2d0a54e6c9f3ec
+  co-signer L1 v: 27
+  outer multiSigActionHash: 0x7bc3a36d385f1decbe4983d98deb4c272e83ed1bb9d7d9736b225960cf5c32c5
+  outer r: 0xe8c710d9ff10597a6960f5a69f02f63351845e7cd31733eb03e6799f085ca60a
+  outer s: 0x5895b4b2fb542667d858e8de39e2adf948916182a52e44cf6dfaa44528beeded
+  outer v: 28
+
+=== Fixture C: co-signer user-signed over sendAsset inner action ===
+  r: 0x888d2aef4c2485bea4c74568157c04886e89509dea6ac0fd9c44e854f0c228d7
+  s: 0x2b96e934360dccc295e085dfb0ed55d4c297dc857132f091c832c183379fb51e
+  v: 27

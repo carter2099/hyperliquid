@@ -1,0 +1,387 @@
+{
+  "float_to_wire": [
+    {
+      "wire": "1670.1",
+      "x": 1670.1
+    },
+    {
+      "wire": "0.0147",
+      "x": 0.0147
+    },
+    {
+      "wire": "100",
+      "x": 100
+    },
+    {
+      "wire": "100",
+      "x": 100.0
+    },
+    {
+      "wire": "95000",
+      "x": 95000.0
+    },
+    {
+      "wire": "0.3",
+      "x": 0.30000000000000004
+    },
+    {
+      "wire": "0.00000001",
+      "x": 1e-08
+    },
+    {
+      "wire": "0.00000003",
+      "x": 3.0000000000000004e-08
+    },
+    {
+      "wire": "1.23456789",
+      "x": 1.23456789
+    },
+    {
+      "wire": "123456789.12345678",
+      "x": 123456789.12345678
+    },
+    {
+      "wire": "100000000000000000000",
+      "x": 1e+20
+    },
+    {
+      "wire": "-1.5",
+      "x": -1.5
+    },
+    {
+      "wire": "-0.00012345",
+      "x": -0.00012345
+    },
+    {
+      "wire": "0",
+      "x": 0.0
+    },
+    {
+      "wire": "-0",
+      "x": -0.0
+    },
+    {
+      "wire": "-0",
+      "x": -1e-13
+    },
+    {
+      "wire": "0",
+      "x": 1e-13
+    },
+    {
+      "wire": "1",
+      "x": 1.0000000000009
+    },
+    {
+      "wire": null,
+      "x": 1.000000000001
+    },
+    {
+      "wire": null,
+      "x": 1e-09
+    },
+    {
+      "wire": null,
+      "x": 5e-09
+    },
+    {
+      "wire": null,
+      "x": 0.123456789
+    },
+    {
+      "wire": null,
+      "x": 1.5e-08
+    },
+    {
+      "wire": "3163",
+      "x": 3163.0
+    },
+    {
+      "wire": "0.001296",
+      "x": 0.001296
+    }
+  ],
+  "slippage": [
+    {
+      "coin": "BTC",
+      "is_buy": true,
+      "is_spot": false,
+      "mid": 96000.0,
+      "px": 100800.0,
+      "slippage": 0.05,
+      "sz_decimals": 5,
+      "wire": "100800"
+    },
+    {
+      "coin": "BTC",
+      "is_buy": false,
+      "is_spot": false,
+      "mid": 96000.0,
+      "px": 91200.0,
+      "slippage": 0.05,
+      "sz_decimals": 5,
+      "wire": "91200"
+    },
+    {
+      "coin": "BTC",
+      "is_buy": true,
+      "is_spot": false,
+      "mid": 96123.4,
+      "px": 97085.0,
+      "slippage": 0.01,
+      "sz_decimals": 5,
+      "wire": "97085"
+    },
+    {
+      "coin": "BTC",
+      "is_buy": false,
+      "is_spot": false,
+      "mid": 96123.4,
+      "px": 95162.0,
+      "slippage": 0.01,
+      "sz_decimals": 5,
+      "wire": "95162"
+    },
+    {
+      "coin": "ETH",
+      "is_buy": true,
+      "is_spot": false,
+      "mid": 3012.37,
+      "px": 3163.0,
+      "slippage": 0.05,
+      "sz_decimals": 4,
+      "wire": "3163"
+    },
+    {
+      "coin": "ETH",
+      "is_buy": false,
+      "is_spot": false,
+      "mid": 3012.37,
+      "px": 2861.8,
+      "slippage": 0.05,
+      "sz_decimals": 4,
+      "wire": "2861.8"
+    },
+    {
+      "coin": "ETH",
+      "is_buy": true,
+      "is_spot": false,
+      "mid": 1670.1,
+      "px": 1675.1,
+      "slippage": 0.003,
+      "sz_decimals": 4,
+      "wire": "1675.1"
+    },
+    {
+      "coin": "X3",
+      "is_buy": true,
+      "is_spot": false,
+      "mid": 0.98765,
+      "px": 1.037,
+      "slippage": 0.05,
+      "sz_decimals": 3,
+      "wire": "1.037"
+    },
+    {
+      "coin": "X3",
+      "is_buy": false,
+      "is_spot": false,
+      "mid": 0.98765,
+      "px": 0.938,
+      "slippage": 0.05,
+      "sz_decimals": 3,
+      "wire": "0.938"
+    },
+    {
+      "coin": "SOL",
+      "is_buy": true,
+      "is_spot": false,
+      "mid": 187.645,
+      "px": 197.03,
+      "slippage": 0.05,
+      "sz_decimals": 2,
+      "wire": "197.03"
+    },
+    {
+      "coin": "SOL",
+      "is_buy": false,
+      "is_spot": false,
+      "mid": 187.645,
+      "px": 178.26,
+      "slippage": 0.05,
+      "sz_decimals": 2,
+      "wire": "178.26"
+    },
+    {
+      "coin": "X1",
+      "is_buy": true,
+      "is_spot": false,
+      "mid": 12.3456,
+      "px": 12.593,
+      "slippage": 0.02,
+      "sz_decimals": 1,
+      "wire": "12.593"
+    },
+    {
+      "coin": "kPEPE",
+      "is_buy": true,
+      "is_spot": false,
+      "mid": 0.0123456,
+      "px": 0.012963,
+      "slippage": 0.05,
+      "sz_decimals": 0,
+      "wire": "0.012963"
+    },
+    {
+      "coin": "kPEPE",
+      "is_buy": false,
+      "is_spot": false,
+      "mid": 0.0123456,
+      "px": 0.011728,
+      "slippage": 0.05,
+      "sz_decimals": 0,
+      "wire": "0.011728"
+    },
+    {
+      "coin": "PURR/USDC",
+      "is_buy": true,
+      "is_spot": true,
+      "mid": 0.18765,
+      "px": 0.19703,
+      "slippage": 0.05,
+      "sz_decimals": 0,
+      "wire": "0.19703"
+    },
+    {
+      "coin": "PURR/USDC",
+      "is_buy": false,
+      "is_spot": true,
+      "mid": 0.18765,
+      "px": 0.17827,
+      "slippage": 0.05,
+      "sz_decimals": 0,
+      "wire": "0.17827"
+    },
+    {
+      "coin": "@1",
+      "is_buy": true,
+      "is_spot": true,
+      "mid": 0.001234,
+      "px": 0.001296,
+      "slippage": 0.05,
+      "sz_decimals": 2,
+      "wire": "0.001296"
+    },
+    {
+      "coin": "@1",
+      "is_buy": false,
+      "is_spot": true,
+      "mid": 0.001234,
+      "px": 0.001172,
+      "slippage": 0.05,
+      "sz_decimals": 2,
+      "wire": "0.001172"
+    },
+    {
+      "coin": "@2",
+      "is_buy": false,
+      "is_spot": true,
+      "mid": 1.23456,
+      "px": 1.173,
+      "slippage": 0.05,
+      "sz_decimals": 5,
+      "wire": "1.173"
+    },
+    {
+      "coin": "@2",
+      "is_buy": true,
+      "is_spot": true,
+      "mid": 0.000123456,
+      "px": 0.0,
+      "slippage": 0.05,
+      "sz_decimals": 5,
+      "wire": "0"
+    },
+    {
+      "coin": "BTC",
+      "is_buy": true,
+      "is_spot": false,
+      "mid": 0.25,
+      "px": 0.2,
+      "slippage": 0.0,
+      "sz_decimals": 5,
+      "wire": "0.2"
+    },
+    {
+      "coin": "BTC",
+      "is_buy": false,
+      "is_spot": false,
+      "mid": 12.25,
+      "px": 12.2,
+      "slippage": 0.0,
+      "sz_decimals": 5,
+      "wire": "12.2"
+    },
+    {
+      "coin": "ETH",
+      "is_buy": true,
+      "is_spot": false,
+      "mid": 1.125,
+      "px": 1.12,
+      "slippage": 0.0,
+      "sz_decimals": 4,
+      "wire": "1.12"
+    },
+    {
+      "coin": "ETH",
+      "is_buy": false,
+      "is_spot": false,
+      "mid": 0.625,
+      "px": 0.62,
+      "slippage": 0.0,
+      "sz_decimals": 4,
+      "wire": "0.62"
+    },
+    {
+      "coin": "ETH",
+      "is_buy": true,
+      "is_spot": false,
+      "mid": 2.675,
+      "px": 2.67,
+      "slippage": 0.0,
+      "sz_decimals": 4,
+      "wire": "2.67"
+    },
+    {
+      "coin": "@2",
+      "is_buy": true,
+      "is_spot": true,
+      "mid": 0.0625,
+      "px": 0.062,
+      "slippage": 0.0,
+      "sz_decimals": 5,
+      "wire": "0.062"
+    },
+    {
+      "coin": "BTC",
+      "is_buy": true,
+      "is_spot": false,
+      "mid": 12344.5,
+      "px": 12344.0,
+      "slippage": 0.0,
+      "sz_decimals": 5,
+      "wire": "12344"
+    },
+    {
+      "coin": "BTC",
+      "is_buy": true,
+      "is_spot": false,
+      "mid": 12345.5,
+      "px": 12346.0,
+      "slippage": 0.0,
+      "sz_decimals": 5,
+      "wire": "12346"
+    }
+  ],
+  "source": "hyperliquid-python-sdk 0.24.0 (2fdb18f9517675ea03695a0962bd19eece9c83f0)"
+}

@@ -1,0 +1,65 @@
+Signer address (sanity check, must match Ruby): 0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A
+
+=== F1 c_signer_jail_self (mainnet) ===
+  action:     {'type': 'CSignerAction', 'jailSelf': None}
+  actionHash: 0x7e23c76d01bfde153fd823a7cae68ce30fa526715e47108348fc4b7b832e407c
+  r: 0x38635f701cb33b50fbad584847661e0a07dc8d37e474e545f365832b4bc66eb1
+  s: 0x21cac402b3d154ea4072f91512d5167448d39f4730def46b029c23b2357930ee
+  v: 28
+
+=== F2 c_signer_unjail_self (mainnet) ===
+  action:     {'type': 'CSignerAction', 'unjailSelf': None}
+  actionHash: 0xc613fed303750252362dada66b05b04833d4559ca0fc9454150489c569d0f077
+  r: 0xb329b0565d78bf514952392a4657e16d1283c0570df6f784b556776cffb97999
+  s: 0x5653180bdda309c4b5114708d2d4b041e6591655dcae74481212b070795bc122
+  v: 27
+
+=== F3 c_signer_jail_self (testnet) ===
+  action:     {'type': 'CSignerAction', 'jailSelf': None}
+  actionHash: 0x7e23c76d01bfde153fd823a7cae68ce30fa526715e47108348fc4b7b832e407c
+  r: 0x6fab3809fbf0e64be37c69f0bb95966a692a82309130cbf2068155d9d2239456
+  s: 0x27940b36a7dd9ca5b206a40d8fcb22134b14bd8614deab5a86c208781102d374
+  v: 28
+
+=== F4 c_signer_jail_self (mainnet, expires_after) ===
+  action:     {'type': 'CSignerAction', 'jailSelf': None}
+  actionHash: 0x81bbf71ae28a5450b2a52ac6fffe60f4293d8e2996b94f1084377fd9c624e63d
+  r: 0x265235480f198a868b3ca097917cc1a8a902096c7a225713e4c3966da8700f91
+  s: 0x5aed84098873d2504cd1150dd4972e8a38cc7387d083c6e759cd670a55dc35c8
+  v: 28
+
+=== F5 c_validator_register (mainnet) ===
+  action:     {'type': 'CValidatorAction', 'register': {'profile': {'node_ip': {'Ip': '1.2.3.4'}, 'name': 'TestValidator', 'description': 'A test validator', 'delegations_disabled': True, 'commission_bps': 500, 'signer': '0x0000000000000000000000000000000000000001'}, 'unjailed': False, 'initial_wei': 1000000000000}}
+  actionHash: 0x23490d4261f0a67161cd534501ceb5cddd4d864024135f8284dd8e19cf76ee20
+  r: 0x2c988761b731b76b503f970ace714fef407aa84768718ea4f15f57753c77ffc4
+  s: 0x3bb5850fb6ee1434ba20adf4167eab76b1c2bb63d10460ba9ecf492032aca935
+  v: 28
+
+=== F6 c_validator_change_profile all-nil except unjailed (mainnet) ===
+  action:     {'type': 'CValidatorAction', 'changeProfile': {'node_ip': None, 'name': None, 'description': None, 'unjailed': True, 'disable_delegations': None, 'commission_bps': None, 'signer': None}}
+  actionHash: 0x9e82e281cd117741a7460587acfe417c1979675c1e4d7c160f354d1412a381f7
+  r: 0xc27ad22c714d5d3d2163d724e2a594bc4104d502faa14c1440e91fa094327c78
+  s: 0x582643edd1702f7dd797e0e161316d9e2a72c4edeb571d74305320e2f8664581
+  v: 28
+
+=== F7 c_validator_change_profile all set (mainnet) ===
+  action:     {'type': 'CValidatorAction', 'changeProfile': {'node_ip': {'Ip': '5.6.7.8'}, 'name': 'Renamed', 'description': 'Updated description', 'unjailed': False, 'disable_delegations': False, 'commission_bps': 250, 'signer': '0x0000000000000000000000000000000000000002'}}
+  actionHash: 0x687692ddcfcdfbc7d6b39869cbcb2496f7e15d46b9b94d00a3a07674fdb78884
+  r: 0x9daa6980f55bf354b3cd59b3bdff6e92c9b8214de92a1b3d354e78bcd2e71ebd
+  s: 0x3ecc2898ac4282048782421e6280d23a9f542bfa801e04b8967ec36285538467
+  v: 28
+
+=== F8 c_validator_unregister (mainnet) ===
+  action:     {'type': 'CValidatorAction', 'unregister': None}
+  actionHash: 0xbf75857de4da4a5ed6204cb335f3296fb39cc2dbe99173ec405d1e8dde50d0b9
+  r: 0x1903aac6497bcc35e8613971842c085665c04fe94d64cafb7b8293db39034de4
+  s: 0x41b7ff234441bba63fa5eb994c2f78499c475e5cb40126607244942adc3b798
+  v: 27
+
+=== F9 validatorL1Stream riskFreeRate 0.05 (mainnet) ===
+  action:     {'type': 'validatorL1Stream', 'riskFreeRate': '0.05'}
+  actionHash: 0x519b23e287b6172a38a34bb9cea9c13d1cc80955e5e857b2856f26953411a0c5
+  r: 0x3105c52c6f6d8d03ff7af1fb99129d2cf5d4a9d14524e1e025a74abcc8494ba3
+  s: 0x25f23dddac180e66973b6cba6a1ca8be9e904b631ddb67a9137afec45364b7e
+  v: 28
+

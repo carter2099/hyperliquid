@@ -1,0 +1,81 @@
+Signer address (sanity check, must match Ruby): 0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A
+
+=== F1 modifyApproval true ===
+  action: {'type': 'perpDeploy', 'star': {'dex': 'test', 'operation': {'proxy': ['0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a', {'modifyApproval': True}]}}}
+  expires_after: None
+  action_hash: 0xe445e2ab7a2dec983f4a88b9a75fa8580e2d5903d52f3acdd225ca355286a051
+  r: 0x95cf659a89beb3aae2134a51117fb910d8c37fe4c580336492d95159c4fbdcb6
+  s: 0x590450ebc45cf7f088b09454ab65b8c3edd40bc2f608aee66328d4b3e3976561
+  v: 28
+
+=== F2 modifyBackstopLiquidatorApproval true ===
+  action: {'type': 'perpDeploy', 'star': {'dex': 'test', 'operation': {'proxy': ['0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a', {'modifyBackstopLiquidatorApproval': True}]}}}
+  expires_after: None
+  action_hash: 0x4a3489099c981993c356a7f5937b14dd6b099bcdd067fe40440a41c973a41cf0
+  r: 0x89b4ff45c80d850de9301a84f42e82b637e9bf9e288306e18181fdbb28d60dc0
+  s: 0x73d9688e3631fc901d1afd7a4c9901f09df6b546be1680b950ac53ed2674fe0
+  v: 28
+
+=== F3 setReduceOnly true ===
+  action: {'type': 'perpDeploy', 'star': {'dex': 'test', 'operation': {'proxy': ['0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a', {'setReduceOnly': True}]}}}
+  expires_after: None
+  action_hash: 0x3630fd954b7ab41b357ecb24434ee0c2d4eb86320c26e840201c3b0a7d929f1a
+  r: 0x225c49823fa14d176145c390bc2da16d388686640e8d2602d6d4e5c0af0ada9f
+  s: 0x337cda8acd9e399d42b01c5f405f59e0ea7cf69328b64e5895785f8c0eabde05
+  v: 27
+
+=== F4 cancel ===
+  action: {'type': 'perpDeploy', 'star': {'dex': 'test', 'operation': {'proxy': ['0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a', {'cancel': {'cancels': [{'a': 110000, 'o': 12345}]}}]}}}
+  expires_after: None
+  action_hash: 0x055a21d369bdf5d1431d4ccd47e04887c8d17ca7a413367fa7ec7a648d4bab00
+  r: 0x4c5bc18e5bebbe61c010d91034a7fc6bebd230efb55a17cddb187628a0671edc
+  s: 0x4283a2ce1d59acd82f7aa36ba13de6fbb1d5867077db7a4d8b3cdd9e8ab64b8c
+  v: 27
+
+=== F5 cancelAll null ===
+  action: {'type': 'perpDeploy', 'star': {'dex': 'test', 'operation': {'proxy': ['0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a', {'cancelAll': {'assets': None}}]}}}
+  expires_after: None
+  action_hash: 0xefab22cc008d50184c868d03dfa7b6d79c7a57283c62438db36898024dfc6bbd
+  r: 0x59631998868b83d45bdad899d30c1fa136921b7e364335920a7dfbef351a2887
+  s: 0x3ff4298202b9e863307f5e3b9efbe20f673c03d603b02d314c2b3496cf8a0250
+  v: 28
+
+=== F6 cancelAll [BTC, ETH] ===
+  action: {'type': 'perpDeploy', 'star': {'dex': 'test', 'operation': {'proxy': ['0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a', {'cancelAll': {'assets': [110000, 110001]}}]}}}
+  expires_after: None
+  action_hash: 0x3760fbce1140180462185463f931857da24bb094cef287168a2c0048361c0fad
+  r: 0x53fc86793bb76c9bc43442586fe8f8c6c1dfb7533becdd57f18b8d8ad4927306
+  s: 0x58153a15253f5db61ad1ab9db5288c58a38be68141ff6eaa2cf3aaad6dba8f62
+  v: 27
+
+=== F7 order (reduce-only limit Gtc) ===
+  action: {'type': 'perpDeploy', 'star': {'dex': 'test', 'operation': {'proxy': ['0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a', {'order': {'orders': [{'a': 110000, 'b': False, 'p': '95000', 's': '0.01', 'r': True, 't': {'limit': {'tif': 'Gtc'}}}], 'grouping': 'na'}}]}}}
+  expires_after: None
+  action_hash: 0x327e28b121c4fb01b4bd46bd2b73bddc0c73c63902c670b3f1b47f305801495b
+  r: 0x67f0dbe21cdd862071175124dad22ecf10a388ff04ae4837291a4ba6ec90012f
+  s: 0x7d1f4b0ef8845db1123e27bb8bcf9dc4e9020a8977133383d43b7a54433038a8
+  v: 27
+
+=== F8 sendAsset ===
+  action: {'type': 'perpDeploy', 'star': {'dex': 'test', 'operation': {'proxy': ['0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a', {'sendAsset': {'destination': '0x00000000000000000000000000000000000000bb', 'amount': '100.0'}}]}}}
+  expires_after: None
+  action_hash: 0x51049015e40cb534fdc01914d943ad5038f075a3526e9fff93684e17e4d10d9b
+  r: 0xc00dc6455275171fe3373da9cfcc3e430a699ccd39b0911968c4fb4127e86f05
+  s: 0x7ee5952ce1632139f101cb5f7bb0f0538baa47a1ef036e65cb89647e18bed043
+  v: 28
+
+=== F9 setOracle (sorted; String verbatim, Numeric float_to_wire) ===
+  action: {'type': 'perpDeploy', 'star': {'dex': 'test', 'operation': {'setOracle': {'oraclePxs': [('test:BTC', '100000'), ('test:ETH', '4000.0')]}}}}
+  expires_after: None
+  action_hash: 0x29c676723f364d105a613bba414f067c64b5e066dde836e6592e27af939e0b96
+  r: 0x3c7ac8a5b5a8bcb13868a8b0fc8185c1f5e3ce9e4a8860989317c479bc10fd21
+  s: 0x7c7f3a8d49b79ac03313665e4d389c4f51bb6f78ca3558e2ea0069acee44b041
+  v: 27
+
+=== F10 modifyApproval false + expires_after ===
+  action: {'type': 'perpDeploy', 'star': {'dex': 'test', 'operation': {'proxy': ['0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a', {'modifyApproval': False}]}}}
+  expires_after: 1700000060000
+  action_hash: 0x2cc076965b0814e4c3ad2d9d3c13c2c4edcf5466cbc165b6be13a1d28034d8f8
+  r: 0x411d856436717dfe36cad765448c055b81ecc700753568bf92ee95692ec5a103
+  s: 0x26b96a11ca09ca8d8371c9170acd90aaa94314b4f663fd730c9e6116b7ce51e7
+  v: 28

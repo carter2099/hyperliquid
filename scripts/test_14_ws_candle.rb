@@ -3,79 +3,105 @@
 
 # Test 14: WebSocket candle Subscription
 #
-# Subscribes to ETH 1m candles on testnet, prints 3 updates
-# with OHLCV data, then cleanly disconnects.
+# Opens three concurrent candle subscriptions on testnet — ETH/1m, ETH/15m
+# (same coin, different interval) and BTC/1m (different coin) — and checks
+# that every message carries all candle keys and is routed to the matching
+# coin/interval callback. Passes once ETH/1m has delivered 2 updates and
+# ETH/15m at least 1 within 120 s (BTC/1m count is informational).
+#
+# Candle pushes are trade-driven (no snapshot on subscribe). On timeout the
+# script asks Info#recent_trades('ETH') whether ETH trades landed during the
+# window: trades occurred but too few candle updates -> FAIL; no testnet ETH
+# trade flow -> INCONCLUSIVE (exit 75).
 #
 # No private key required (read-only WebSocket).
 #
 # Usage:
 #   ruby scripts/test_14_ws_candle.rb
 
-require_relative '../lib/hyperliquid'
+require_relative 'test_helpers'
 
-def green(text)
-  "\e[32m#{text}\e[0m"
-end
+TEST_NAME = 'Test 14 WebSocket candle'
+REQUIRED_ETH_1M = 2
+TIMEOUT = 120
+SUBS = [%w[ETH 1m], %w[ETH 15m], %w[BTC 1m]].freeze
+CANDLE_KEYS = %w[t T s i o c h l v n].freeze
 
-def red(text)
-  "\e[31m#{text}\e[0m"
-end
-
-puts
-puts '=' * 60
-puts 'TEST 14: WebSocket candle Subscription'
-puts '=' * 60
-puts
-puts 'Network: Testnet'
-puts 'Subscribing to ETH 1m candles (3 updates, then disconnect)'
+sdk = build_public_sdk
+separator('TEST 14: WebSocket candle Subscription')
+puts "Subscribing to #{SUBS.map { |c, i| "#{c}/#{i}" }.join(', ')} candles"
+puts "(need #{REQUIRED_ETH_1M} ETH/1m + 1 ETH/15m updates within #{TIMEOUT}s)"
 puts
 
-sdk = Hyperliquid.new(testnet: true)
-updates = []
+received = Hash.new { |h, k| h[k] = [] }
+routing_errors = []
 mutex = Mutex.new
 done = ConditionVariable.new
+opened_at_ms = nil
 
-sdk.ws.on(:open) { puts 'WebSocket connected.' }
+sdk.ws.on(:open) do
+  mutex.synchronize { opened_at_ms ||= (Time.now.to_f * 1000).to_i }
+  puts 'WebSocket connected.'
+end
 sdk.ws.on(:error) { |e| puts red("WebSocket error: #{e}") }
 
-sdk.ws.subscribe({ type: 'candle', coin: 'ETH', interval: '1m' }) do |data|
-  mutex.synchronize do
-    next if updates.length >= 3
-
-    update_num = updates.length + 1
-    puts "Update #{update_num}/3:"
-    puts "  Symbol:   #{data['s']}"
-    puts "  Interval: #{data['i']}"
-    puts "  Open:     #{data['o']}"
-    puts "  High:     #{data['h']}"
-    puts "  Low:      #{data['l']}"
-    puts "  Close:    #{data['c']}"
-    puts "  Volume:   #{data['v']}"
-    puts
-
-    updates << data
-    done.signal if updates.length >= 3
+SUBS.each do |coin, interval|
+  sdk.ws.subscribe({ type: 'candle', coin: coin, interval: interval }) do |data|
+    mutex.synchronize do
+      key = "#{coin}/#{interval}"
+      missing = CANDLE_KEYS.reject { |k| data.is_a?(Hash) && data.key?(k) }
+      if missing.any? || data['s'] != coin || data['i'] != interval
+        s = data.is_a?(Hash) ? data['s'] : nil
+        i = data.is_a?(Hash) ? data['i'] : nil
+        routing_errors << "#{key} got s=#{s.inspect} i=#{i.inspect} missing=#{missing}"
+      else
+        received[key] << data
+        puts "#{key} update #{received[key].length}: o=#{data['o']} c=#{data['c']} v=#{data['v']} n=#{data['n']}"
+      end
+      done.signal
+    end
   end
 end
 
-# Wait for 3 updates or timeout after 90 seconds (candles can be slow)
-success = false
+satisfied = -> { received['ETH/1m'].length >= REQUIRED_ETH_1M && received['ETH/15m'].length >= 1 }
+deadline = Time.now + TIMEOUT
 mutex.synchronize do
-  deadline = Time.now + 90
-  while updates.length < 3 && Time.now < deadline
-    remaining = deadline - Time.now
-    break if remaining <= 0
-
-    done.wait(mutex, remaining)
-  end
-  success = updates.length >= 3
+  done.wait(mutex, [deadline - Time.now, 0.1].max) while !satisfied.call && routing_errors.empty? && Time.now < deadline
 end
-
+sleep 2 # drain: ETH/15m arrives with the same trade as ETH/1m
 sdk.ws.close
 
-if success
-  puts green('Test 14 WebSocket candle passed!')
-else
-  puts red("Test 14 FAILED: only received #{updates.length}/3 updates within 90s")
-  exit 1
+counts = SUBS.map { |c, i| "#{c}/#{i}=#{received["#{c}/#{i}"].length}" }.join(' ')
+puts
+puts "Updates received: #{counts}"
+
+if routing_errors.any?
+  routing_errors.each { |e| puts red("Routing error: #{e}") }
+  fail!('candle message routed to the wrong subscription or missing keys')
+  test_passed(TEST_NAME)
 end
+
+test_passed(TEST_NAME) if satisfied.call
+
+if received['ETH/1m'].length >= 1 && received['ETH/15m'].empty?
+  fail!('same-coin second interval not routed (ETH/1m updated, ETH/15m did not)')
+  test_passed(TEST_NAME)
+end
+
+if opened_at_ms.nil?
+  fail!('WebSocket never opened')
+  test_passed(TEST_NAME)
+end
+
+window_start = opened_at_ms + 1000
+window_end = (deadline.to_f * 1000).to_i
+blocks = sdk.info.recent_trades('ETH').map { |t| t['time'] }
+            .select { |t| t >= window_start && t <= window_end - 1000 }.uniq.size
+eth_updates = received['ETH/1m'].length
+
+if eth_updates < [blocks, REQUIRED_ETH_1M].min
+  fail!("#{blocks} ETH trade blocks on testnet during the window but only #{eth_updates} candle updates")
+  test_passed(TEST_NAME)
+end
+
+finish_inconclusive(TEST_NAME, "only #{blocks} ETH trade block(s) on testnet in #{TIMEOUT}s — no trade flow to observe")

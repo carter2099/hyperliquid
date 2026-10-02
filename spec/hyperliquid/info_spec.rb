@@ -1270,6 +1270,19 @@ RSpec.describe Hyperliquid::Info do
     end
   end
 
+  describe '#user_star_state' do
+    let(:user_address) { '0x1234567890123456789012345678901234567890' }
+
+    it 'requests userStarState and returns dexToState pairs unchanged' do
+      expected = { 'dexToState' => [['test', { 'isReduceOnly' => false, 'isBackstopLiquidatorDepositAllowed' => true }],
+                                    ['demo', nil]] }
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'userStarState', user: user_address }.to_json)
+        .to_return(status: 200, body: expected.to_json)
+      expect(info.user_star_state(user_address)).to eq(expected)
+    end
+  end
+
   describe '#perp_dex_status' do
     it 'requests perp DEX status for a builder-deployed dex' do
       expected_response = { 'totalNetDeposit' => '12345.67' }
@@ -1444,6 +1457,19 @@ RSpec.describe Hyperliquid::Info do
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.outcome_templates
+      expect(result).to eq(expected_response)
+    end
+  end
+
+  describe '#outcome_deployer_limits' do
+    it 'requests deployer limits for a HIP-4 outcome venue' do
+      expected_response = { 'nDailyOutcomesRemaining' => 50, 'nActiveOutcomesRemaining' => 14 }
+
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'outcomeDeployerLimits', venue: 'ab' }.to_json)
+        .to_return(status: 200, body: expected_response.to_json)
+
+      result = info.outcome_deployer_limits('ab')
       expect(result).to eq(expected_response)
     end
   end
@@ -1685,30 +1711,6 @@ RSpec.describe Hyperliquid::Info do
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.token_details(token_id)
-      expect(result).to eq(expected_response)
-    end
-  end
-
-  describe '#aligned_quote_token_info' do
-    let(:token) { 1328 }
-
-    it 'requests aligned quote token info for a token index' do
-      expected_response = {
-        'isAligned' => true,
-        'firstAlignedTime' => 1_700_000_000_000,
-        'evmMintedSupply' => '1000000.5',
-        'dailyAmountOwed' => [
-          ['2026-04-24', '12.34'],
-          ['2026-04-25', '15.67']
-        ],
-        'predictedRate' => '0.0125'
-      }
-
-      stub_request(:post, info_endpoint)
-        .with(body: { type: 'alignedQuoteTokenInfo', token: token }.to_json)
-        .to_return(status: 200, body: expected_response.to_json)
-
-      result = info.aligned_quote_token_info(token)
       expect(result).to eq(expected_response)
     end
   end
