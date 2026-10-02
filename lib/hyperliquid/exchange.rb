@@ -34,6 +34,12 @@ module Hyperliquid
       @signer.address
     end
 
+    # Redacted representation: never exposes the signer's private key.
+    # @return [String]
+    def inspect
+      "#<#{self.class.name} address=#{address} testnet=#{@testnet} expires_after=#{@expires_after.inspect}>"
+    end
+
     # Place a single order
     # @param coin [String] Asset symbol (e.g., "BTC")
     # @param is_buy [Boolean] True for buy, false for sell
@@ -517,7 +523,7 @@ module Hyperliquid
     def create_sub_account(name:)
       nonce = timestamp_ms
       action = { type: 'createSubAccount', name: name }
-      signature = @signer.sign_l1_action(action, nonce)
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
       post_action(action, signature, nonce, nil)
     end
 
@@ -534,7 +540,7 @@ module Hyperliquid
         isDeposit: is_deposit,
         usd: float_to_usd_int(usd)
       }
-      signature = @signer.sign_l1_action(action, nonce)
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
       post_action(action, signature, nonce, nil)
     end
 
@@ -553,7 +559,7 @@ module Hyperliquid
         token: token,
         amount: amount.to_s
       }
-      signature = @signer.sign_l1_action(action, nonce)
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
       post_action(action, signature, nonce, nil)
     end
 
@@ -570,7 +576,7 @@ module Hyperliquid
         isDeposit: is_deposit,
         usd: float_to_usd_int(usd)
       }
-      signature = @signer.sign_l1_action(action, nonce)
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
       post_action(action, signature, nonce, nil)
     end
 
@@ -580,7 +586,7 @@ module Hyperliquid
     def set_referrer(code:)
       nonce = timestamp_ms
       action = { type: 'setReferrer', code: code }
-      signature = @signer.sign_l1_action(action, nonce)
+      signature = @signer.sign_l1_action(action, nonce, expires_after: @expires_after)
       post_action(action, signature, nonce, nil)
     end
 
@@ -2105,7 +2111,7 @@ module Hyperliquid
 
     # Get current timestamp in milliseconds
     def timestamp_ms
-      (Time.now.to_f * 1000).to_i
+      Process.clock_gettime(Process::CLOCK_REALTIME, :millisecond)
     end
 
     # Find a position for a coin
@@ -2438,6 +2444,7 @@ module Hyperliquid
       star_action(dex, { proxy: [user.downcase, proxy_operation] })
     end
 
+    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     # Convert order type to wire format
     # @param order_type [Hash] Order type configuration
     # @return [Hash] Wire format order type
@@ -2465,6 +2472,7 @@ module Hyperliquid
         raise ArgumentError, 'order_type must specify :limit or :trigger'
       end
     end
+    # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     # Build, sign, and post a `CSignerAction` L1 action whose variant key carries null.
     # @param variant [Symbol] :jailSelf or :unjailSelf

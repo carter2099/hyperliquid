@@ -8,12 +8,24 @@ module Hyperliquid
     # EIP-712 signature generation for Hyperliquid exchange operations
     # Implements the phantom agent signing scheme used by Hyperliquid
     class Signer
+      # Accepted private key format: 32 bytes as 64 hex characters, optional 0x prefix
+      PRIVATE_KEY_FORMAT = /\A(0x)?\h{64}\z/
+      private_constant :PRIVATE_KEY_FORMAT
+
       # Initialize a new signer
       # @param private_key [String] Ethereum private key (hex string with or without 0x prefix)
       # @param testnet [Boolean] Whether to sign for testnet (default: false)
+      # @raise [ArgumentError] if private_key is not 64 hex characters (optionally 0x-prefixed);
+      #   the message never includes the supplied value
       def initialize(private_key:, testnet: false)
         @testnet = testnet
         @key = Eth::Key.new(priv: normalize_private_key(private_key))
+      end
+
+      # Redacted representation: never exposes the private key.
+      # @return [String]
+      def inspect
+        "#<#{self.class.name} address=#{address} testnet=#{@testnet}>"
       end
 
       # Get the wallet address
@@ -104,10 +116,15 @@ module Hyperliquid
 
       private
 
-      # Normalize private key format
+      # Validate and normalize the private key format
       # @param key [String] Private key with or without 0x prefix
       # @return [String] Private key with 0x prefix
+      # @raise [ArgumentError] if the key is not 64 hex characters (the message omits the value)
       def normalize_private_key(key)
+        unless key.is_a?(String) && PRIVATE_KEY_FORMAT.match?(key)
+          raise ArgumentError, 'private_key must be 64 hex characters (32 bytes), optionally 0x-prefixed'
+        end
+
         key.start_with?('0x') ? key : "0x#{key}"
       end
 

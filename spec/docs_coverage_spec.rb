@@ -22,9 +22,10 @@ RSpec.describe 'API documentation coverage' do
   # [H2 title, owner, singleton methods?, names deliberately left out (with reason)]
   surfaces = [
     ['SDK', Hyperliquid, true, []],
-    ['SDK', Hyperliquid::SDK, false, []],
+    # Redacted #inspect is Ruby object protocol, not SDK API.
+    ['SDK', Hyperliquid::SDK, false, %i[inspect]],
     ['Info', Hyperliquid::Info, false, []],
-    ['Exchange', Hyperliquid::Exchange, false, []],
+    ['Exchange', Hyperliquid::Exchange, false, %i[inspect]],
     ['WebSocket', Hyperliquid::WS::Client, false, []],
     ['Client Order IDs (Cloid)', Hyperliquid::Cloid, true, []],
     # Ruby object protocol, not SDK API.
