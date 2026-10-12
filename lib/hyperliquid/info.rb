@@ -180,10 +180,11 @@ module Hyperliquid
     end
 
     # Retrieve a user's subaccounts
-    # @param user [String]
-    # @return [Array]
+    # @param user [String] Wallet address
+    # @return [Array<Hash>, nil] Array of entries with name, subAccountUser, master,
+    #   clearinghouseState and spotState; nil if the user has no subaccounts
     def user_subaccounts(user)
-      @client.post(Constants::INFO_ENDPOINT, { type: 'subaccounts', user: user })
+      @client.post(Constants::INFO_ENDPOINT, { type: 'subAccounts', user: user })
     end
 
     # Retrieve a user's V2 subaccounts (per-dex clearinghouse + spot state)

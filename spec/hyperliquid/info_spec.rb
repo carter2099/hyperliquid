@@ -458,14 +458,31 @@ RSpec.describe Hyperliquid::Info do
     let(:user_address) { '0x1234567890123456789012345678901234567890' }
 
     it "requests user's subaccounts" do
-      expected_response = ['0x1111111111111111111111111111111111111111']
+      expected_response = [
+        {
+          'name' => 'sub1',
+          'subAccountUser' => '0x2222222222222222222222222222222222222222',
+          'master' => user_address,
+          'clearinghouseState' => { 'marginSummary' => { 'accountValue' => '100' } },
+          'spotState' => { 'balances' => [] }
+        }
+      ]
 
       stub_request(:post, info_endpoint)
-        .with(body: { type: 'subaccounts', user: user_address }.to_json)
+        .with(body: { type: 'subAccounts', user: user_address }.to_json)
         .to_return(status: 200, body: expected_response.to_json)
 
       result = info.user_subaccounts(user_address)
       expect(result).to eq(expected_response)
+    end
+
+    it 'returns nil for users with no sub-accounts' do
+      stub_request(:post, info_endpoint)
+        .with(body: { type: 'subAccounts', user: user_address }.to_json)
+        .to_return(status: 200, body: 'null')
+
+      result = info.user_subaccounts(user_address)
+      expect(result).to be_nil
     end
   end
 
