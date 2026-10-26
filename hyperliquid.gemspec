@@ -33,5 +33,8 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'faraday', '~> 2.0'
   spec.add_dependency 'faraday-retry', '~> 2.0'
   spec.add_dependency 'msgpack', '~> 1.7'
+  # Security floor, not a direct API dependency (eth >= 0.5.11 requires rbsecp256k1 ~> 6.0):
+  # 6.0.1+ requires rubyzip ~> 3.4 (GHSA-47m2-wp7j-p9vc); 6.0.0 pinned rubyzip ~> 2.3.
+  spec.add_dependency 'rbsecp256k1', '~> 6.0', '>= 6.0.1'
   spec.add_dependency 'ws_lite', '~> 1.0.1'
 end

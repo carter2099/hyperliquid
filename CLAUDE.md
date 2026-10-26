@@ -207,7 +207,7 @@ GitHub Actions (`.github/workflows/main.yml`) runs on pushes to `main` and `dev`
 - The 3.4 leg then runs a built-gem smoke test:
   - `gem build`;
   - fail if the gem contains any path outside the allowlist;
-  - `gem install` into an empty temp `GEM_HOME`, so dependencies resolve from rubygems the way they do for a consumer, without the lockfile or the rbsecp256k1 fork;
+  - `gem install` into an empty temp `GEM_HOME`, so dependencies resolve from rubygems the way they do for a consumer, without the lockfile;
   - from outside the repo, `require 'hyperliquid'`, check `Hyperliquid::VERSION` against `lib/hyperliquid/version.rb`, and run `Hyperliquid.new(testnet: true)`.
 - The `Ruby 3.3` and `Ruby 3.4` job names are required status checks in the `steward-auto-merge-gate` ruleset on `main`. Never rename the job or change the versions without updating that ruleset. Any new check must be a step inside this job; a new job would not gate auto-merge.
 
@@ -215,9 +215,9 @@ The release workflow (`.github/workflows/release.yml`) runs on `v*` tags. It fai
 
 Dependabot checks Bundler and GitHub Actions dependencies weekly with a 14-day default cooldown. Bundler major updates use a 30-day cooldown.
 
-### rbsecp256k1 git source
+### rbsecp256k1 security floor
 
-The `Gemfile` pins `rbsecp256k1` to Carter's fork (`carter2099/rbsecp256k1`, full-SHA `ref:`, version 6.1.0) because rubygems only has 6.0.0, which requires `rubyzip ~> 2.3` (GHSA-47m2-wp7j-p9vc); the fork requires `rubyzip >= 3.4, < 4` and builds libsecp256k1 0.8.0. This affects only the dev/CI lockfile — a gemspec cannot declare git sources, so consumers of the published gem still resolve rubygems rbsecp256k1 6.0.0 via `eth ~> 0.5`. Dependabot is not expected to bump a SHA-pinned git ref; a Dependabot PR touching rbsecp256k1's source/ref or moving rubyzip below 3.4 must not be applied without Carter. Never `bundle update` it or drop the declaration; moving the ref is a deliberate, reviewed change (re-run the signature-parity specs in `spec/hyperliquid/signing/`). Remove the git source once an upstream rbsecp256k1 release on rubygems allows rubyzip 3.
+`hyperliquid.gemspec` declares `spec.add_dependency 'rbsecp256k1', '~> 6.0', '>= 6.0.1'` although the SDK never calls rbsecp256k1 directly (it arrives via `eth ~> 0.5`; eth ≥ 0.5.11 requires `rbsecp256k1 ~> 6.0`, eth 0.5.0–0.5.10 required `~> 5.1`, so the floor also implies eth ≥ 0.5.11). The floor exists so consumers resolve rubyzip ≥ 3.4: rbsecp256k1 6.0.0 pinned `rubyzip ~> 2.3` (GHSA-47m2-wp7j-p9vc), 6.0.1+ requires `~> 3.4`. rbsecp256k1 uses rubyzip only at install time to unpack its SHA-256-pinned libsecp256k1 archive; nothing loads `Zip` at runtime. Keep the `~> 6.0` cap in step with eth's requirement (widen it in the same change if eth moves to a new rbsecp256k1 major). rbsecp256k1 bumps arrive as ordinary Dependabot updates but swap the native signing library: the full suite — including the fixed-vector signature-parity specs in `spec/hyperliquid/signing/` and `spec/hyperliquid/exchange_spec.rb` — must pass, and the lock must keep rubyzip ≥ 3.4 with no `GIT` source. From 1.9.2 until the release after 2.0.0 the dev/CI lock built rbsecp256k1 from the carter2099 fork; do not reintroduce a git source.
 
 ## Release Flow
 
