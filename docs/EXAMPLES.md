@@ -78,7 +78,9 @@ twap_fills_ranged = sdk.info.user_twap_slice_fills(user_address, start_time_ms, 
 
 # Retrieve a user's subaccounts
 subaccounts = sdk.info.user_subaccounts(user_address)
-# => ["0x1111...", ...]
+# => [{ "name" => "sub1", "subAccountUser" => "0x2222...", "master" => "0x...",
+#       "clearinghouseState" => {...}, "spotState" => {...} }, ...]
+# => nil when the user has no subaccounts
 
 # Retrieve details for a vault
 vault_addr = "0x..."

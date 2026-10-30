@@ -1,5 +1,11 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
+## [Unreleased]
+
+### Fixed
+
+- `Info#user_subaccounts` sent `type: "subaccounts"`, which the API rejects with 422; it now sends `subAccounts`, matching the Python SDK. Its documented return value is now an array of sub-account hashes, or `nil` when the user has none.
+
 ## [2.0.0] - 2026-10-02
 
 ### Breaking

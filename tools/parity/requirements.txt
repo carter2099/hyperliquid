@@ -2,7 +2,7 @@
 # Direct: hyperliquid-python-sdk, eth-account, msgpack; the rest are their resolved transitive deps.
 annotated-types==0.8.0
 bitarray==3.11.0
-certifi==2026.7.22
+certifi==2026.10.19
 charset-normalizer==3.5.2
 ckzg==2.1.8
 cytoolz==1.1.0

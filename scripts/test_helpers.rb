@@ -28,8 +28,10 @@ EXIT_INCONCLUSIVE = 75
 EXIT_SKIPPED = 77
 EXIT_GUARDED = 78
 
-# Response text a key with no Hyperliquid account gets back for a signed action.
-SIGNER_REJECTION = /does not exist|User or API Wallet|Must deposit before performing actions/i
+# Response text a key with no Hyperliquid account gets back for a signed action. For a
+# user-signed action naming another user (userPortfolioMargin), testnet answers
+# "Sub-account <user> is not registered to <recovered signer>" (since 2026-10).
+SIGNER_REJECTION = /does not exist|User or API Wallet|Must deposit before performing actions|is not registered to/i
 FIX_HINT = 'run `ruby scripts/testnet_wallet_check.rb --fix`'
 
 COLOR = $stdout.tty? && ENV['NO_COLOR'].nil?
