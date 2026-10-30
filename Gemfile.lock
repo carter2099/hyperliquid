@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    hyperliquid (2.0.0)
+    hyperliquid (2.0.1)
       bigdecimal (>= 3.1)
       eth (~> 0.5)
       faraday (~> 2.0)

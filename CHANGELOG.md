@@ -1,6 +1,11 @@
 ## [Ruby Hyperliquid SDK Changelog]
 
-## [Unreleased]
+## [2.0.1] - 2026-10-30
+
+### Security
+
+- `hyperliquid` now requires `rbsecp256k1` `~> 6.0, >= 6.0.1`. rbsecp256k1 6.0.1 and later require rubyzip `~> 3.4`, so applications installing this gem resolve a rubyzip release fixed for GHSA-47m2-wp7j-p9vc (CVE-2026-85396); run `bundle update hyperliquid rbsecp256k1 rubyzip` to pick it up. This also requires `eth` 0.5.11 or later, because eth 0.5.0–0.5.10 required rbsecp256k1 5.x.
+- The development and CI lockfile now uses `rbsecp256k1` 6.0.2 from RubyGems instead of the `carter2099/rbsecp256k1` fork. Applications that added the fork line from the 1.9.2 README can remove it; keeping it also satisfies the new requirement.
 
 ### Fixed
 
